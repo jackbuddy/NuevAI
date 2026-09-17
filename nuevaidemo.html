@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0d3443" />
+    <title>NuevAI — Nueva community portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      window.tailwind = window.tailwind || {};
+      window.tailwind.config = {
+          theme: {
+            extend: {
+              colors: {
+                ink: "#102D3B",
+                teal: { 50: "#ECF7F4", 100: "#D8EFE9", 500: "#12816D", 600: "#0D695A", 700: "#0A564A" },
+                coral: { 50: "#FFF3ED", 100: "#FFE2D3", 400: "#F47F52", 500: "#E66335" },
+                parchment: "#F7F7F3",
+                cloud: "#F1F5F4"
+              },
+              boxShadow: {
+                soft: "0 18px 45px -24px rgba(16,45,59,.26)",
+                float: "0 24px 70px -28px rgba(11,62,69,.38)"
+              },
+              animation: {
+                rise: "rise .45s ease-out both",
+                pop: "pop .22s ease-out both"
+              },
+              keyframes: {
+                rise: { from: { opacity: 0, transform: "translateY(12px)" }, to: { opacity: 1, transform: "translateY(0)" } },
+                pop: { from: { opacity: 0, transform: "scale(.96)" }, to: { opacity: 1, transform: "scale(1)" } }
+              }
+            }
+          }
+        };
+    </script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      html { scroll-behavior: smooth; }
+      body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      ::selection { background: #D8EFE9; color: #102D3B; }
+      .soft-grid { background-image: radial-gradient(rgba(18,129,109,.12) 1px, transparent 1px); background-size: 20px 20px; }
+      .hide-scrollbar::-webkit-scrollbar { display: none; }
+      .hide-scrollbar { scrollbar-width: none; }
+    </style>
+  </head>
+  <body class="min-h-screen bg-parchment text-ink antialiased">
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useMemo, useRef, useState, useEffect } = React;
+
+      const Icon = ({ name, size = 18, className = "" }) => {
+        const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "round", strokeLinejoin: "round", className, "aria-hidden": true };
+        const paths = {
+          spark: <><path d="m12 3-1.4 5.6L5 10l5.6 1.4L12 17l1.4-5.6L19 10l-5.6-1.4L12 3Z"/><path d="m19 16-.6 2.4L16 19l2.4.6L19 22l.6-2.4L22 19l-2.4-.6L19 16Z"/></>,
+          grid: <><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
+          calendar: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></>,
+          message: <><path d="M20 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h9a4 4 0 0 1 4 4v8Z"/><path d="M8 10h8M8 14h5"/></>,
+          book: <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></>,
+          chevron: <path d="m9 18 6-6-6-6"/>,
+          down: <path d="m6 9 6 6 6-6"/>,
+          close: <><path d="m6 6 12 12M18 6 6 18"/></>,
+          plus: <path d="M12 5v14M5 12h14"/>,
+          check: <path d="m5 12 4 4L19 6"/>,
+          clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
+          pin: <><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2"/></>,
+          send: <><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></>,
+          external: <><path d="M14 3h7v7M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></>,
+          sliders: <><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></>,
+          wifi: <><path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><path d="M12 20h.01"/></>,
+          printer: <><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></>,
+          bell: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></>,
+          arrow: <><path d="M5 12h14M13 6l6 6-6 6"/></>,
+          dots: <><circle cx="5" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="19" cy="12" r="1" fill="currentColor"/></>,
+          user: <><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></>,
+          lock: <><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></>,
+          building: <><path d="M4 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18M2 22h20M8 6h2M8 10h2M8 14h2M16 8h2M16 12h2M16 16h2"/></>,
+          sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></>
+        };
+        return <svg {...common}>{paths[name] || paths.spark}</svg>;
+      };
+
+      const initialAssignments = [
+        { id: 1, course: "Humanities 11", title: "Comparative essay outline", due: "Today · 11:59 PM", color: "bg-[#FEE5D7] text-[#A94B26]", done: false },
+        { id: 2, course: "Physics", title: "Lab: momentum data review", due: "Tomorrow · 8:30 AM", color: "bg-[#E0EFFB] text-[#246B96]", done: false },
+        { id: 3, course: "Advanced Math", title: "Problem set 4", due: "Thu · 10:00 AM", color: "bg-[#E9E5FA] text-[#6653AA]", done: true },
+        { id: 4, course: "Spanish", title: "Conversation reflection", due: "Fri · 3:00 PM", color: "bg-[#DFF2E9] text-[#247458]", done: false }
+      ];
+
+      const calendarEvents = [
+        { id: 1, time: "8:00", meridiem: "AM", title: "Physics · Lab 3", detail: "Bring your lab notebook and safety glasses.", place: "Room 218", tag: "Academic", color: "border-l-[#12816D] bg-[#EFF9F6]" },
+        { id: 2, time: "12:15", meridiem: "PM", title: "Robotics club", detail: "Final build session before Saturday's scrimmage.", place: "Innovation Studio", tag: "Clubs", color: "border-l-[#E66335] bg-[#FFF6F1]" },
+        { id: 3, time: "4:30", meridiem: "PM", title: "Varsity volleyball · Home", detail: "vs. Eastside. Student section opens at 4:00 PM.", place: "Moran Gym", tag: "Athletics", color: "border-l-[#5367B4] bg-[#F2F3FC]" }
+      ];
+
+      const quickActions = [
+        { id: "room", title: "Book a room", subtitle: "Study spaces & wellness pods", icon: "building", tint: "bg-[#EAF4F1] text-teal-600" },
+        { id: "hours", title: "Facility hours", subtitle: "Library, gym & dining", icon: "clock", tint: "bg-[#FFF1E9] text-coral-500" },
+        { id: "course", title: "Course selection", subtitle: "Explore paths & teachers", icon: "book", tint: "bg-[#EEF0FC] text-[#5367B4]" }
+      ];
+
+      const resources = [
+        { icon: "wifi", title: "IT essentials", description: "Wi‑Fi, printing, laptop care, and support hours.", links: 14, tint: "bg-[#EAF4F1] text-teal-600" },
+        { icon: "book", title: "Student handbook", description: "Policies, schedules, community expectations, and support.", links: 8, tint: "bg-[#FFF2E8] text-coral-500" },
+        { icon: "calendar", title: "Campus life", description: "Clubs, traditions, affinity spaces, and events.", links: 21, tint: "bg-[#EEF0FC] text-[#5367B4]" },
+        { icon: "user", title: "People & places", description: "Teacher profiles, offices, and helpful contacts.", links: 36, tint: "bg-[#F5EFFF] text-[#7852A1]" }
+      ];
+
+      const exampleMessages = [
+        { id: 1, speaker: "Student", from: "user", text: "How do I set up the library printer on my laptop?" },
+        { id: 2, speaker: "NuevAI", from: "ai", text: "Start with the IT Print Setup guide. You’ll install the managed printer profile, then choose “Nueva Library” from the print menu. I can open the steps for you." },
+        { id: 3, speaker: "Parent", from: "user", text: "What time is afternoon pickup today?" },
+        { id: 4, speaker: "NuevAI", from: "ai", text: "Middle school pickup begins at 3:20 PM; upper school pickup begins at 3:35 PM. The Friday traffic plan is in effect today." },
+        { id: 5, speaker: "Teacher", from: "user", text: "Where can I find the field-trip permission policy?" },
+        { id: 6, speaker: "NuevAI", from: "ai", text: "It’s in the Faculty Handbook under Experiential Learning. I found the current form and the five-day family notice guideline." }
+      ];
+
+      const cn = (...classes) => classes.filter(Boolean).join(" ");
+
+      function App() {
+        const [activeTab, setActiveTab] = useState("dashboard");
+        const [loggedIn, setLoggedIn] = useState(true);
+        const [profileOpen, setProfileOpen] = useState(false);
+        const [chatOpen, setChatOpen] = useState(false);
+        const [assignments, setAssignments] = useState(initialAssignments);
+        const [expandedEvent, setExpandedEvent] = useState(2);
+        const [calendarFilter, setCalendarFilter] = useState("All");
+        const [modal, setModal] = useState(null);
+        const [toast, setToast] = useState(null);
+        const [interests, setInterests] = useState(["Science Friday", "Robotics", "Volleyball"]);
+        const [digestOn, setDigestOn] = useState(true);
+        const [notificationOn, setNotificationOn] = useState(true);
+
+        const notify = (message) => {
+          setToast(message);
+          window.clearTimeout(window.__nuevaiToast);
+          window.__nuevaiToast = window.setTimeout(() => setToast(null), 3000);
+        };
+
+        const navigate = (tab) => {
+          setActiveTab(tab);
+          setChatOpen(false);
+          setProfileOpen(false);
+        };
+
+        const toggleAssignment = (id) => {
+          setAssignments((items) => items.map((item) => item.id === id ? { ...item, done: !item.done } : item));
+        };
+
+        const toggleInterest = (interest) => {
+          setInterests((list) => list.includes(interest) ? list.filter((item) => item !== interest) : [...list, interest]);
+        };
+
+        const openChat = (prompt = "") => {
+          setChatOpen(true);
+          setProfileOpen(false);
+          window.setTimeout(() => document.getElementById("chat-composer")?.focus(), 50);
+        };
+
+        const signIn = () => {
+          setLoggedIn(true);
+          notify("Demo sign-in complete — welcome, Jack.");
+        };
+
+        const signOut = () => {
+          setLoggedIn(false);
+          setProfileOpen(false);
+          setActiveTab("dashboard");
+          notify("You’re viewing the guest demo.");
+        };
+
+        return (
+          <div className="min-h-screen overflow-x-hidden">
+            <Header
+              activeTab={activeTab}
+              onNavigate={navigate}
+              loggedIn={loggedIn}
+              onSignIn={signIn}
+              profileOpen={profileOpen}
+              setProfileOpen={setProfileOpen}
+              onSignOut={signOut}
+              openSettings={() => setModal("settings")}
+              onOpenChat={() => setChatOpen(true)}
+            />
+
+            <main className="mx-auto max-w-7xl px-4 pb-20 pt-7 sm:px-6 lg:px-8">
+              {activeTab === "dashboard" && <Dashboard
+                assignments={assignments}
+                toggleAssignment={toggleAssignment}
+                calendarEvents={calendarEvents}
+                expandedEvent={expandedEvent}
+                setExpandedEvent={setExpandedEvent}
+                openChat={openChat}
+                openModal={setModal}
+                digestOn={digestOn}
+                interests={interests}
+                loggedIn={loggedIn}
+              />}
+              {activeTab === "calendar" && <CalendarPage
+                events={calendarEvents}
+                filter={calendarFilter}
+                setFilter={setCalendarFilter}
+                expandedEvent={expandedEvent}
+                setExpandedEvent={setExpandedEvent}
+                openModal={setModal}
+              />}
+              {activeTab === "chat" && <ChatPage openChat={openChat} />}
+              {activeTab === "resources" && <ResourcesPage resources={resources} openModal={setModal} openChat={openChat} />}
+            </main>
+
+            <Footer onLink={(label) => notify(`${label} is a demo link.`)} />
+
+            {activeTab !== "chat" && <ChatLauncher open={chatOpen} setOpen={setChatOpen} openChat={openChat} />}
+            {chatOpen && <ChatDrawer close={() => setChatOpen(false)} notify={notify} />}
+
+            {modal && <Modal
+              type={modal}
+              close={() => setModal(null)}
+              interests={interests}
+              toggleInterest={toggleInterest}
+              digestOn={digestOn}
+              setDigestOn={setDigestOn}
+              notificationOn={notificationOn}
+              setNotificationOn={setNotificationOn}
+              notify={notify}
+            />}
+
+            {toast && <div role="status" className="fixed bottom-6 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2 rounded-full bg-ink px-4 py-3 text-sm font-medium text-white shadow-float animate-pop"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-teal-500"><Icon name="check" size={13}/></span>{toast}</div>}
+          </div>
+        );
+      }
+
+      function Header({ activeTab, onNavigate, loggedIn, onSignIn, profileOpen, setProfileOpen, onSignOut, openSettings, onOpenChat }) {
+        const tabs = [
+          { id: "dashboard", label: "Dashboard", icon: "grid" },
+          { id: "calendar", label: "Calendar", icon: "calendar" },
+          { id: "chat", label: "Chat", icon: "message" },
+          { id: "resources", label: "Resources", icon: "book" }
+        ];
+        return <header className="sticky top-0 z-40 border-b border-[#DDE6E3]/80 bg-[#F7F7F3]/90 backdrop-blur-xl">
+          <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+            <button onClick={() => onNavigate("dashboard")} className="group flex shrink-0 items-center gap-2.5 text-left" aria-label="NuevAI home">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-ink text-[#BDEADD] shadow-sm transition-transform duration-300 group-hover:rotate-6"><Icon name="spark" size={20}/></span>
+              <span className="text-[20px] font-semibold tracking-[-0.045em]">Nuev<span className="text-teal-600">AI</span></span>
+            </button>
+            <nav className="hide-scrollbar hidden items-center gap-1 overflow-x-auto md:flex" aria-label="Main navigation">
+              {tabs.map((tab) => <button key={tab.id} onClick={() => onNavigate(tab.id)} className={cn("flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium transition", activeTab === tab.id ? "bg-white text-ink shadow-sm ring-1 ring-[#E2EAE7]" : "text-[#54706F] hover:bg-white/70 hover:text-ink")}><Icon name={tab.icon} size={16}/>{tab.label}</button>)}
+            </nav>
+            <div className="flex items-center gap-2">
+              <button onClick={onOpenChat} className="hidden rounded-xl p-2.5 text-[#54706F] transition hover:bg-white hover:text-teal-600 sm:flex" aria-label="Open chat"><Icon name="bell" size={18}/></button>
+              {loggedIn ? <div className="relative">
+                <button onClick={() => setProfileOpen(!profileOpen)} className="flex items-center gap-2 rounded-xl border border-transparent p-1.5 pr-2 text-left transition hover:border-[#DDE6E3] hover:bg-white" aria-expanded={profileOpen} aria-label="Open profile menu">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#F6C9A9] text-xs font-bold text-[#7E3F24]">JB</span><span className="hidden text-sm font-medium sm:block">Jack</span><Icon name="down" size={14} className="text-[#6C8684]"/>
+                </button>
+                {profileOpen && <div className="absolute right-0 top-12 w-52 overflow-hidden rounded-2xl border border-[#E1EAE7] bg-white p-1.5 shadow-float animate-pop">
+                  <div className="border-b border-[#EDF1EF] px-3 py-2.5"><p className="text-sm font-semibold">Jack Budd</p><p className="mt-0.5 text-xs text-[#6A8381]">Upper School · Class of 2027</p></div>
+                  <button onClick={openSettings} className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-[#415F5E] hover:bg-[#F3F7F5]"><Icon name="sliders" size={16}/>Settings</button>
+                  <button onClick={onSignOut} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-coral-500 hover:bg-coral-50"><Icon name="close" size={16}/>Log out</button>
+                </div>}
+              </div> : <button onClick={onSignIn} className="rounded-xl bg-ink px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#1B4552]">Log in / Sign up</button>}
+            </div>
+          </div>
+          <nav className="hide-scrollbar flex gap-1 overflow-x-auto border-t border-[#E5ECE9] px-4 py-2 md:hidden" aria-label="Mobile navigation">
+            {tabs.map((tab) => <button key={tab.id} onClick={() => onNavigate(tab.id)} className={cn("flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold", activeTab === tab.id ? "bg-teal-50 text-teal-700" : "text-[#5F7775]")}><Icon name={tab.icon} size={14}/>{tab.label}</button>)}
+          </nav>
+        </header>;
+      }
+
+      function SectionLabel({ children, action, onAction }) {
+        return <div className="mb-4 flex items-center justify-between gap-4"><h2 className="text-base font-semibold tracking-[-0.02em] text-ink">{children}</h2>{action && <button onClick={onAction} className="flex items-center gap-1 text-xs font-semibold text-teal-600 transition hover:text-teal-700">{action}<Icon name="chevron" size={14}/></button>}</div>;
+      }
+
+      function Dashboard({ assignments, toggleAssignment, calendarEvents, expandedEvent, setExpandedEvent, openChat, openModal, digestOn, interests, loggedIn }) {
+        const complete = assignments.filter((item) => item.done).length;
+        return <div className="animate-rise">
+          <section className="relative overflow-hidden rounded-3xl bg-ink px-6 py-7 text-white shadow-float sm:px-9 sm:py-9">
+            <div className="soft-grid pointer-events-none absolute inset-0 opacity-40"></div>
+            <div className="absolute -right-20 -top-28 h-64 w-64 rounded-full bg-teal-500/20 blur-3xl"></div>
+            <div className="relative grid items-end gap-6 lg:grid-cols-[1fr_370px]">
+              <div>
+                <div className="mb-3 flex items-center gap-2 text-sm font-medium text-[#BDEADD]"><span className="h-2 w-2 rounded-full bg-[#F7A982] animate-pulse"></span>Tuesday, September 3</div>
+                <h1 className="max-w-2xl text-3xl font-semibold tracking-[-0.055em] sm:text-4xl">{loggedIn ? "Hey Jack, here’s what’s happening today." : "Welcome to a calmer school day."}</h1>
+                <p className="mt-3 max-w-xl text-sm leading-6 text-[#C5D7D6]">A little less digging, a little more doing. Your school life—connected in one thoughtful place.</p>
+              </div>
+              <button onClick={() => openChat()} className="group flex min-h-[66px] w-full items-center gap-3 rounded-2xl bg-white p-2.5 text-left text-[#74908D] shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-600"><Icon name="spark" size={21}/></span>
+                <span className="flex-1 text-sm">Ask NuevAI anything...</span><span className="mr-1 flex h-8 w-8 items-center justify-center rounded-lg border border-[#E5EEEB] text-ink transition group-hover:border-teal-200 group-hover:text-teal-600"><Icon name="arrow" size={16}/></span>
+              </button>
+            </div>
+          </section>
+
+          <section className="mt-8 grid gap-5 lg:grid-cols-2">
+            <article className="rounded-3xl border border-[#E0E9E5] bg-white p-5 shadow-soft sm:p-6">
+              <SectionLabel action="View all" onAction={() => openModal("assignments")}>To-do / assignments</SectionLabel>
+              <div className="mb-5 flex items-end justify-between"><div><p className="text-3xl font-semibold tracking-[-0.05em]">{complete}<span className="text-[#94AAA8]">/{assignments.length}</span></p><p className="mt-1 text-xs text-[#6A8381]">tasks finished this week</p></div><div className="w-32"><div className="mb-2 flex justify-between text-[11px] font-semibold text-[#6A8381]"><span>Momentum</span><span>{Math.round((complete / assignments.length) * 100)}%</span></div><div className="h-2 overflow-hidden rounded-full bg-[#EAF1EE]"><div className="h-full rounded-full bg-teal-500 transition-all duration-500" style={{width: `${(complete / assignments.length) * 100}%`}}></div></div></div></div>
+              <div className="space-y-2">
+                {assignments.slice(0, 3).map((item) => <button key={item.id} onClick={() => toggleAssignment(item.id)} className="group flex w-full items-center gap-3 rounded-2xl border border-transparent px-2 py-2 text-left transition hover:border-[#E2EBE7] hover:bg-[#FBFCFB]">
+                  <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition", item.done ? "border-teal-500 bg-teal-500 text-white" : "border-[#BED0CA] bg-white group-hover:border-teal-400")}>{item.done && <Icon name="check" size={13}/>}</span>
+                  <span className="min-w-0 flex-1"><span className={cn("block truncate text-sm font-medium", item.done && "text-[#9AADAA] line-through")}>{item.title}</span><span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-[#79908E]"><span className={cn("rounded-md px-1.5 py-0.5 font-semibold", item.color)}>{item.course}</span>· {item.due}</span></span>
+                </button>)}
+              </div>
+            </article>
+
+            <article className="rounded-3xl border border-[#E0E9E5] bg-white p-5 shadow-soft sm:p-6">
+              <SectionLabel action="Open calendar" onAction={() => openModal("calendarNote")}>Today’s calendar</SectionLabel>
+              <div className="space-y-2.5">
+                {calendarEvents.map((event) => <div key={event.id} className={cn("overflow-hidden rounded-2xl border border-[#E3ECE8] border-l-4 transition", event.color)}>
+                  <button onClick={() => setExpandedEvent(expandedEvent === event.id ? null : event.id)} className="flex w-full items-center gap-3 px-3 py-3 text-left"><span className="w-10 shrink-0 text-right"><span className="block text-sm font-bold leading-4">{event.time}</span><span className="text-[10px] font-semibold text-[#6D8683]">{event.meridiem}</span></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{event.title}</span><span className="mt-0.5 flex items-center gap-1 text-[11px] text-[#6D8683]"><Icon name="pin" size={12}/>{event.place}</span></span><span className={cn("text-[#6D8683] transition-transform", expandedEvent === event.id && "rotate-90")}><Icon name="chevron" size={16}/></span></button>
+                  {expandedEvent === event.id && <div className="border-t border-[#E3ECE8] bg-white/75 px-4 py-3 pl-[68px] animate-rise"><p className="text-xs leading-5 text-[#55706D]">{event.detail}</p><button onClick={() => openChat(`Tell me more about ${event.title}`)} className="mt-2 text-xs font-semibold text-teal-600 hover:text-teal-700">Ask NuevAI about this →</button></div>}
+                </div>)}
+              </div>
+            </article>
+
+            <article className="relative overflow-hidden rounded-3xl border border-[#E0E9E5] bg-[#FFFCF8] p-5 shadow-soft sm:p-6">
+              <div className="absolute right-[-34px] top-[-34px] h-28 w-28 rounded-full bg-coral-100/60"></div>
+              <div className="relative"><SectionLabel action="Customize" onAction={() => openModal("digest")}>Your weekly digest</SectionLabel>
+                <div className="rounded-2xl border border-[#F3E4DB] bg-white p-4"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-coral-50 text-coral-500"><Icon name="sun" size={17}/></span><div><p className="text-sm font-semibold">Friday, in your orbit</p><p className="text-[11px] text-[#718784]">Ready for 8:00 AM</p></div></div><span className={cn("h-2.5 w-2.5 rounded-full", digestOn ? "bg-teal-500" : "bg-[#B5C4C1]")}></span></div>
+                  <div className="mt-4 space-y-2 border-t border-[#F2EDE9] pt-3"><p className="text-xs leading-5 text-[#506B68]">Science Friday speakers, <span className="font-semibold">Robotics</span> build night, and a <span className="font-semibold">Volleyball</span> home game are on your list.</p><div className="flex items-center gap-1.5">{interests.slice(0,3).map((interest) => <span key={interest} className="rounded-full bg-[#FFF2EA] px-2 py-1 text-[10px] font-semibold text-[#A14D2A]">{interest}</span>)}</div></div>
+                </div>
+              </div>
+            </article>
+
+            <article className="rounded-3xl border border-[#E0E9E5] bg-white p-5 shadow-soft sm:p-6"><SectionLabel>Quick actions</SectionLabel><div className="grid gap-2.5 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+              {quickActions.map((action) => <button key={action.id} onClick={() => openModal(action.id)} className="group rounded-2xl border border-[#E6EEEB] p-3 text-left transition hover:-translate-y-1 hover:border-teal-200 hover:shadow-md"><span className={cn("mb-3 flex h-9 w-9 items-center justify-center rounded-xl", action.tint)}><Icon name={action.icon} size={18}/></span><span className="block text-xs font-semibold text-ink">{action.title}</span><span className="mt-1 block text-[11px] leading-4 text-[#728986]">{action.subtitle}</span></button>)}
+            </div></article>
+          </section>
+
+          <section className="mt-7 grid gap-4 rounded-3xl border border-[#DDE9E5] bg-[#EAF4F1] p-5 sm:grid-cols-[1fr_auto] sm:items-center sm:p-6"><div className="flex items-start gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-teal-600 shadow-sm"><Icon name="spark" size={20}/></span><div><p className="text-sm font-semibold">NuevAI learns what’s useful—without sharing private conversations.</p><p className="mt-1 text-xs leading-5 text-[#54716E]">Ask a question, check the sources, then let us know if it helped. Community questions become resources only after staff review.</p></div></div><button onClick={() => openChat()} className="rounded-xl bg-ink px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1A4653]">Try a question</button></section>
+        </div>;
+      }
+
+      function CalendarPage({ events, filter, setFilter, expandedEvent, setExpandedEvent, openModal }) {
+        const filters = ["All", "Academic", "Clubs", "Athletics"];
+        const shown = filter === "All" ? events : events.filter((event) => event.tag === filter);
+        return <div className="animate-rise"><section className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="mb-2 text-sm font-semibold text-teal-600">YOUR WEEK, YOUR WAY</p><h1 className="text-3xl font-semibold tracking-[-.05em]">The week at Nueva.</h1><p className="mt-2 max-w-xl text-sm leading-6 text-[#627C79]">Follow exactly what matters to you—without the everything-all-at-once calendar.</p></div><button onClick={() => openModal("calendarNote")} className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D5E3DE] bg-white px-4 py-2.5 text-sm font-semibold text-[#365B56] transition hover:border-teal-300 hover:text-teal-700"><Icon name="plus" size={16}/>Add a calendar</button></section>
+          <div className="mb-5 flex flex-wrap gap-2">{filters.map((item) => <button key={item} onClick={() => setFilter(item)} className={cn("rounded-full px-3.5 py-2 text-xs font-semibold transition", filter === item ? "bg-ink text-white shadow-sm" : "border border-[#D9E5E0] bg-white text-[#607A77] hover:border-teal-300 hover:text-teal-700")}>{item}</button>)}</div>
+          <section className="grid gap-5 lg:grid-cols-[1.2fr_.8fr]"><article className="rounded-3xl border border-[#E0E9E5] bg-white p-5 shadow-soft sm:p-6"><div className="mb-5 flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-[.14em] text-[#7E9692]">Tuesday</p><p className="mt-1 text-2xl font-semibold tracking-[-.04em]">September 3</p></div><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-50 text-teal-600"><Icon name="calendar" size={20}/></span></div><div className="space-y-3">{shown.map((event) => <button key={event.id} onClick={() => setExpandedEvent(expandedEvent === event.id ? null : event.id)} className={cn("w-full overflow-hidden rounded-2xl border border-[#E1EBE7] border-l-4 text-left transition hover:shadow-sm", event.color)}><div className="flex gap-4 px-4 py-4"><span className="w-12 pt-0.5 text-right"><strong className="block text-base leading-4">{event.time}</strong><span className="text-[10px] font-semibold text-[#6E8784]">{event.meridiem}</span></span><span className="flex-1"><span className="flex items-center justify-between gap-3"><strong className="text-sm">{event.title}</strong><span className="rounded-md bg-white/80 px-1.5 py-0.5 text-[10px] font-bold text-[#647D79]">{event.tag}</span></span><span className="mt-1 flex items-center gap-1 text-xs text-[#68807D]"><Icon name="pin" size={13}/>{event.place}</span></span></div>{expandedEvent === event.id && <div className="border-t border-[#DFE9E5] bg-white/85 px-5 py-4 pl-[80px] animate-rise"><p className="text-sm leading-6 text-[#526C68]">{event.detail}</p><div className="mt-3 flex gap-2"><button onClick={(e) => {e.stopPropagation(); openModal("calendarNote")}} className="rounded-lg bg-ink px-3 py-2 text-xs font-semibold text-white">Follow event</button><button onClick={(e) => {e.stopPropagation(); openModal("digest")}} className="rounded-lg border border-[#DCE7E2] bg-white px-3 py-2 text-xs font-semibold text-[#4B6864]">Add to digest</button></div></div>}</button>)}</div></article>
+          <aside className="rounded-3xl bg-ink p-6 text-white shadow-float"><p className="text-xs font-semibold uppercase tracking-[.14em] text-[#BDEADD]">Your calendar mix</p><h2 className="mt-2 text-2xl font-semibold tracking-[-.04em]">Busy, not buried.</h2><p className="mt-3 text-sm leading-6 text-[#C9D8D6]">You’re following 5 calendars. Toggle only the events that belong in your week.</p><div className="mt-6 space-y-2.5">{["Academic schedule", "Robotics", "Volleyball", "Science Friday"].map((item, index) => <button key={item} onClick={() => openModal("calendarNote")} className="flex w-full items-center justify-between rounded-xl bg-white/8 px-3 py-3 text-left text-sm transition hover:bg-white/14"><span className="flex items-center gap-2"><span className={cn("h-2.5 w-2.5 rounded-full", ["bg-teal-400","bg-coral-400","bg-[#9DAAFF]","bg-[#F9D36C]"][index])}></span>{item}</span><Icon name="chevron" size={15} className="text-[#AEC7C4]"/></button>)}</div></aside></section></div>;
+      }
+
+      function ChatPage({ openChat }) {
+        return <div className="animate-rise"><section className="grid gap-6 lg:grid-cols-[.78fr_1.22fr]"><div className="rounded-3xl bg-ink p-6 text-white shadow-float sm:p-8"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-500/20 text-[#BDEADD]"><Icon name="spark" size={22}/></span><p className="mt-6 text-xs font-semibold uppercase tracking-[.14em] text-[#BDEADD]">A more helpful school portal</p><h1 className="mt-2 text-3xl font-semibold tracking-[-.055em]">Ask in your own words.</h1><p className="mt-3 text-sm leading-6 text-[#CADBD8]">NuevAI pulls together approved school resources and gives you a clear, cited place to start.</p><div className="mt-7 space-y-2">{["What’s happening after school?", "Where can I get tech help?", "Which classes fit my interests?"].map((question) => <button key={question} onClick={() => openChat(question)} className="flex w-full items-center justify-between rounded-xl bg-white/8 px-3.5 py-3 text-left text-sm text-[#EFF8F6] transition hover:bg-white/14"><span>{question}</span><Icon name="arrow" size={15} className="text-[#BDEADD]"/></button>)}</div></div><div className="rounded-3xl border border-[#DEE9E5] bg-white p-5 shadow-soft sm:p-7"><div className="mb-6 flex items-center justify-between"><div><p className="text-sm font-semibold">NuevAI conversations</p><p className="mt-1 text-xs text-[#748A87]">Examples across the Nueva community</p></div><button onClick={() => openChat()} className="rounded-xl bg-teal-600 px-3.5 py-2.5 text-xs font-semibold text-white transition hover:bg-teal-700">Start a chat</button></div><div className="space-y-3">{exampleMessages.map((message) => <div key={message.id} className={cn("flex gap-2.5", message.from === "user" && "justify-end")}><span className={cn("mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold", message.from === "ai" ? "bg-teal-50 text-teal-600" : "order-2 bg-[#F5E6DC] text-[#9A542F]")}>{message.from === "ai" ? <Icon name="spark" size={15}/> : message.speaker.charAt(0)}</span><div className={cn("max-w-[80%] rounded-2xl px-3.5 py-3 text-sm leading-5", message.from === "ai" ? "bg-[#F2F7F5] text-[#365550]" : "bg-ink text-white")}><p className={cn("mb-1 text-[10px] font-bold uppercase tracking-[.09em]", message.from === "ai" ? "text-teal-600" : "text-[#BDEADD]")}>{message.speaker}</p>{message.text}</div></div>)}</div></div></section></div>;
+      }
+
+      function ResourcesPage({ resources, openModal, openChat }) {
+        const [expandedFaq, setExpandedFaq] = useState(0);
+        const faqs = [
+          ["How does NuevAI know what is current?", "Each answer is meant to point back to an approved source. In the full product, school staff would control what sources are indexed and when they are reviewed."],
+          ["Can NuevAI see everyone’s Canvas work?", "No. The proposed dashboard would retrieve only the signed-in student’s permitted information. This demo contains no real data or connections."],
+          ["What if I need a human?", "NuevAI should make it easy to find the right office, teacher, or support channel when a question needs personal help."]
+        ];
+        return <div className="animate-rise"><section className="mb-7 rounded-3xl bg-[#EAF4F1] px-6 py-7 sm:px-8"><p className="text-xs font-semibold uppercase tracking-[.15em] text-teal-600">KNOW WHERE TO LOOK</p><h1 className="mt-2 text-3xl font-semibold tracking-[-.05em]">Helpful, without the scavenger hunt.</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-[#597470]">Start with a trusted resource—or ask NuevAI to help you find the right next step.</p><button onClick={() => openChat()} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1A4653]"><Icon name="spark" size={16}/>Ask a question</button></section><section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{resources.map((resource) => <button key={resource.title} onClick={() => openModal("resource")} className="group rounded-3xl border border-[#E0E9E5] bg-white p-5 text-left shadow-soft transition hover:-translate-y-1 hover:border-teal-200 hover:shadow-md"><span className={cn("flex h-10 w-10 items-center justify-center rounded-xl", resource.tint)}><Icon name={resource.icon} size={19}/></span><h2 className="mt-5 text-base font-semibold">{resource.title}</h2><p className="mt-2 text-sm leading-5 text-[#6B8380]">{resource.description}</p><span className="mt-5 flex items-center gap-1 text-xs font-semibold text-teal-600">{resource.links} guides <Icon name="chevron" size={14}/></span></button>)}</section><section className="mt-7 grid gap-5 lg:grid-cols-[.9fr_1.1fr]"><aside className="rounded-3xl border border-[#E0E9E5] bg-white p-6 shadow-soft"><p className="text-xs font-semibold uppercase tracking-[.14em] text-[#7C9290]">RECENTLY UPDATED</p><div className="mt-4 space-y-3">{["Fall athletic schedules", "Library late-hours policy", "Peer tutoring sign-up guide"].map((item, i) => <button key={item} onClick={() => openModal("resource")} className="flex w-full items-center gap-3 rounded-xl border border-[#E4ECE9] px-3 py-3 text-left transition hover:border-teal-200 hover:bg-teal-50/40"><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#F4F7F6] text-teal-600"><Icon name={i === 0 ? "calendar" : i === 1 ? "clock" : "user"} size={14}/></span><span className="flex-1 text-sm font-medium">{item}</span><Icon name="chevron" size={15} className="text-[#7E9693]"/></button>)}</div></aside><div className="rounded-3xl border border-[#E0E9E5] bg-white p-6 shadow-soft"><p className="text-xs font-semibold uppercase tracking-[.14em] text-[#7C9290]">ABOUT NUEVAI</p><h2 className="mt-2 text-xl font-semibold tracking-[-.035em]">A little clarity goes a long way.</h2><div className="mt-4 divide-y divide-[#E7EEEB]">{faqs.map(([question, answer], index) => <button key={question} onClick={() => setExpandedFaq(expandedFaq === index ? null : index)} className="w-full py-3.5 text-left"><span className="flex items-center justify-between gap-3 text-sm font-semibold"><span>{question}</span><span className={cn("text-teal-600 transition-transform", expandedFaq === index && "rotate-90")}><Icon name="chevron" size={16}/></span></span>{expandedFaq === index && <p className="pr-6 pt-2 text-sm leading-6 text-[#607A76] animate-rise">{answer}</p>}</button>)}</div></div></section></div>;
+      }
+
+      function ChatLauncher({ open, setOpen }) {
+        return <button onClick={() => setOpen(!open)} className={cn("fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white shadow-float transition duration-300 hover:-translate-y-1", open ? "bg-[#284B56]" : "bg-teal-600 hover:bg-teal-700")} aria-label={open ? "Close NuevAI chat" : "Open NuevAI chat"}>{open ? <Icon name="close" size={19}/> : <><span className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/15"><Icon name="spark" size={15}/></span>Ask NuevAI</>}</button>;
+      }
+
+      function ChatDrawer({ close, notify }) {
+        const [messages, setMessages] = useState(exampleMessages.slice(0, 2));
+        const [draft, setDraft] = useState("");
+        const [loading, setLoading] = useState(false);
+        const scrollRef = useRef(null);
+        useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, loading]);
+        const send = (event) => {
+          event?.preventDefault();
+          const trimmed = draft.trim();
+          if (!trimmed || loading) return;
+          setMessages((items) => [...items, { id: Date.now(), speaker: "You", from: "user", text: trimmed }]);
+          setDraft(""); setLoading(true);
+          window.setTimeout(() => { setMessages((items) => [...items, { id: Date.now() + 1, speaker: "NuevAI", from: "ai", text: "Thanks for the question. In this visual demo, I would now search approved Nueva resources and return a clear answer with links to its sources." }]); setLoading(false); }, 520);
+        };
+        const suggestions = ["What’s the Wi‑Fi password?", "When is spirit week?", "How do I book a study room?"];
+        return <aside className="fixed bottom-24 right-4 z-50 flex h-[min(650px,calc(100vh-120px))] w-[calc(100%-2rem)] max-w-[440px] flex-col overflow-hidden rounded-3xl border border-[#D8E6E1] bg-white shadow-float animate-rise sm:right-6"><div className="flex items-center justify-between border-b border-[#E6EEEB] bg-[#FBFDFC] px-5 py-4"><div className="flex items-center gap-2.5"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-ink text-[#BDEADD]"><Icon name="spark" size={18}/></span><div><p className="text-sm font-semibold">Ask NuevAI</p><p className="text-[11px] text-teal-600">Mock assistant · citations-first</p></div></div><button onClick={close} className="rounded-lg p-2 text-[#708784] hover:bg-[#EDF4F1] hover:text-ink" aria-label="Close chat"><Icon name="close" size={18}/></button></div><div ref={scrollRef} className="hide-scrollbar flex-1 space-y-3 overflow-y-auto bg-[#FAFCFB] p-4">{messages.map((message) => <div key={message.id} className={cn("flex gap-2", message.from === "user" && "justify-end")}><span className={cn("mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold", message.from === "ai" ? "bg-teal-100 text-teal-600" : "order-2 bg-[#F6D8C7] text-[#995233]")}>{message.from === "ai" ? <Icon name="spark" size={14}/> : "J"}</span><div className={cn("max-w-[79%] rounded-2xl px-3 py-2.5 text-sm leading-5", message.from === "ai" ? "bg-white text-[#385652] shadow-sm ring-1 ring-[#E5EEEA]" : "bg-ink text-white")}>{message.text}{message.from === "ai" && <button onClick={() => notify("Source preview opened (demo).") } className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-teal-600"><Icon name="external" size={11}/>View source</button>}</div></div>)}{loading && <div className="flex gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-lg bg-teal-100 text-teal-600"><Icon name="spark" size={14}/></span><div className="flex items-center gap-1 rounded-2xl bg-white px-3 py-3 shadow-sm"><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-teal-500"></span><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-teal-500 [animation-delay:120ms]"></span><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-teal-500 [animation-delay:240ms]"></span></div></div>}</div><div className="border-t border-[#E6EEEB] bg-white p-3"><div className="hide-scrollbar mb-2 flex gap-1.5 overflow-x-auto">{suggestions.map((item) => <button key={item} onClick={() => setDraft(item)} className="shrink-0 rounded-full border border-[#DCE8E3] px-2.5 py-1.5 text-[10px] font-semibold text-[#53716C] transition hover:border-teal-300 hover:bg-teal-50">{item}</button>)}</div><form onSubmit={send} className="flex items-center gap-2 rounded-2xl border border-[#D8E6E1] bg-[#FBFDFC] p-1.5 focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-100"><input id="chat-composer" value={draft} onChange={(e) => setDraft(e.target.value)} className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none placeholder:text-[#91A5A2]" placeholder="Ask about Nueva…"/><button type="submit" className="flex h-8 w-8 items-center justify-center rounded-xl bg-teal-600 text-white transition hover:bg-teal-700" aria-label="Send message"><Icon name="send" size={15}/></button></form></div></aside>;
+      }
+
+      function Modal({ type, close, interests, toggleInterest, digestOn, setDigestOn, notificationOn, setNotificationOn, notify }) {
+        const is = (value) => type === value;
+        let title = "";
+        if (is("digest")) title = "Shape your weekly digest";
+        if (is("room")) title = "Book a space";
+        if (is("hours")) title = "Facility hours";
+        if (is("course")) title = "Course selection helper";
+        if (is("settings")) title = "Your demo settings";
+        if (is("assignments")) title = "All assignments";
+        if (is("calendarNote")) title = "Your calendars";
+        if (is("resource")) title = "Resource preview";
+        return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#0C2935]/35 p-4 backdrop-blur-[2px] sm:items-center" onMouseDown={(event) => {if (event.target === event.currentTarget) close();}}><div role="dialog" aria-modal="true" aria-labelledby="modal-title" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-5 shadow-float animate-pop sm:p-7"><div className="mb-6 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[.14em] text-teal-600">NUEVAI DEMO</p><h2 id="modal-title" className="mt-1 text-2xl font-semibold tracking-[-.04em]">{title}</h2></div><button onClick={close} className="rounded-xl p-2 text-[#708784] transition hover:bg-[#EDF4F1] hover:text-ink" aria-label="Close modal"><Icon name="close" size={19}/></button></div>
+          {is("digest") && <DigestModal interests={interests} toggleInterest={toggleInterest} digestOn={digestOn} setDigestOn={setDigestOn} close={close} notify={notify}/>} 
+          {is("room") && <RoomModal close={close} notify={notify}/>} 
+          {is("hours") && <HoursModal close={close} notify={notify}/>} 
+          {is("course") && <CourseModal close={close} notify={notify}/>} 
+          {is("settings") && <SettingsModal notificationOn={notificationOn} setNotificationOn={setNotificationOn} close={close} notify={notify}/>} 
+          {is("assignments") && <AssignmentsModal close={close} notify={notify}/>} 
+          {is("calendarNote") && <CalendarNoteModal close={close} notify={notify}/>} 
+          {is("resource") && <ResourceModal close={close} notify={notify}/>} 
+        </div></div>;
+      }
+
+      const Toggle = ({ enabled, onClick, label }) => <button onClick={onClick} className={cn("relative h-7 w-12 rounded-full transition", enabled ? "bg-teal-600" : "bg-[#C5D4D0]")} role="switch" aria-checked={enabled} aria-label={label}><span className={cn("absolute top-1 h-5 w-5 rounded-full bg-white shadow transition", enabled ? "left-6" : "left-1")}></span></button>;
+
+      function DigestModal({ interests, toggleInterest, digestOn, setDigestOn, close, notify }) { const all = ["Science Friday", "Robotics", "Volleyball", "Visual arts", "College counseling", "Community service"]; return <div><div className="flex items-center justify-between rounded-2xl bg-[#EFF8F5] p-4"><div><p className="text-sm font-semibold">Send my Friday digest</p><p className="mt-1 text-xs text-[#67817D]">A calm, tailored look at next week.</p></div><Toggle enabled={digestOn} onClick={() => setDigestOn(!digestOn)} label="Toggle weekly digest"/></div><p className="mt-5 text-sm font-semibold">I’d like to hear about</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{all.map((item) => <button key={item} onClick={() => toggleInterest(item)} className={cn("flex items-center gap-2.5 rounded-xl border px-3 py-3 text-left text-sm font-medium transition", interests.includes(item) ? "border-teal-300 bg-teal-50 text-teal-700" : "border-[#DEE9E5] text-[#56706C] hover:border-teal-200")}><span className={cn("flex h-5 w-5 items-center justify-center rounded-md border", interests.includes(item) ? "border-teal-600 bg-teal-600 text-white" : "border-[#BED0CA]")}>{interests.includes(item) && <Icon name="check" size={13}/>}</span>{item}</button>)}</div><div className="mt-6 flex justify-end gap-2"><button onClick={close} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-[#59726E] hover:bg-[#F1F5F3]">Cancel</button><button onClick={() => {notify("Digest preferences saved (demo)."); close();}} className="rounded-xl bg-ink px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1A4653]">Save preferences</button></div></div> }
+      function RoomModal({ close, notify }) { const [room, setRoom] = useState("Wellness pod"); return <div><p className="text-sm leading-6 text-[#617A76]">Find a focused space without leaving your flow. This is a mock reservation only.</p><div className="mt-5 grid gap-3 sm:grid-cols-2"><label className="text-xs font-semibold text-[#5C7672]">Space<select value={room} onChange={(e)=>setRoom(e.target.value)} className="mt-1.5 w-full rounded-xl border border-[#DCE7E2] bg-white px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-teal-500"><option>Wellness pod</option><option>Library study room</option><option>Innovation Studio</option></select></label><label className="text-xs font-semibold text-[#5C7672]">Time<select className="mt-1.5 w-full rounded-xl border border-[#DCE7E2] bg-white px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-teal-500"><option>Today · 3:30–4:00 PM</option><option>Tomorrow · 8:00–8:30 AM</option></select></label></div><div className="mt-4 rounded-2xl border border-teal-100 bg-teal-50 p-3 text-xs leading-5 text-teal-700"><strong>Available now:</strong> {room} · 30-minute block · Main Building</div><button onClick={() => {notify("Mock reservation held for 10 minutes."); close();}} className="mt-6 w-full rounded-xl bg-teal-600 py-3 text-sm font-semibold text-white transition hover:bg-teal-700">Hold this time</button></div> }
+      function HoursModal({ close, notify }) { const sites = [["Library","7:30 AM – 7:00 PM","Open late"],["Moran Gym","6:30 AM – 6:00 PM","Open"],["Dining Commons","7:15 AM – 2:30 PM","Lunch 11:35–1:10"]]; return <div><p className="mb-4 text-sm text-[#617A76]">Today’s mock operating hours.</p><div className="space-y-2">{sites.map(([name,hours,status])=><button key={name} onClick={()=>notify(`${name} details opened (demo).`)} className="flex w-full items-center gap-3 rounded-2xl border border-[#E0EAE6] p-3.5 text-left hover:border-teal-200 hover:bg-teal-50/40"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F1F7F4] text-teal-600"><Icon name="building" size={17}/></span><span className="flex-1"><strong className="block text-sm">{name}</strong><span className="text-xs text-[#6D8581]">{hours}</span></span><span className="rounded-full bg-[#E5F4ED] px-2 py-1 text-[10px] font-bold text-[#237453]">{status}</span></button>)}</div><button onClick={close} className="mt-6 w-full rounded-xl border border-[#DCE7E2] py-3 text-sm font-semibold text-[#516C67] hover:bg-[#F2F7F4]">Done</button></div> }
+      function CourseModal({ close, notify }) { const [selected, setSelected] = useState("Humanities & the world"); const paths=["Humanities & the world","Making & engineering","Life sciences"]; return <div><p className="text-sm leading-6 text-[#617A76]">Explore a starting point, then connect with the people who can help you choose. No real course data is loaded in this demo.</p><div className="mt-5 space-y-2">{paths.map((path,i)=><button key={path} onClick={()=>setSelected(path)} className={cn("flex w-full items-center gap-3 rounded-xl border p-3 text-left transition",selected===path?"border-teal-300 bg-teal-50":"border-[#E0EAE6] hover:border-teal-200")}><span className={cn("flex h-8 w-8 items-center justify-center rounded-lg",["bg-[#FDE9DD] text-coral-500","bg-[#E9F4F1] text-teal-600","bg-[#EEF0FC] text-[#5367B4]"][i])}><Icon name={i===1?"spark":i===2?"sun":"book"} size={16}/></span><span className="flex-1 text-sm font-semibold">{path}</span>{selected===path&&<Icon name="check" size={16} className="text-teal-600"/>}</button>)}</div><button onClick={()=>{notify(`${selected} path saved for later (demo).`);close();}} className="mt-6 w-full rounded-xl bg-ink py-3 text-sm font-semibold text-white hover:bg-[#1A4653]">Explore this path</button></div> }
+      function SettingsModal({ notificationOn, setNotificationOn, close, notify }) { return <div><div className="flex items-center justify-between rounded-2xl border border-[#E1EBE7] p-4"><div><p className="text-sm font-semibold">Helpful notifications</p><p className="mt-1 text-xs text-[#718783]">Digest and deadline nudges</p></div><Toggle enabled={notificationOn} onClick={() => setNotificationOn(!notificationOn)} label="Toggle notifications"/></div><div className="mt-3 flex items-center justify-between rounded-2xl border border-[#E1EBE7] p-4"><div><p className="text-sm font-semibold">Conversation privacy</p><p className="mt-1 text-xs text-[#718783]">Keep demo chats on this device</p></div><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#E9F4F1] text-teal-600"><Icon name="lock" size={16}/></span></div><button onClick={() => {notify("Settings saved for this demo."); close();}} className="mt-6 w-full rounded-xl bg-ink py-3 text-sm font-semibold text-white hover:bg-[#1A4653]">Save settings</button></div> }
+      function AssignmentsModal({ close, notify }) { return <div><p className="text-sm text-[#607A76]">A fuller Canvas-style task list would live here in the real product.</p><div className="mt-5 space-y-2">{initialAssignments.map((a) => <button key={a.id} onClick={() => notify(`${a.title} opened (demo).`)} className="flex w-full items-center gap-3 rounded-xl border border-[#E2EBE7] p-3 text-left hover:border-teal-200"><span className={cn("h-2.5 w-2.5 rounded-full", a.done ? "bg-teal-500" : "bg-coral-400")}></span><span className="flex-1"><strong className="block text-sm">{a.title}</strong><span className="text-xs text-[#718783]">{a.course} · {a.due}</span></span><Icon name="chevron" size={15} className="text-[#778D89]"/></button>)}</div><button onClick={close} className="mt-6 w-full rounded-xl border border-[#DCE7E2] py-3 text-sm font-semibold text-[#516C67] hover:bg-[#F2F7F4]">Close</button></div> }
+      function CalendarNoteModal({ close, notify }) { const [following,setFollowing]=useState(["Academic schedule","Robotics","Volleyball"]); const opts=["Academic schedule","Robotics","Volleyball","Science Friday","Community service"]; return <div><p className="text-sm leading-6 text-[#617A76]">Choose the parts of campus life that should surface in your view.</p><div className="mt-5 space-y-2">{opts.map(item=><button key={item} onClick={()=>setFollowing(x=>x.includes(item)?x.filter(i=>i!==item):[...x,item])} className={cn("flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left text-sm font-medium",following.includes(item)?"border-teal-300 bg-teal-50 text-teal-700":"border-[#E0EAE6] text-[#56706C]")}><span>{item}</span><span className={cn("flex h-5 w-5 items-center justify-center rounded-md border",following.includes(item)?"border-teal-600 bg-teal-600 text-white":"border-[#BED0CA]")}>{following.includes(item)&&<Icon name="check" size={13}/>}</span></button>)}</div><button onClick={()=>{notify("Calendar preferences updated (demo).");close();}} className="mt-6 w-full rounded-xl bg-teal-600 py-3 text-sm font-semibold text-white hover:bg-teal-700">Update my calendar</button></div> }
+      function ResourceModal({ close, notify }) { return <div><div className="rounded-2xl bg-[#EAF4F1] p-4"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-teal-600 shadow-sm"><Icon name="book" size={19}/></span><h3 className="mt-4 text-lg font-semibold">Student resource guide</h3><p className="mt-2 text-sm leading-6 text-[#5D7773]">This mock preview shows how a trusted school resource could be surfaced with its owner, updated date, and direct link.</p></div><div className="mt-4 flex items-center justify-between rounded-xl border border-[#E1EBE7] px-3.5 py-3"><span><strong className="block text-sm">Verified by Student Life</strong><span className="text-xs text-[#718783]">Updated August 28</span></span><span className="rounded-full bg-[#E5F4ED] px-2 py-1 text-[10px] font-bold text-[#237453]">Current</span></div><button onClick={()=>{notify("Resource link opened (demo). ");close();}} className="mt-6 w-full rounded-xl bg-ink py-3 text-sm font-semibold text-white hover:bg-[#1A4653]">Open resource</button></div> }
+
+      function Footer({ onLink }) { return <footer className="border-t border-[#DCE7E2] bg-white"><div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"><div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink text-[#BDEADD]"><Icon name="spark" size={16}/></span><span><strong className="text-sm">Nuev<span className="text-teal-600">AI</span></strong><span className="mx-2 text-[#A1B2AF]">·</span><span className="text-xs text-[#6E8582]">Built for the Nueva community</span></span></div><div className="flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-[#69817E]"><button onClick={() => onLink("About NuevAI")} className="hover:text-teal-600">About</button><button onClick={() => onLink("Privacy")} className="hover:text-teal-600">Privacy</button><button onClick={() => onLink("Feedback")} className="hover:text-teal-600">Feedback</button><button onClick={() => onLink("Help")} className="hover:text-teal-600">Help</button></div></div></footer> }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+</html>
