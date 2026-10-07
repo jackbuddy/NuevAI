@@ -17,3 +17,4 @@ urllib3==2.8.0
 vispy==0.10.0
 uvicorn[standard]
 fastapi
+groq
