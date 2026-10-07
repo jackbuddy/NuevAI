@@ -1,0 +1,20 @@
+.env
+*.pem
+node_modules/
+.next/
+__pycache__/
+*.pyc
+venv/
+.venv/
+data/
+*.db
+*.sqlite
+*.index
+*.pkl
+.DS_Store
+server.log
+Terminal Saved Output*.txt
+Applications/
+snake.py
+start.command
+fix_env.py
