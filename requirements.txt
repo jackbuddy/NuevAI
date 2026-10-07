@@ -15,3 +15,5 @@ requests==2.34.2
 skia-python==144.0.post2
 urllib3==2.8.0
 vispy==0.10.0
+uvicorn[standard]
+fastapi
