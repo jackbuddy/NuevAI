@@ -1,2 +1,0 @@
-cd ~/Desktop/NuevAI/nuevai-chat
-git init && git add -A && git commit -m "NuevAI chat UI"

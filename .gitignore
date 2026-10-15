@@ -18,3 +18,7 @@ Applications/
 snake.py
 start.command
 fix_env.py
+
+# Next.js / Vercel
+next-env.d.ts
+.vercel/
