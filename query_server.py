@@ -69,6 +69,42 @@ def get_embed_model():
 def health():
     return {"status": "ok", "model_loaded": _embed_model is not None}
 
+
+def _key_kind(key: str) -> str:
+    """Label the Supabase key type without revealing it."""
+    if not key:
+        return "missing"
+    if key.startswith("sb_secret_"):
+        return "secret (server)"
+    if key.startswith("sb_publishable_"):
+        return "publishable (public, RLS applies)"
+    if key.startswith("eyJ"):
+        import base64
+        try:
+            payload = key.split(".")[1]
+            payload += "=" * (-len(payload) % 4)
+            return "jwt:" + str(json.loads(base64.urlsafe_b64decode(payload)).get("role"))
+        except Exception:
+            return "jwt:unreadable"
+    return "unknown format"
+
+
+@app.get("/health/deep")
+def health_deep():
+    """Checks which Supabase project/key the server is actually using."""
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    url = os.getenv("SUPABASE_URL", "")
+    info = {
+        "supabase_host": url.replace("https://", "").replace("http://", "").split("/")[0].split(".")[0][:4] + "…",
+        "key_kind": _key_kind(key),
+    }
+    try:
+        res = get_supabase().table("document_chunks").select("chunk_id", count="exact").limit(1).execute()
+        info["chunk_rows_visible"] = res.count
+    except Exception as e:
+        info["error"] = str(e)[:200]
+    return info
+
 class QueryRequest(BaseModel):
     query: str
     top_k: int = 5
