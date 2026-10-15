@@ -1,6 +1,8 @@
 import os
 import json
 import asyncio
+import threading
+from contextlib import asynccontextmanager
 
 # 1. Threading environment overrides (MUST be set before any heavy imports)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -15,7 +17,15 @@ from groq import Groq
 
 load_dotenv()
 
-app = FastAPI(title="NuevAI RAG Service")
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Warm the embedding model in the background so the first user request is
+    # not a cold load, and so startup/health checks are never blocked by it.
+    threading.Thread(target=get_embed_model, daemon=True).start()
+    yield
+
+
+app = FastAPI(title="NuevAI RAG Service", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -42,15 +52,22 @@ def get_supabase():
 
 # 3. Lazy Embedding Model Client
 _embed_model = None
+_embed_lock = threading.Lock()
 
 def get_embed_model():
     global _embed_model
-    if _embed_model is None:
-        print("Loading SentenceTransformer on CPU...")
-        from sentence_transformers import SentenceTransformer
-        # Force CPU execution to prevent Apple Silicon MPS / OpenMP locks
-        _embed_model = SentenceTransformer("BAAI/bge-large-en-v1.5", device="cpu")
+    with _embed_lock:
+        if _embed_model is None:
+            print("Loading SentenceTransformer on CPU...", flush=True)
+            from sentence_transformers import SentenceTransformer
+            # Force CPU execution to prevent Apple Silicon MPS / OpenMP locks
+            _embed_model = SentenceTransformer("BAAI/bge-large-en-v1.5", device="cpu")
+            print("SentenceTransformer ready.", flush=True)
     return _embed_model
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "model_loaded": _embed_model is not None}
 
 class QueryRequest(BaseModel):
     query: str
@@ -82,21 +99,24 @@ KNOWLEDGE, ATTRIBUTION & FALLBACKS:
 async def chat_endpoint(request: QueryRequest):
     try:
         # Offload vector encoding to a background thread to prevent PyTorch event-loop locks
-        model = get_embed_model()
+        # Loading (first call only) and encoding both run off the event loop.
+        model = await asyncio.to_thread(get_embed_model)
         encoded = await asyncio.to_thread(
             model.encode, request.query, normalize_embeddings=True
         )
         query_vector = encoded.tolist()
 
-        # Lazy Supabase RPC call
-        rpc_response = get_supabase().rpc(
-            "match_chunks",
-            {
-                "query_embedding": query_vector,
-                "match_threshold": 0.45,
-                "match_count": request.top_k
-            }
-        ).execute()
+        # Lazy Supabase RPC call (sync client, so keep it off the event loop)
+        rpc_response = await asyncio.to_thread(
+            lambda: get_supabase().rpc(
+                "match_chunks",
+                {
+                    "query_embedding": query_vector,
+                    "match_threshold": 0.45,
+                    "match_count": request.top_k
+                }
+            ).execute()
+        )
 
         retrieved_chunks = rpc_response.data or []
 
@@ -109,14 +129,16 @@ async def chat_endpoint(request: QueryRequest):
 
         full_prompt = f"{SYSTEM_PERSONA}\n\nRetrieved Documentation Context:\n{context_str}"
 
-        completion = groq_client.chat.completions.create(
-            model=request.model,
-            messages=[
-                {"role": "system", "content": full_prompt},
-                {"role": "user", "content": request.query}
-            ],
-            temperature=0.35,
-            max_tokens=1200
+        completion = await asyncio.to_thread(
+            lambda: groq_client.chat.completions.create(
+                model=request.model,
+                messages=[
+                    {"role": "system", "content": full_prompt},
+                    {"role": "user", "content": request.query}
+                ],
+                temperature=0.35,
+                max_tokens=1200
+            )
         )
 
         sources = [
