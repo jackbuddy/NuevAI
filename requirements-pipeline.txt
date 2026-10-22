@@ -1,0 +1,10 @@
+# Ingestion pipeline only (not needed by the Render web service).
+--extra-index-url https://download.pytorch.org/whl/cpu
+requests
+beautifulsoup4
+python-dotenv
+supabase
+sentence-transformers
+torch
+python-docx
+pypdf

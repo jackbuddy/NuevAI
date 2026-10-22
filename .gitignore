@@ -22,3 +22,10 @@ fix_env.py
 # Next.js / Vercel
 next-env.d.ts
 .vercel/
+
+# ingestion pipeline output and local privacy list
+data/pipeline/
+
+# local-only: lists private documents; TypeScript cache
+DOWNLOAD_THESE.md
+tsconfig.tsbuildinfo

@@ -4,3 +4,11 @@ __pycache__/
 .git/
 .env
 *.pyc
+node_modules/
+.next/
+data/
+DOWNLOAD_THESE.md
+.github/
+app/
+lib/
+components/

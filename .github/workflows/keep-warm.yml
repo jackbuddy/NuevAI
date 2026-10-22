@@ -1,0 +1,17 @@
+name: Keep backend warm
+
+# Render stops an idle web service after ~15 minutes; the next visitor then waits ~1.5 minutes while the
+# 1.3 GB embedding model reloads. A ping every 10 minutes prevents that. (Skip this job if the Render
+# service is on an always-on paid plan.)
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping /health
+        run: curl -fsS --max-time 90 --retry 2 https://nuevai-backend.onrender.com/health

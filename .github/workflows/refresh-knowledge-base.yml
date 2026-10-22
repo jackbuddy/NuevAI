@@ -1,0 +1,49 @@
+name: Refresh calendar
+
+# Daily unattended calendar refresh: iCal feed -> chunk -> embed -> Supabase.
+# Expired events are removed automatically. The public site is crawled once and
+# Nexus (behind school SSO/2FA) is refreshed by hand, both locally:
+#   python run_pipeline.py --refresh-nexus
+on:
+  schedule:
+    - cron: "30 13 * * *"      # daily 13:30 UTC (~6:30am Pacific)
+  workflow_dispatch:
+    inputs:
+      prune:
+        description: "unused"
+        type: boolean
+        default: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-pipeline.txt
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-bge-large-en-v1.5
+      - run: pip install -r requirements-pipeline.txt
+      - name: Run pipeline
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NUEVAI_CALENDAR_URL: ${{ secrets.NUEVAI_CALENDAR_URL }}
+        run: |
+          python run_pipeline.py --stages calendar,chunk,index
+      - name: Upload report and unreadable-doc list
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-report
+          path: |
+            data/pipeline/report.json
+            data/pipeline/needs_access.json
+            data/pipeline/links.json
