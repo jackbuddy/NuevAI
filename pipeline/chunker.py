@@ -18,7 +18,7 @@ from datetime import date, timedelta
 from . import config
 from .common import load_pages
 from .links import build as build_links, link_cards
-from . import sheets
+from . import sheets, workbooks
 
 HEADING = re.compile(r"^(#{1,6})\s+(.*)$")
 
@@ -133,11 +133,16 @@ def chunk_page(page: dict):
 
 def run(log=print) -> list[dict]:
     chunks, seen_bodies = [], set()
-    skipped_private = 0
+    skipped_private = skipped_old = 0
     for page in load_pages():
         if sheets.is_sensitive(page):
             skipped_private += 1
             continue
+        if config.SUPERSEDED_TITLE.search(page.get("title", "") or ""):
+            skipped_old += 1
+            continue
+        if page.get("source") == "google_sheet" and sheets.sports_events(page, date(2000, 1, 1), date(2100, 1, 1)):
+            continue          # a team schedule: its games become structured events below, the raw CSV text would only add noise
         for n, content in chunk_page(page):
             body_hash = hashlib.sha1(content.split("\n\n", 1)[1].encode()).hexdigest()
             if body_hash in seen_bodies:
@@ -151,7 +156,7 @@ def run(log=print) -> list[dict]:
             })
     today = date.today()
     for page in load_pages():
-        if sheets.is_sensitive(page):
+        if sheets.is_sensitive(page) or config.SUPERSEDED_TITLE.search(page.get("title", "") or ""):
             continue
         if page.get("source") == "google_sheet":
             for e in sheets.sports_events(page, today - timedelta(days=14), today + timedelta(days=430)):
@@ -167,6 +172,7 @@ def run(log=print) -> list[dict]:
                            "content": content, "source_file": page["url"],
                            "metadata": {"source_url": page["url"], "title": page["title"], "source": page["source"],
                                         "kind": "outline", "content_hash": hashlib.sha1(content.encode()).hexdigest()}})
+    chunks.extend(workbooks.build_chunks(log))            # teacher/course map, A/B day calendar, advisors, clubs
     links = build_links(log)
     for i, card in enumerate(link_cards(links)):
         content = f"Title: {card['title']}\nSource: link_registry\n\n{card['text']}"
@@ -188,6 +194,8 @@ def run(log=print) -> list[dict]:
     chunks = unique
     config.CHUNKS_FILE.write_text(json.dumps(chunks, ensure_ascii=False), encoding="utf-8")
     sizes = sorted(len(c["content"]) for c in chunks)
+    if skipped_old:
+        log(f"superseded filter: skipped {skipped_old} page(s) from the previous school year")
     if skipped_private:
         log(f"privacy filter: skipped {skipped_private} sheet(s) with student/people data")
     log(f"chunking done: {len(chunks)} chunks, median {sizes[len(sizes)//2] if sizes else 0} chars -> {config.CHUNKS_FILE}")

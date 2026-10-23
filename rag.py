@@ -21,6 +21,13 @@ from intent import CalendarIntent, parse_intent
 CANDIDATES = 24
 VECTOR_THRESHOLD = 0.0      # gte-small cosine scores sit high (unrelated ~0.75), so rank, do not threshold
 W_VECTOR, W_LEXICAL = 0.5, 0.5
+TEACH_CUE = re.compile(r"\b(teach\w*|taught|class(es)?|room|block|course|prof|instructor|mr|mrs|ms|dr)\b|'s\b", re.I)
+
+
+def norm_words(s: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", s.lower().replace("&", " and ").replace("+", " and "))).strip()
+
+
 LIST_WORDS = re.compile(r"\b(list|all|every|which|what (courses?|classes|electives?|sports|clubs|departments?)|offered|options|available)\b", re.I)
 
 LINK_INTENTS = [
@@ -51,6 +58,7 @@ SYNONYMS = {
     r"\blaptop\b|\bwi-?fi\b|\bprint\w*\b|\bpassword\b|\bwifi\b": "technology IT help desk laptop wifi printing",
     r"\bgraduat\w*\b": "graduation requirements credits",
     r"\belective\b": "elective courses",
+    r"\badvis(ory|or|ors|er|ers)\b": "advisory advisors advising team room",
     r"\bclubs?\b|\baffinity\b|\bstudent organi[sz]ations?\b": "clubs and affinity groups list",
     r"\bmakeup\b|\bmake[- ]up\b|\bretake\b": "make-up retake assessment policy",
 }
@@ -67,7 +75,7 @@ _pool = ThreadPoolExecutor(max_workers=6)
 STOP = set("""a an the is are was were be been do does did can could will would should what when where which who whom how why of for on in at to from
 with about into over under this that these those it its my our your their me us we you i there here any some all more most next last new
 today tomorrow tonight please tell show give list find get have has had am pm""".split())
-TOKEN = re.compile(r"[a-z0-9][a-z0-9'-]*")
+TOKEN = re.compile(r"[a-z0-9]+(?:[.'-][a-z0-9]+)*")
 
 
 def tokens(text: str) -> list[str]:
@@ -140,7 +148,7 @@ class Retriever:
             return cached
         digest = intent.short_range() and not (intent.sport or intent.kind or intent.keywords or intent.category)
         q = self.sb().table(settings.CHUNKS_TABLE).select("chunk_id,content,metadata") \
-            .in_("metadata->>source", ["calendar_day"] if digest else ["calendar", "calendar_sheet"]) \
+            .in_("metadata->>source", ["calendar_day", "school_day"] if digest else ["calendar", "calendar_sheet"]) \
             .gte("metadata->>event_date" if digest else "metadata->>end_date", intent.start.isoformat()) \
             .lte("metadata->>event_date", intent.end.isoformat())
         if not digest:
@@ -194,6 +202,42 @@ class Retriever:
             r["similarity"] = 1.0
         return rows
 
+    # ---- teachers and courses ---------------------------------------------
+    def _entities(self) -> list[dict]:
+        """All teacher and course records (about 400 small rows), cached for 30 minutes."""
+        hit = self.calendar_cache.get("entities")
+        if hit is None:
+            hit = self.sb().table(settings.CHUNKS_TABLE).select("chunk_id,content,metadata").eq("metadata->>source", "school_courses") \
+                .in_("metadata->>kind", ["teacher", "course"]).limit(1000).execute().data or []
+            self.calendar_cache.set("entities", hit, ttl=1800)
+        return hit
+
+    def entity_chunks(self, query: str, today: date) -> list[dict]:
+        """Direct lookup for 'who teaches Chemistry', 'what does Wes Chao teach', 'which room is Mr. Lee in'.
+        Matches teacher names and course names against the question, so it never depends on semantic search."""
+        qn = norm_words(query)
+        tokens_q = set(qn.split())
+        cue = bool(TEACH_CUE.search(query))
+        hits = []
+        for r in self._entities():
+            m = r.get("metadata") or {}
+            if m.get("kind") == "teacher":
+                full = norm_words(m.get("teacher", ""))
+                names = {m.get("teacher_last", "")} | set(m.get("aliases", []))
+                ok = bool(full) and f" {full} " in f" {qn} "
+                ok = ok or any(n and n in tokens_q and (len(n) >= 6 or cue) for n in names)
+                if ok:
+                    hits.append((0, r))
+            elif m.get("kind") == "course":
+                ck = m.get("course_key", "")
+                if len(ck) >= 5 and f" {ck} " in f" {qn} ":
+                    hits.append((1, r))
+        def sem_rank(r):
+            sem = (r.get("metadata") or {}).get("semester", "")
+            return 0 if (("Fall" in sem) == (today.month >= 8)) else 1
+        hits.sort(key=lambda x: (x[0], sem_rank(x[1]), -len((x[1].get("metadata") or {}).get("course_key", ""))))
+        return [r for _, r in hits][:6]
+
     # ---- orchestration ----------------------------------------------------
     def retrieve(self, query: str, history: list[dict] | None = None, top_k: int = 6, today: date | None = None) -> dict:
         t0 = time.time()
@@ -222,6 +266,11 @@ class Retriever:
             timings["calendar_ms"] = round((time.time() - t) * 1000)
             return rows
 
+        try:
+            ents = self.entity_chunks(query, today)
+        except Exception as e:
+            ents = []
+            print(f"entity lookup failed: {e}", flush=True)
         f_vec, f_cal, f_links = _pool.submit(vec_task), _pool.submit(cal_task), _pool.submit(self.link_cards, query)
         rows, events = f_vec.result(), []
         try:
@@ -248,12 +297,14 @@ class Retriever:
         link_rows = link_rows[:3]
         docs = (link_rows + [d for d in ranked if d["chunk_id"] not in {l["chunk_id"] for l in link_rows}])[:top_k + len(link_rows)]
         timings["retrieve_ms"] = round((time.time() - t0) * 1000)
-        return {"docs": docs, "events": events, "intent": intent, "timings": timings, "candidates": len(rows)}
+        ent_ids = {e["chunk_id"] for e in ents}
+        docs = [d for d in docs if d["chunk_id"] not in ent_ids]
+        return {"docs": docs, "events": events, "intent": intent, "timings": timings, "candidates": len(rows), "entities": ents}
 
 
 def fmt_event(r: dict) -> str:
     m = r.get("metadata") or {}
-    if m.get("source") == "calendar_day":
+    if m.get("source") in ("calendar_day", "school_day"):
         return r["content"].split("\n\n", 1)[-1]
     when = m.get("when", m.get("event_date", ""))
     time_s = "all day" if m.get("all_day") else m.get("time", "")
@@ -320,6 +371,12 @@ def build_context(result: dict, max_events: int = 14) -> tuple[str, list[dict]]:
             sources.append({"chunk_id": e["chunk_id"], "title": m.get("summary") or m.get("title"), "type": "calendar"})
     elif intent and (intent.sport or intent.kind or intent.category or intent.date_given):
         parts.append(f"SCHOOL CALENDAR: no events found for {intent.label} matching that request.")
+    ents = result.get("entities") or []
+    if ents:
+        parts.append("TEACHING ASSIGNMENTS (from the master schedule; Blocks 1-4 meet on A/A' days, Blocks 5-8 on B/B' days):\n\n"
+                     + "\n\n".join(e["content"].split("\n\n", 1)[-1] for e in ents))
+        for e in ents[:3]:
+            sources.append({"chunk_id": e["chunk_id"], "title": (e.get("metadata") or {}).get("title"), "type": "schedule"})
     for d in result["docs"]:
         m = d.get("metadata") or {}
         parts.append(d["content"][:1400])          # keeps prompts small: the LLM plan is token-rate limited

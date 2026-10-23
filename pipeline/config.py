@@ -103,3 +103,16 @@ PINNED_LINKS = [
 
 # Categories worth a dedicated, directly retrievable "link card" chunk.
 LINK_CARD_CATEGORIES = {"booking", "form", "payment", "calendar", "document", "portal"}
+
+
+# --- live Google Sheets (public "anyone with the link" sheets re-read on every run) ----------------------------------
+# kind "team_schedule": only the listed tabs are fetched (tab names are matched ignoring trailing spaces).
+# kind "workbook": the whole workbook is downloaded as .xlsx and parsed by pipeline/workbooks.py.
+LIVE_SHEETS = [
+    {"kind": "team_schedule", "id": "1J5_IJlocnZMbREgyWXgDnqT5h6JQLEz-Ku0l3uxMkuA",
+     "tabs": {"Varsity Schedule 26-27": "US Boys Basketball Varsity", "JV Schedule 26-27": "US Boys Basketball JV"}},
+    {"kind": "workbook", "id": "1GpJrrLKDJEl5bW83cfa7FRGmgxr4yiNlU0C5JFXyMGY", "name": "Course Offerings by Block (live)"},
+]
+
+# Pages whose title matches are from a previous school year and are never indexed (they would contradict the current ones).
+SUPERSEDED_TITLE = re.compile(r"25\s*[\u2013-]\s*26.{0,40}(clubs?|catalog)|(clubs?|catalog).{0,40}25\s*[\u2013-]\s*26", re.I)

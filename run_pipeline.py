@@ -5,7 +5,7 @@
     python run_pipeline.py --stages chunk,index # re-chunk and re-index already-downloaded pages
     python run_pipeline.py --dry-run            # crawl/chunk, then show what indexing WOULD change
 
-Stages: public (once), nexus, google, manual, calendar, chunk, index.  A JSON report of every run is
+Stages: public (once), nexus, google, live, manual, calendar, chunk, index.  A JSON report of every run is
 written to data/pipeline/report.json; documents that could not be read
 (private Google Docs) are listed in data/pipeline/needs_access.json.
 """
@@ -17,9 +17,9 @@ from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 
-from pipeline import calendar_feed, chunker, config, crawl_public, fetch_google, index, manual_import, nexus_import
+from pipeline import calendar_feed, chunker, config, crawl_public, fetch_google, index, live_sheets, manual_import, nexus_import
 
-ALL = ["public", "nexus", "google", "manual", "calendar", "chunk", "index"]
+ALL = ["public", "nexus", "google", "live", "manual", "calendar", "chunk", "index"]
 
 
 def main() -> int:
@@ -59,6 +59,7 @@ def main() -> int:
     stage("public", public)
     stage("nexus", lambda: nexus_import.run(args.refresh_nexus))
     stage("google", lambda: fetch_google.run([scraper_data / "google_links_deduped.json", scraper_data / "external_links.json"]))
+    stage("live", live_sheets.run)
     stage("manual", manual_import.run)
     stage("calendar", calendar_feed.run)
     stage("chunk", lambda: {"chunks": len(chunker.run())})

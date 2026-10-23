@@ -1,6 +1,6 @@
 name: Refresh calendar
 
-# Daily unattended calendar refresh: iCal feed -> chunk -> embed -> Supabase.
+# Daily unattended refresh: iCal calendar feed + live team-schedule sheets -> chunk -> embed -> Supabase.
 # Expired events are removed automatically. The public site is crawled once and
 # Nexus (behind school SSO/2FA) is refreshed by hand, both locally:
 #   python run_pipeline.py --refresh-nexus
@@ -32,7 +32,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           NUEVAI_CALENDAR_URL: ${{ secrets.NUEVAI_CALENDAR_URL }}
         run: |
-          python run_pipeline.py --stages calendar,chunk,index
+          LIVE_KINDS=team_schedule python run_pipeline.py --stages calendar,live,chunk,index
       - name: Upload report and unreadable-doc list
         if: always()
         uses: actions/upload-artifact@v4

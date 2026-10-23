@@ -5,11 +5,11 @@
 Each case passes when a regex is found in the retrieved context (documents + calendar block).
 Add cases whenever a real question goes wrong (the /insights page lists them).
 """
+import os
 import re
 import sys
 import time
-from datetime import datetime
-from zoneinfo import ZoneInfo
+from datetime import date
 
 from dotenv import load_dotenv
 
@@ -40,13 +40,27 @@ CASES = [
     ("What clubs can I join?", r"clubs and affinity groups \(\d+ listed\)", "clubs outline"),
     ("What happens if I'm late to class?", r"(?i)tard", "synonym expansion -> attendance policy"),
     ("What time is boys basketball practice?", r"PRACTICE SCHEDULE", "calendar: practice overview"),
+    # master schedule, course map, clubs, team schedules (facts checked against the source workbooks)
+    ("Who teaches Chemistry?", r"David Eik", "teacher map: course -> teacher"),
+    ("What does Wes Chao teach?", r"Computer Vision", "teacher map: teacher -> courses"),
+    ("What room is Computer Security in?", r"(?i)room 240", "teacher map: course -> room"),
+    ("What block is Software Engineering?", r"Block 2", "teacher map: course -> block"),
+    ("Is October 5 an A day or B day?", r"October 5, 2026 - A day", "A/B day calendar"),
+    ("Is there school on Labor Day?", r"Labor Day", "no-class day"),
+    ("When is advisory for juniors on August 20?", r"Juniors: Advisory", "advisory by grade"),
+    ("Where does advisory 9.1 meet?", r"(?i)advisory 9\.1.*room 215", "advisor rooms"),
+    ("Who advises the AI/ML club?", r"Matt Hesby", "clubs: advisor"),
+    ("Who leads the AMC/AIME club?", r"Alex Yang", "clubs: leaders"),
+    ("When is the next US boys basketball game?", r"US Boys Basketball (Varsity|JV) - Game", "live team schedule"),
+    ("What courses are offered in Block 3?", r"Block 3 .*offerings", "offerings by block"),
 ]
 
 
 def main() -> int:
     r = Retriever(get_supabase)
     r.embed("warm up")
-    today = datetime.now(ZoneInfo("America/Los_Angeles")).date()
+    # fixed date: the calendar checks refer to dates in the 2026-27 school year
+    today = date.fromisoformat(os.getenv("EVAL_TODAY", "2026-10-22"))
     passed = 0
     for q, rx, note in CASES:
         t = time.time()

@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 
 from bs4 import BeautifulSoup
 
-from . import config
+from . import config, workbooks
 from .common import html_to_markdown, save_page
 
 MANUAL_DIR = config.DATA_DIR / "manual_docs"
@@ -72,10 +72,13 @@ def read_file(path) -> str:
 
 def run(log=print) -> dict:
     MANUAL_DIR.mkdir(parents=True, exist_ok=True)
-    imported, failed = 0, []
+    imported, failed, handled = 0, [], []
     files = sorted(MANUAL_DIR.glob("*")) + (sorted(LEGACY_DIR.glob("*.txt")) if LEGACY_DIR.exists() else [])
     for path in files:
         if path.name.startswith(".") or path.is_dir():
+            continue
+        if path.suffix.lower() == ".xlsx" and workbooks.kind_of_path(path):
+            handled.append(path.name)                  # parsed into structured records by pipeline/workbooks.py
             continue
         try:
             text = read_file(path).strip()
@@ -91,6 +94,6 @@ def run(log=print) -> dict:
         save_page({"url": f"manual://{path.name}", "title": title, "source": "manual", "text": text, "links": [],
                    "scraped_at": datetime.now(timezone.utc).isoformat()})
         imported += 1
-    stats = {"imported": imported, "failed": failed, "skipped_private_tabs": SKIPPED_TABS, "folder": str(MANUAL_DIR)}
+    stats = {"imported": imported, "failed": failed, "structured_workbooks": handled, "skipped_private_tabs": SKIPPED_TABS, "folder": str(MANUAL_DIR)}
     log(f"manual docs done: {stats}")
     return stats

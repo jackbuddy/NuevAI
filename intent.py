@@ -50,6 +50,7 @@ class CalendarIntent:
     date_given: bool = False
     next_only: bool = False
     label: str = ""
+    dayinfo: bool = False           # asking about A/B day type or which blocks meet
 
     def short_range(self) -> bool:
         return (self.end - self.start).days <= 3
@@ -67,8 +68,14 @@ def _school_year_date(today: date, month: int, day: int) -> date | None:
         d = date(today.year, month, day)
     except ValueError:
         return None
-    # past dates more than ~2 months back are assumed to mean next year
-    return d if d >= today - timedelta(days=60) else date(today.year + 1, month, day)
+    # A date means the one inside the current school year (August to July): "August 20" in October is two months ago,
+    # not next year. Only dates past the end of the school year roll over.
+    sy_start = date(today.year if today.month >= 8 else today.year - 1, 8, 1)
+    year = sy_start.year if month >= 8 else sy_start.year + 1
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
 
 
 def parse_range(q: str, today: date):
@@ -143,6 +150,7 @@ def parse_intent(question: str, today: date, previous_user_msg: str = "") -> Cal
         category = "athletics"
     rng = parse_range(q, today)
     has_cal_word = bool(re.search(CAL_WORDS, q))
+    dayinfo = bool(re.search(r"\b[AB]['\u2019]?[ -]?day\b", question) or re.search(r"\b(a|b) day (or|and) (a|b) day\b|\bwhich blocks?\b|\bwhat blocks?\b|\bday type\b|\bblock schedule\b|\bwhat day (is|are) (it|we|today|tomorrow)\b", q))
 
     # short follow-ups ("what about tomorrow?") inherit the topic of the previous question
     if previous_user_msg and not sport and not category and len(q.split()) <= 8 and rng:
@@ -151,7 +159,9 @@ def parse_intent(question: str, today: date, previous_user_msg: str = "") -> Cal
             prev.start, prev.end, prev.date_given, prev.label = rng[0], rng[1], True, rng[2]
             return prev
 
-    if not (sport or kind or category or rng or has_cal_word):
+    advisory = bool(re.search(r"\badvisory\b", q))
+    dayinfo = dayinfo or advisory
+    if not (sport or kind or category or rng or has_cal_word or dayinfo):
         return None
 
     gender = "girls" if re.search(r"\b(girls?|women'?s?|female)\b", q) else "boys" if re.search(r"\b(boys?|men'?s?|male)\b", q) else None
@@ -163,12 +173,15 @@ def parse_intent(question: str, today: date, previous_user_msg: str = "") -> Cal
     taken = set(SPORTS) | set(MONTHS) | set(WEEKDAYS) | {"games", "game", "practice", "practices", "match", "matches", "boys", "girls",
                                                               "middle", "school", "upper", "lower", "home", "away", "varsity", "playing"}
     keywords = [w for w in words if w not in STOP and w not in taken][:3]
-    if sport or kind or category:
+    if sport or kind or category or dayinfo:
         keywords = []   # structured filters are enough; extra words only add noise
 
     if rng:
         start, end, label = rng
         date_given = True
+    elif dayinfo:
+        start, end = today, today + timedelta(days=14 if advisory else 0)
+        date_given, label = True, "the next two weeks" if advisory else "today"
     else:
         date_given = False
         label = "upcoming"
@@ -184,4 +197,4 @@ def parse_intent(question: str, today: date, previous_user_msg: str = "") -> Cal
     next_only = bool(re.search(r"\b(next|upcoming|soonest|first)\b", q)) and not rng
     if not (sport or kind or category or keywords or rng):
         return None
-    return CalendarIntent(start, end, sport, kind, category, gender, division, home_away, keywords, date_given, next_only, label)
+    return CalendarIntent(start, end, sport, kind, category, gender, division, home_away, keywords, date_given, next_only, label, dayinfo)
