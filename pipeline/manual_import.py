@@ -6,7 +6,7 @@ the files in  data/pipeline/manual_docs/ . On the next run they are indexed.
 The file name (without extension) becomes the document title, so name them
 like people would ask for them ("Student Forms.docx").
 
-Supported: .txt .md .html .csv .docx .pdf
+Supported: .txt .md .html .csv .docx .xlsx .pdf
 """
 import re
 from datetime import datetime, timezone
@@ -44,6 +44,17 @@ def read_file(path) -> str:
             for row in table.rows:
                 out.append("| " + " | ".join(c.text.strip() for c in row.cells) + " |")
         return "\n\n".join(out)
+    if ext == ".xlsx":
+        import openpyxl
+        wb = openpyxl.load_workbook(str(path), read_only=True, data_only=True)
+        out = []
+        for ws in wb.worksheets:                       # every tab, as comma-separated rows under a heading
+            out.append(f"## {ws.title}")
+            for row in ws.iter_rows(values_only=True):
+                cells = ["" if c is None else str(c).strip() for c in row]
+                if any(cells):
+                    out.append(",".join(cells))
+        return "\n".join(out)
     if ext == ".pdf":
         from pypdf import PdfReader
         return "\n\n".join((pg.extract_text() or "") for pg in PdfReader(str(path)).pages)

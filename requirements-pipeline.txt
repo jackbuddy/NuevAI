@@ -6,3 +6,4 @@ supabase
 httpx
 python-docx
 pypdf
+openpyxl
