@@ -34,7 +34,7 @@ ANSWER_TTL = 6 * 3600
 DATE_ANSWER_TTL = 600           # answers that depend on the calendar go stale quickly
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-groq_client = Groq(api_key=GROQ_API_KEY)
+groq_client = Groq(api_key=GROQ_API_KEY, max_retries=0, timeout=40)   # our own fallback chain handles rate limits; SDK retries only add seconds
 
 _supabase_client = None
 
@@ -91,11 +91,17 @@ def _warm():
         if not data_status()["rows"]:
             print("Warm-up skipped: knowledge base unreadable (check SUPABASE_SERVICE_ROLE_KEY).", flush=True)
             return
-        for q in STARTERS:
+        popular = []
+        try:
+            popular = [q for q, n in analytics.summary(14).get("top_questions", []) if n >= 2][:8]   # what people really ask
+        except Exception:
+            pass
+        for q in STARTERS + [p for p in popular if p not in [s.lower() for s in STARTERS]]:
             try:
                 answer_once(q)
+                time.sleep(3)           # stay under the LLM token-per-minute limit
             except Exception as e:
-                print(f"starter warm failed for {q!r}: {e}", flush=True)
+                print(f"warm failed for {q!r}: {e}", flush=True)
         print("Warm-up complete.", flush=True)
     except Exception as e:
         print(f"warm-up failed: {e}", flush=True)
@@ -179,12 +185,60 @@ GROUNDING
 - For "next game / what's next" questions give the first matching entry (and the one after it if helpful).
 - If the calendar block says nothing matched, say that no such event is on the school calendar yet and suggest checking with the relevant office; do not guess.
 - Course questions: use the course entries and "Contents of ..." lists in the context and name every relevant course found.
+- Dates written inside documents that are earlier than today belong to a previous school year (for example old club deadlines). Never present them as upcoming; leave them out or say the document lists last year's dates and to check with the office.
+- "Is there school on <day>?": if the calendar shows no "No school" entry for a weekday, say school is in session; if it does, name the entry. Keep it to one or two sentences.
+- Practices repeat all season. Give the team's next practice and its usual days; do not list every session.
+- Questions that are not about Nueva (jokes, weather, trivia): decline in one friendly sentence and offer what you can help with.
 - If the answer is not in the context: say what is missing in one sentence and point to the right office or portal. Do not guess.
 - Greetings or "what can you do": introduce yourself briefly as NuevAI and list what you can help with."""
 
 
 def _norm(q: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9' ]+", " ", q.lower())).strip()
+
+
+GREETING = re.compile(r"^\s*(hi|hello|hey|hiya|yo|howdy|good (morning|afternoon|evening))\b[\s!.,?]*$", re.I)
+THANKS = re.compile(r"^\s*(thanks|thank you|thx|ty|cool thanks|great thanks|awesome)\b[\s!.,]*$", re.I)
+CAPABILITIES = re.compile(r"^\s*(what can you do|what do you do|who are you|help|how does this work|what are you)\b[\s!.?]*$", re.I)
+
+
+def smalltalk(q: str) -> str | None:
+    """Instant, free replies for greetings and 'what can you do' - no retrieval, no LLM call."""
+    if GREETING.match(q):
+        return "Hi! I'm NuevAI. Ask me about courses, the school calendar and game schedules, policies in the handbook, or how to book, register or pay for things."
+    if THANKS.match(q):
+        return "You're welcome! Ask me anything else about Nueva."
+    if CAPABILITIES.match(q):
+        return ("I'm NuevAI, an assistant for the Nueva community. I can help with:\n\n"
+                "- Courses: what's offered, prerequisites, what a class covers\n"
+                "- The school calendar and sports schedules: games, practices, breaks, events\n"
+                "- Handbook policies: attendance, phones, dress code, academic integrity\n"
+                "- Links: booking a tour, applying, giving, the store, key documents")
+    return None
+
+
+def suggestions_for(result: dict, query: str) -> list[dict]:
+    """Two or three follow-ups that fit what was just answered."""
+    intent, docs, events = result.get("intent"), result.get("docs", []), result.get("events", [])
+    out = []
+    if events and intent:
+        if intent.kind == "game":
+            sport = intent.sport or ""
+            out += [{"label": "Show all home games", "query": f"What are all the {sport} home games?".replace("  ", " ")},
+                    {"label": "When is practice?", "query": f"What time is {sport or 'team'} practice?"}]
+        elif intent.sport:
+            out += [{"label": "When is the next game?", "query": f"When is the next {intent.sport} game?"}]
+        elif intent.category == "no_school":
+            out += [{"label": "What's happening this week?", "query": "What events are happening this week?"}]
+        out.append({"label": "Open the calendar", "action": "calendar"})
+    else:
+        titles = " ".join((d.get("metadata") or {}).get("title", "") for d in docs).lower()
+        if "catalog" in titles or "course" in titles:
+            out += [{"label": "What are the prerequisites?", "query": f"{query.rstrip('?')} - what are the prerequisites?"},
+                    {"label": "What other departments are there?", "query": "What departments and subjects are offered?"}]
+        elif "handbook" in titles or "policy" in titles:
+            out += [{"label": "Who do I contact about this?", "query": "Who do I contact about " + query.rstrip("?").lower() + "?"}]
+    return out[:3]
 
 
 def _prepare(req: QueryRequest):
@@ -211,23 +265,30 @@ def _prepare(req: QueryRequest):
     return msgs, sources, result, now
 
 
-FALLBACK_MODELS = [m.strip() for m in os.getenv("LLM_FALLBACKS", "llama-3.3-70b-versatile,llama-3.1-8b-instant").split(",") if m.strip()]
+FALLBACK_MODELS = [m.strip() for m in os.getenv("LLM_FALLBACKS", "openai/gpt-oss-20b,qwen/qwen3.8-27b").split(",") if m.strip()]
+RETRYABLE_STATUS = {400, 404, 408, 413, 422, 429, 500, 502, 503, 504, 529}
 
 
 def _create(msgs, model: str, stream: bool):
-    """Groq call with automatic fallback when a model is rate limited (each model has its own token budget)."""
-    last = None
+    """Groq call that moves to the next model on rate limits, missing models, overload or timeouts
+    (each model has its own token budget). If every model is busy the visitor gets a friendly message."""
+    from groq import APIConnectionError, APIStatusError
+    last, all_rate_limited = None, True
     for m in [model] + [x for x in FALLBACK_MODELS if x != model]:
         try:
             return groq_client.chat.completions.create(messages=msgs, stream=stream, **_llm_kwargs(m)), m
-        except Exception as e:
+        except APIStatusError as e:
             last = e
-            text = str(e).lower()
-            if "429" in text or "rate_limit" in text or "rate limit" in text or "over capacity" in text or "503" in text:
-                print(f"LLM {m} unavailable ({text[:80]}); trying next model", flush=True)
-                continue
-            raise
-    raise last
+            if e.status_code not in RETRYABLE_STATUS:
+                raise
+            all_rate_limited &= e.status_code == 429
+            print(f"LLM {m} unavailable (HTTP {e.status_code}); trying next model", flush=True)
+        except APIConnectionError as e:
+            last, all_rate_limited = e, False
+            print(f"LLM {m} unreachable ({type(e).__name__}); trying next model", flush=True)
+    if all_rate_limited:
+        raise HTTPException(429, "The assistant is getting a lot of questions right now - please try again in a few seconds.")
+    raise HTTPException(503, "The assistant is temporarily unavailable - please try again in a moment.") from last
 
 
 def _llm_kwargs(model: str) -> dict:
@@ -258,6 +319,9 @@ def answer_once(query: str) -> dict:
 def _answer(req: QueryRequest, request: Request | None) -> dict:
     t0 = time.time()
     now = datetime.now(PACIFIC)
+    if (canned := smalltalk(req.query)) is not None:
+        _track(req, request, {"query": req.query[:300], "cached": True, "smalltalk": True, "total_ms": 0, "ttft_ms": 0, "sources": 0})
+        return {"answer": canned, "model_used": "none", "sources": [], "suggestions": [], "cached": True, "timings": {"total_ms": 0}}
     key = _cache_key(req, now)
     if key and (hit := answer_cache.get(key)):
         total = round((time.time() - t0) * 1000)
@@ -269,7 +333,7 @@ def _answer(req: QueryRequest, request: Request | None) -> dict:
     completion, model = _create(msgs, model, stream=False)
     answer = completion.choices[0].message.content or ""
     timings = {**result["timings"], "llm_ms": round((time.time() - t_llm) * 1000), "total_ms": round((time.time() - t0) * 1000)}
-    payload = {"answer": answer, "model_used": model, "sources": sources}
+    payload = {"answer": answer, "model_used": model, "sources": sources, "suggestions": suggestions_for(result, req.query)}
     if key and sources:       # never cache an answer that had nothing behind it
         intent = result["intent"]
         answer_cache.set(key, payload, ttl=DATE_ANSWER_TTL if intent else ANSWER_TTL)
@@ -327,6 +391,12 @@ def chat_stream(req: QueryRequest, request: Request):
         t0 = time.time()
         try:
             now = datetime.now(PACIFIC)
+            if (canned := smalltalk(req.query)) is not None:
+                yield _sse("meta", {"sources": [], "cached": True})
+                yield _sse("delta", {"t": canned})
+                yield _sse("done", {"cached": True, "timings": {"total_ms": 0, "ttft_ms": 0}, "suggestions": []})
+                _track(req, request, {"query": req.query[:300], "cached": True, "smalltalk": True, "total_ms": 0, "ttft_ms": 0, "sources": 0})
+                return
             key = _cache_key(req, now)
             hit = answer_cache.get(key) if key else None
             if hit:
@@ -335,7 +405,7 @@ def chat_stream(req: QueryRequest, request: Request):
                 for i in range(0, len(text), 60):          # replay quickly so the UI looks the same as a live stream
                     yield _sse("delta", {"t": text[i:i + 60]})
                 total = round((time.time() - t0) * 1000)
-                yield _sse("done", {"cached": True, "timings": {"total_ms": total, "ttft_ms": 0}})
+                yield _sse("done", {"cached": True, "timings": {"total_ms": total, "ttft_ms": 0}, "suggestions": hit.get("suggestions", [])})
                 _track(req, request, {"query": req.query[:300], "cached": True, "total_ms": total, "ttft_ms": total, "sources": len(hit["sources"])})
                 return
             msgs, sources, result, now = _prepare(req)
@@ -353,9 +423,10 @@ def chat_stream(req: QueryRequest, request: Request):
             answer = "".join(parts)
             timings = {**result["timings"], "ttft_ms": ttft, "llm_ms": round((time.time() - t_llm) * 1000),
                        "total_ms": round((time.time() - t0) * 1000)}
-            yield _sse("done", {"cached": False, "timings": timings})
+            suggestions = suggestions_for(result, req.query)
+            yield _sse("done", {"cached": False, "timings": timings, "suggestions": suggestions})
             if key and answer and sources:
-                answer_cache.set(key, {"answer": answer, "model_used": model, "sources": sources},
+                answer_cache.set(key, {"answer": answer, "model_used": model, "sources": sources, "suggestions": suggestions},
                                  ttl=DATE_ANSWER_TTL if result["intent"] else ANSWER_TTL)
             _track(req, request, {"query": req.query[:300], "cached": False, "sources": len(sources), "no_context": not sources,
                                   "fallback": bool(re.search(r"(isn't|is not|not) (in|available)|not on the school calendar", answer, re.I)),
@@ -378,7 +449,7 @@ def calendar_events(start: str = Query(..., alias="from"), to: str = Query(...),
     key = (start, to, category, q.lower(), limit)
     if (hit := api_cache.get(key)) is not None:
         return hit
-    query = get_supabase().table("document_chunks").select("metadata").eq("metadata->>source", "calendar") \
+    query = get_supabase().table("document_chunks").select("metadata").in_("metadata->>source", ["calendar", "calendar_sheet"]) \
         .gte("metadata->>end_date", start).lte("metadata->>event_date", to)
     if category and re.fullmatch(r"[a-z_]{3,20}", category):
         query = query.eq("metadata->>category", category)

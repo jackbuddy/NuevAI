@@ -35,6 +35,11 @@ CASES = [
     ("When is the November break?", r"(?i)november break", "calendar: no school"),
     ("What is happening on November 12?", r"(?i)schedule for thursday, november 12", "calendar: day digest"),
     ("When is the winter concert?", r"(?i)concert", "calendar: arts"),
+    ("Are there any upper school basketball games coming up?", r"US Girls Basketball - Game", "calendar: US sheet games"),
+    ("When does the girls volleyball team play next?", r"US Girls Volleyball - Game", "calendar: US sheet games"),
+    ("What clubs can I join?", r"clubs and affinity groups \(\d+ listed\)", "clubs outline"),
+    ("What happens if I'm late to class?", r"(?i)tard", "synonym expansion -> attendance policy"),
+    ("What time is boys basketball practice?", r"PRACTICE SCHEDULE", "calendar: practice overview"),
 ]
 
 

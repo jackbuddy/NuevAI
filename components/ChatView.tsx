@@ -69,14 +69,14 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
       await streamChat(q, history, {
         onMeta: (m) => patch((x) => ({ ...x, sources: m.sources, cached: m.cached })),
         onDelta: (t) => { if (!first) { first = performance.now() - t0; setWaking(false); } patch((x) => ({ ...x, content: x.content + t })); },
-        onDone: (d) => patch((x) => ({ ...x, streaming: false, cached: d.cached, ms: Math.round(first), totalMs: Math.round(performance.now() - t0) })),
+        onDone: (d) => patch((x) => ({ ...x, streaming: false, cached: d.cached, suggestions: d.suggestions ?? [], ms: Math.round(first), totalMs: Math.round(performance.now() - t0) })),
       }, ac.signal);
       track('chat_rendered', { first_ms: Math.round(first), total_ms: Math.round(performance.now() - t0) });
     } catch (e: any) {
       if (e?.name === 'AbortError') { patch((x) => ({ ...x, streaming: false })); }
       else {
         track('chat_error_ui', { message: String(e?.message ?? e).slice(0, 120), after_ms: Math.round(performance.now() - t0) });
-        patch((x) => ({ ...x, streaming: false, error: true, content: x.content || (/knowledge base/i.test(String(e?.message)) ? 'The assistant can’t reach the school’s knowledge base right now — this is a server setup issue, not your question. Please try again later.' : String(e?.message).includes('timed out')
+        patch((x) => ({ ...x, streaming: false, error: true, content: x.content || (/knowledge base/i.test(String(e?.message)) ? 'The assistant can’t reach the school’s knowledge base right now — this is a server setup issue, not your question. Please try again later.' : /lot of questions|temporarily unavailable/i.test(String(e?.message)) ? String(e.message).replace(' - ', ' — ') : String(e?.message).includes('timed out')
           ? 'The assistant took too long to respond. It may be waking up after being idle — please try again in a moment.'
           : 'I couldn’t reach the assistant just now. Check your connection and try again.') }));
       }
@@ -153,7 +153,21 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
         <>
           <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
             <div className="mx-auto w-full max-w-3xl space-y-7 px-4 pb-6 pt-8 md:px-6">
-              {messages.map((m) => <Bubble key={m.id} m={m} waking={waking && !!m.streaming && !m.content} onRetry={() => retry(m)} />)}
+              {messages.map((m, i) => (
+                <div key={m.id}>
+                  <Bubble m={m} waking={waking && !!m.streaming && !m.content} onRetry={() => retry(m)} />
+                  {i === messages.length - 1 && !busy && !m.error && m.suggestions && m.suggestions.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2 pl-[38px]">
+                      {m.suggestions.map((s) => (
+                        <button key={s.label} onClick={() => { track('suggestion_click', { label: s.label }); s.action === 'calendar' ? onOpenCalendar() : s.query && send(s.query, 'starter'); }}
+                                className="surface-2 rounded-full border border-transparent px-3.5 py-1.5 text-[13px] font-medium text-brand-800 transition hover:border-[var(--line)] hover:bg-white hover:shadow-soft">
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
               <div ref={endRef} />
             </div>
           </div>

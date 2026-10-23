@@ -50,6 +50,8 @@ def run(prune=False, prune_legacy=False, dry_run=False, log=print) -> dict:
     sb = client()
     have = existing(sb)
     new_ids = {c["chunk_id"] for c in chunks}
+    chunks = list({c["chunk_id"]: c for c in chunks}.values())
+    new_ids = {c["chunk_id"] for c in chunks}
     todo = [c for c in chunks if have.get(c["chunk_id"], (None,))[0] != c["metadata"]["content_hash"]]
     stale = [i for i, (h, u, s) in have.items() if u and i not in new_ids]    # written by this pipeline
     legacy = [i for i, (h, u, s) in have.items() if not u]                    # old pipeline

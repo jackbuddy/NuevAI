@@ -28,6 +28,39 @@ LINK_INTENTS = [
     ("payment", re.compile(r"\b(donat\w*|giv(e|ing)|gift|pay|payment|tuition|store|buy|merch\w*|spirit ?wear)\b", re.I)),
 ]
 
+# Never served, even if such rows exist in the database: sheets/forms that hold people's data.
+BLOCKED_TITLE = re.compile(r"diploma|rsvp|sign[- ]?up|roster|responses|attendance sheet|transcript|salary|payroll|medical", re.I)
+
+# Everyday wording -> the words the handbook actually uses. Added to the search text only (never shown).
+SYNONYMS = {
+    r"\blate\b|\bleft early\b": "tardy tardies attendance",
+    r"\babsent\b|\bmiss(ing)? school\b|\bsick\b": "absence absences attendance illness",
+    r"\bphones?\b|\bairpods?\b|\bearbuds?\b": "cell phone policy devices",
+    r"\bai\b|\bchatgpt\b|\bgpt\b": "artificial intelligence generative AI academic integrity",
+    r"\bcheat(ing)?\b|\bcopy(ing)?\b": "plagiarism academic integrity honor",
+    r"\bhomework\b": "homework assignments late work",
+    r"\bgrad(e|es|ing)\b|\bgpa\b|\breport cards?\b": "grading grades assessment reporting",
+    r"\bbus(es)?\b|\btransport\w*\b|\bshuttle\b": "transportation shuttle bus",
+    r"\blunch\b|\bfood\b|\bcafeteria\b|\bcafe\b": "lunch cafe meals dining",
+    r"\bpark(ing)?\b|\bdrop[- ]?off\b|\bpick[- ]?up\b": "parking drop-off pick-up",
+    r"\buniform\b|\bwear\b|\bclothes\b": "dress code",
+    r"\binjur\w*\b|\bhurt\b|\btrainer\b": "sports medicine athletic training injury",
+    r"\btuition\b|\bcost\b|\bfinancial aid\b|\bscholarship\b": "tuition financial assistance",
+    r"\bcounsel\w*\b|\bstress(ed)?\b|\banxi\w*\b|\bmental\b": "counseling wellness support",
+    r"\bcollege\b|\bapplications?\b|\bcommon app\b": "college counseling",
+    r"\blaptop\b|\bwi-?fi\b|\bprint\w*\b|\bpassword\b|\bwifi\b": "technology IT help desk laptop wifi printing",
+    r"\bgraduat\w*\b": "graduation requirements credits",
+    r"\belective\b": "elective courses",
+    r"\bclubs?\b|\baffinity\b|\bstudent organi[sz]ations?\b": "clubs and affinity groups list",
+    r"\bmakeup\b|\bmake[- ]up\b|\bretake\b": "make-up retake assessment policy",
+}
+
+
+def expand_query(q: str) -> str:
+    extra = [w for rx, w in SYNONYMS.items() if re.search(rx, q, re.I)]
+    return f"{q} ({' '.join(extra)})" if extra else q
+
+
 _pool = ThreadPoolExecutor(max_workers=6)
 
 
@@ -112,7 +145,7 @@ class Retriever:
             return cached
         digest = intent.short_range() and not (intent.sport or intent.kind or intent.keywords or intent.category)
         q = self.sb().table("document_chunks").select("chunk_id,content,metadata") \
-            .eq("metadata->>source", "calendar_day" if digest else "calendar") \
+            .in_("metadata->>source", ["calendar_day"] if digest else ["calendar", "calendar_sheet"]) \
             .gte("metadata->>event_date" if digest else "metadata->>end_date", intent.start.isoformat()) \
             .lte("metadata->>event_date", intent.end.isoformat())
         if not digest:
@@ -173,7 +206,7 @@ class Retriever:
         history = history or []
         prev_user = next((m["content"] for m in reversed(history) if m.get("role") == "user"), "")
         # short follow-ups ("what about tomorrow?") borrow the previous question for search
-        search_q = f"{prev_user} {query}" if prev_user and len(query.split()) <= 6 else query
+        search_q = expand_query(f"{prev_user} {query}" if prev_user and len(query.split()) <= 6 else query)
         intent = parse_intent(query, today, prev_user)
         timings = {}
 
@@ -206,6 +239,7 @@ class Retriever:
         except Exception as e:
             print(f"calendar lookup failed: {e}", flush=True)
 
+        rows = [r for r in rows if not BLOCKED_TITLE.search((r.get("metadata") or {}).get("title", "") or "")]
         # Prefer rows written by the current pipeline; old-pipeline rows (no source_url) only as a fallback.
         fresh = [r for r in rows if (r.get("metadata") or {}).get("source_url")]
         if len(fresh) >= 3:
@@ -250,6 +284,24 @@ def team_overview(events: list[dict]) -> str:
     return "TEAMS ON THE SCHOOL CALENDAR (all teams that have scheduled games or practices):\n" + "\n".join(lines[:60])
 
 
+def practice_overview(events: list[dict]) -> str:
+    """'What time is basketball practice?' -> each team's next practice and how often they meet, not 20 sessions."""
+    teams: dict[str, list[dict]] = {}
+    for e in events:
+        m = e.get("metadata") or {}
+        name = re.sub(r"\s*-\s*practice.*$", "", m.get("summary", ""), flags=re.I).strip(" -")
+        teams.setdefault(name, []).append(m)
+    lines = []
+    for name, ms in sorted(teams.items()):
+        first = ms[0]
+        days = sorted({datetime.fromisoformat(x["event_date"]).strftime("%a") for x in ms if x.get("event_date")},
+                      key=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].index)
+        lines.append(f"- {name}: next {first.get('when', '')}, {first.get('time', '')}"
+                     + (f" at {first['location']}" if first.get("location") else "")
+                     + f" (practices on {', '.join(days)}; {len(ms)} scheduled)")
+    return "PRACTICE SCHEDULE (one line per team; times can differ by day):\n" + "\n".join(lines[:30])
+
+
 def build_context(result: dict, max_events: int = 14) -> tuple[str, list[dict]]:
     """-> (context string for the model, sources list for the UI)"""
     parts, sources = [], []
@@ -258,6 +310,10 @@ def build_context(result: dict, max_events: int = 14) -> tuple[str, list[dict]]:
         parts.append(team_overview(events))
         shown = []
         sources.append({"chunk_id": "calendar-teams", "title": "Team schedules", "type": "calendar"})
+    elif events and intent and intent.kind == "practice" and len(events) > 4:
+        parts.append(practice_overview(events))
+        shown = []
+        sources.append({"chunk_id": "calendar-practices", "title": "Practice schedule", "type": "calendar"})
     elif events:
         shown = events[:3] if (intent and intent.next_only and intent.kind == "game") else events[:max_events]
         more = f"\n(+{len(events) - len(shown)} more matching events not shown)" if len(events) > len(shown) else ""

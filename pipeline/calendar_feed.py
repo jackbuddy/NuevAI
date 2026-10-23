@@ -186,7 +186,9 @@ def run(log=print) -> dict:
         if e.get("description"):
             lines.append(f"Details: {e['description'][:600]}")
         content = f"Title: {e['summary']}\nSource: school calendar\n\n" + "\n".join(lines)
-        uid = hashlib.sha1(f"{e.get('uid', e['summary'])}|{e['start']}".encode()).hexdigest()[:12]
+        # id from the event's own content, not the feed's UID: the feed repeats events with different UIDs
+        # and which copy is kept can change between fetches
+        uid = hashlib.sha1(f"{e['summary']}|{e['start']}|{e.get('end')}|{e.get('location', '')}".encode()).hexdigest()[:12]
         extra = {
             "end_date": e["end_date"].isoformat(), "summary": e["summary"], "when": e["when"], "time": e["time"],
             "all_day": e["all_day"],

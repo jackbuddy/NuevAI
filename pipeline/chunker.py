@@ -13,10 +13,12 @@ indexer skip chunks whose text did not change.
 import hashlib
 import json
 import re
+from datetime import date, timedelta
 
 from . import config
 from .common import load_pages
 from .links import build as build_links, link_cards
+from . import sheets
 
 HEADING = re.compile(r"^(#{1,6})\s+(.*)$")
 
@@ -131,7 +133,11 @@ def chunk_page(page: dict):
 
 def run(log=print) -> list[dict]:
     chunks, seen_bodies = [], set()
+    skipped_private = 0
     for page in load_pages():
+        if sheets.is_sensitive(page):
+            skipped_private += 1
+            continue
         for n, content in chunk_page(page):
             body_hash = hashlib.sha1(content.split("\n\n", 1)[1].encode()).hexdigest()
             if body_hash in seen_bodies:
@@ -143,7 +149,18 @@ def run(log=print) -> list[dict]:
                 "metadata": {"source_url": page["url"], "title": page["title"], "source": page["source"],
                              "content_hash": hashlib.sha1(content.encode()).hexdigest()},
             })
+    today = date.today()
     for page in load_pages():
+        if sheets.is_sensitive(page):
+            continue
+        if page.get("source") == "google_sheet":
+            for e in sheets.sports_events(page, today - timedelta(days=14), today + timedelta(days=430)):
+                chunks.append(sheets.event_chunk(e))
+            for j, (title, body) in enumerate(sheets.club_outline(page)):
+                content = f"Title: {title}\nSection: {title} (outline)\nSource: {page['url']}\n\n{body}"
+                chunks.append({"chunk_id": f"{hashlib.sha1(page['url'].encode()).hexdigest()[:12]}-clubs-{j:03d}", "content": content,
+                               "source_file": page["url"], "metadata": {"source_url": page["url"], "title": title, "source": page["source"],
+                                                                      "kind": "outline", "content_hash": hashlib.sha1(content.encode()).hexdigest()}})
         for j, (trail, body) in enumerate(outline_chunks(page)):
             content = f"Title: {page['title']}\nSection: {trail} (outline)\nSource: {page['url']}\n\n{body}"
             chunks.append({"chunk_id": f"{hashlib.sha1(page['url'].encode()).hexdigest()[:12]}-outline-{j:03d}",
@@ -163,7 +180,15 @@ def run(log=print) -> list[dict]:
         })
     if config.CALENDAR_FILE.exists():
         chunks.extend(json.loads(config.CALENDAR_FILE.read_text(encoding="utf-8")))
+    unique, seen_ids = [], set()
+    for c in chunks:                    # one row per id: Postgres rejects duplicates inside a single upsert
+        if c["chunk_id"] not in seen_ids:
+            seen_ids.add(c["chunk_id"])
+            unique.append(c)
+    chunks = unique
     config.CHUNKS_FILE.write_text(json.dumps(chunks, ensure_ascii=False), encoding="utf-8")
     sizes = sorted(len(c["content"]) for c in chunks)
+    if skipped_private:
+        log(f"privacy filter: skipped {skipped_private} sheet(s) with student/people data")
     log(f"chunking done: {len(chunks)} chunks, median {sizes[len(sizes)//2] if sizes else 0} chars -> {config.CHUNKS_FILE}")
     return chunks
