@@ -17,6 +17,12 @@ from . import config
 from .common import html_to_markdown, save_page
 
 MANUAL_DIR = config.DATA_DIR / "manual_docs"
+
+# Spreadsheet tabs that hold individual students (advisee lists, rosters, name lists) are never indexed, even if they
+# are left in the export. Skipped tab names are reported in the run summary so nothing disappears silently.
+SKIP_TAB_TITLE = re.compile(r"advisee|roster|student (list|names?)|class list|attendance|grades?\b|medical|diploma", re.I)
+SKIP_TAB_HEADER = re.compile(r"advisee|student\s*(last|first|name|id)|^students?$", re.I)
+SKIPPED_TABS: list[str] = []
 # text files the old scraper already pulled by hand
 LEGACY_DIR = config.NEXUS_SCRAPER_DIR / "data" / "manual_docs"
 
@@ -49,11 +55,14 @@ def read_file(path) -> str:
         wb = openpyxl.load_workbook(str(path), read_only=True, data_only=True)
         out = []
         for ws in wb.worksheets:                       # every tab, as comma-separated rows under a heading
+            rows = [["" if c is None else str(c).strip() for c in row] for row in ws.iter_rows(values_only=True)]
+            rows = [r for r in rows if any(r)]
+            head = rows[:3]
+            if SKIP_TAB_TITLE.search(ws.title) or any(SKIP_TAB_HEADER.search(c) for r in head for c in r if c):
+                SKIPPED_TABS.append(f"{path.name} > {ws.title}")
+                continue
             out.append(f"## {ws.title}")
-            for row in ws.iter_rows(values_only=True):
-                cells = ["" if c is None else str(c).strip() for c in row]
-                if any(cells):
-                    out.append(",".join(cells))
+            out.extend(",".join(r) for r in rows)
         return "\n".join(out)
     if ext == ".pdf":
         from pypdf import PdfReader
@@ -82,6 +91,6 @@ def run(log=print) -> dict:
         save_page({"url": f"manual://{path.name}", "title": title, "source": "manual", "text": text, "links": [],
                    "scraped_at": datetime.now(timezone.utc).isoformat()})
         imported += 1
-    stats = {"imported": imported, "failed": failed, "folder": str(MANUAL_DIR)}
+    stats = {"imported": imported, "failed": failed, "skipped_private_tabs": SKIPPED_TABS, "folder": str(MANUAL_DIR)}
     log(f"manual docs done: {stats}")
     return stats
