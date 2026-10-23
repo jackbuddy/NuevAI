@@ -15,12 +15,12 @@ export interface CalEvent {
 }
 
 export const CATEGORIES: { id: string; label: string; dot: string; chip: string }[] = [
-  { id: 'athletics', label: 'Athletics', dot: 'bg-orange-500', chip: 'bg-orange-500/10 text-orange-700 dark:text-orange-300' },
-  { id: 'academics', label: 'Academics', dot: 'bg-blue-600', chip: 'bg-blue-600/10 text-blue-700 dark:text-blue-300' },
-  { id: 'arts', label: 'Arts', dot: 'bg-fuchsia-500', chip: 'bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300' },
-  { id: 'community', label: 'Community', dot: 'bg-emerald-500', chip: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' },
-  { id: 'no_school', label: 'No school', dot: 'bg-rose-500', chip: 'bg-rose-500/10 text-rose-700 dark:text-rose-300' },
-  { id: 'other', label: 'Other', dot: 'bg-slate-400', chip: 'bg-slate-500/10 text-slate-700 dark:text-slate-300' },
+  { id: 'athletics', label: 'Athletics', dot: 'bg-brand-800', chip: 'bg-brand-800/10 text-brand-800' },
+  { id: 'academics', label: 'Academics', dot: 'bg-brand-500', chip: 'bg-brand-500/10 text-brand-600' },
+  { id: 'arts', label: 'Arts', dot: 'bg-brand-300', chip: 'bg-brand-300/25 text-brand-700' },
+  { id: 'community', label: 'Community', dot: 'bg-slate-400', chip: 'bg-slate-400/15 text-slate-600' },
+  { id: 'no_school', label: 'No school', dot: 'bg-amber-500', chip: 'bg-amber-500/15 text-amber-800' },
+  { id: 'other', label: 'Other', dot: 'bg-slate-300', chip: 'bg-slate-300/25 text-slate-600' },
 ];
 export const catMeta = (id: string) => CATEGORIES.find((c) => c.id === id) ?? CATEGORIES[CATEGORIES.length - 1];
 

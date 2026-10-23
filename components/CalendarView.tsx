@@ -64,13 +64,13 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
       <div className="mx-auto w-full max-w-5xl px-4 pb-10 pt-6 md:px-6">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-brand-600 dark:text-brand-300">School calendar</p>
-            <h2 className="font-display text-3xl font-semibold tracking-tight md:text-4xl">{monthLabel}</h2>
+            <p className="text-sm font-medium text-brand-600">School calendar</p>
+            <h2 className="text-3xl font-bold tracking-tight text-brand-900 md:text-4xl">{monthLabel}</h2>
           </div>
           <div className="flex items-center gap-2">
             <div className="surface flex rounded-full p-0.5 text-xs font-semibold">
               {(['month', 'agenda'] as View[]).map((v) => (
-                <button key={v} onClick={() => setView(v)} className={`rounded-full px-3.5 py-1.5 capitalize transition ${view === v ? 'bg-brand-700 text-white' : 'ink-2'}`}>{v}</button>
+                <button key={v} onClick={() => setView(v)} className={`rounded-full px-3.5 py-1.5 capitalize transition ${view === v ? 'bg-brand-900 text-white' : 'ink-2'}`}>{v}</button>
               ))}
             </div>
             <button onClick={goToday} className="surface rounded-full px-3.5 py-2 text-xs font-semibold hover:bg-[var(--surface-2)]">Today</button>
@@ -93,7 +93,7 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
               const on = cats.has(c.id);
               return (
                 <button key={c.id} onClick={() => toggleCat(c.id)} aria-pressed={on}
-                        className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${on ? 'border-transparent bg-brand-700 text-white' : 'surface ink-2 hover:bg-[var(--surface-2)]'}`}>
+                        className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${on ? 'border-transparent bg-brand-900 text-white' : 'surface ink-2 hover:bg-[var(--surface-2)]'}`}>
                   <span className={`h-2 w-2 rounded-full ${c.dot}`} />{c.label}
                 </button>
               );
@@ -110,7 +110,7 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
             <CalendarX2 className="ink-2 mx-auto mb-3 h-8 w-8" />
             <p className="font-semibold">The calendar couldn’t load</p>
             <p className="ink-2 mt-1 text-sm">The server may be waking up. Give it a few seconds.</p>
-            <button onClick={load} className="mt-4 rounded-full bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600">Try again</button>
+            <button onClick={load} className="mt-4 rounded-full bg-brand-900 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">Try again</button>
           </div>
         )}
 
@@ -126,7 +126,7 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
                   return (
                     <button key={k} onClick={() => { setSelected(k); track('calendar_day', { day: k, events: list.length }); }}
                             className={`relative min-h-[4.25rem] border-b border-r hairline p-1.5 text-left transition hover:bg-[var(--surface-2)] md:min-h-[6rem] ${!inMonth ? 'opacity-40' : ''} ${isSel ? 'bg-brand-500/10 ring-2 ring-inset ring-brand-500' : ''}`}>
-                      <span className={`grid h-6 w-6 place-items-center rounded-full text-xs font-semibold ${isToday ? 'bg-brand-700 text-white' : ''}`}>{d.getDate()}</span>
+                      <span className={`grid h-6 w-6 place-items-center rounded-full text-xs font-semibold ${isToday ? 'bg-brand-900 text-white' : ''}`}>{d.getDate()}</span>
                       <div className="mt-1 hidden space-y-0.5 md:block">
                         {list.slice(0, 2).map((e, i) => (
                           <div key={i} className={`truncate rounded px-1 py-0.5 text-[10px] font-medium leading-tight ${catMeta(e.category).chip}`}>{e.summary.trim()}</div>
@@ -143,8 +143,8 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
             </div>
 
             <aside className="surface shadow-soft h-fit rounded-3xl p-4 lg:sticky lg:top-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-300">{selected === todayIso ? 'Today' : 'Selected day'}</p>
-              <h3 className="font-display mb-3 text-xl font-semibold">{parseISO(selected).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</h3>
+              <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">{selected === todayIso ? 'Today' : 'Selected day'}</p>
+              <h3 className="mb-3 text-xl font-bold">{parseISO(selected).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</h3>
               {dayEvents.length === 0 ? <Empty practicesHidden={!practices && events.some((e) => onDay(e, selected) && e.kind === 'practice')} /> :
                 <div className="space-y-2.5">{dayEvents.map((e, i) => <EventCard key={i} e={e} onAsk={onAsk} />)}</div>}
             </aside>
@@ -157,7 +157,7 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
             {agendaDays.map(([k, list]) => (
               <section key={k}>
                 <h3 className="mb-2 flex items-baseline gap-2 text-sm font-semibold">
-                  <span className={k === todayIso ? 'text-brand-600 dark:text-brand-300' : ''}>{parseISO(k).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+                  <span className={k === todayIso ? 'text-brand-600' : ''}>{parseISO(k).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</span>
                   {k === todayIso && <span className="rounded-full bg-brand-700 px-2 py-0.5 text-[10px] text-white">Today</span>}
                 </h3>
                 <div className="grid gap-2.5 md:grid-cols-2">{list.map((e, i) => <EventCard key={i} e={e} onAsk={onAsk} />)}</div>
@@ -197,8 +197,8 @@ function EventCard({ e, onAsk }: { e: CalEvent; onAsk: (q: string) => void }) {
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${cat.chip}`}>{cat.label}</span>
-            {e.kind === 'game' && <span className="rounded-full bg-orange-500/10 px-2 py-0.5 text-[10px] font-semibold text-orange-700 dark:text-orange-300">Game</span>}
-            {e.home_away === 'home' && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300"><Home className="h-2.5 w-2.5" />Home</span>}
+            {e.kind === 'game' && <span className="rounded-full bg-brand-800/10 px-2 py-0.5 text-[10px] font-semibold text-brand-800">Game</span>}
+            {e.home_away === 'home' && <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-700"><Home className="h-2.5 w-2.5" />Home</span>}
             {e.home_away === 'away' && <span className="inline-flex items-center gap-1 rounded-full bg-slate-500/10 px-2 py-0.5 text-[10px] font-semibold"><Plane className="h-2.5 w-2.5" />Away</span>}
           </div>
           {e.description && <p className="ink-2 mt-2 text-xs leading-relaxed">{e.description}</p>}

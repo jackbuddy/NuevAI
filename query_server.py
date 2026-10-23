@@ -53,6 +53,27 @@ analytics = Analytics(get_supabase)
 answer_cache = TTLCache(max_items=800, ttl=ANSWER_TTL)
 api_cache = TTLCache(max_items=128, ttl=600)
 
+_data_state = {"at": 0.0, "rows": None, "error": ""}
+
+
+def data_status() -> dict:
+    """Can the server actually read the knowledge base? Cached for 60s. The anon key (or a wrong project) reads 0 rows."""
+    if time.time() - _data_state["at"] < 60 and _data_state["rows"]:
+        return _data_state
+    try:
+        res = get_supabase().table("document_chunks").select("chunk_id", count="exact").limit(1).execute()
+        _data_state.update(rows=res.count or 0, error="")
+    except Exception as e:
+        _data_state.update(rows=0, error=str(e)[:160])
+    _data_state["at"] = time.time()
+    return _data_state
+
+
+class KnowledgeBaseUnavailable(HTTPException):
+    def __init__(self):
+        super().__init__(503, "The school knowledge base is unreachable right now (server configuration). Please try again later.")
+
+
 STARTERS = [
     "What sports are playing this season?",
     "What engineering courses are offered?",
@@ -67,6 +88,9 @@ def _warm():
         retriever.models.embed_model()
         retriever.models.rerank_model()
         time.sleep(2)
+        if not data_status()["rows"]:
+            print("Warm-up skipped: knowledge base unreadable (check SUPABASE_SERVICE_ROLE_KEY).", flush=True)
+            return
         for q in STARTERS:
             try:
                 answer_once(q)
@@ -90,8 +114,9 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False,
 # ------------------------------------------------------------------ health
 @app.get("/health")
 def health():
+    d = data_status()
     return {"status": "ok", "model_loaded": retriever.models.ready["embedding"], **retriever.models.ready,
-            "answer_cache": answer_cache.stats()}
+            "data_ok": bool(d["rows"]), "data_rows": d["rows"], "answer_cache": answer_cache.stats()}
 
 
 def _key_kind(key: str) -> str:
@@ -165,9 +190,18 @@ def _norm(q: str) -> str:
 def _prepare(req: QueryRequest):
     """Retrieval + prompt assembly. Returns everything the LLM step and the logs need."""
     now = datetime.now(PACIFIC)
-    result = retriever.retrieve(req.query, [t.model_dump() for t in req.history], top_k=min(max(req.top_k, 3), 8), today=now.date())
+    try:
+        result = retriever.retrieve(req.query, [t.model_dump() for t in req.history], top_k=min(max(req.top_k, 3), 8), today=now.date())
+    except Exception as e:
+        if not data_status()["rows"]:
+            print(f"KNOWLEDGE BASE UNREACHABLE ({str(e)[:80]}) - check SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY", flush=True)
+            raise KnowledgeBaseUnavailable()
+        raise
     context, sources = build_context(result)
     if not context.strip():
+        if not data_status()["rows"]:
+            print("KNOWLEDGE BASE UNREADABLE: 0 rows visible - check SUPABASE_SERVICE_ROLE_KEY (must be the service/secret key)", flush=True)
+            raise KnowledgeBaseUnavailable()
         context = "No relevant documentation was found for this question."
     system = (f"{SYSTEM_PERSONA}\n\nToday is {now.strftime('%A, %B %-d, %Y')} (Pacific time).\n\n"
               f"CONTEXT:\n{context}")
@@ -236,7 +270,7 @@ def _answer(req: QueryRequest, request: Request | None) -> dict:
     answer = completion.choices[0].message.content or ""
     timings = {**result["timings"], "llm_ms": round((time.time() - t_llm) * 1000), "total_ms": round((time.time() - t0) * 1000)}
     payload = {"answer": answer, "model_used": model, "sources": sources}
-    if key:
+    if key and sources:       # never cache an answer that had nothing behind it
         intent = result["intent"]
         answer_cache.set(key, payload, ttl=DATE_ANSWER_TTL if intent else ANSWER_TTL)
     _track(req, request, {"query": req.query[:300], "cached": False, "sources": len(sources), "no_context": not sources,
@@ -250,6 +284,8 @@ def chat_endpoint(req: QueryRequest, request: Request):
     _rate_limit(req, request)
     try:
         return _answer(req, request)
+    except HTTPException:
+        raise
     except Exception as e:
         if req.anon_id:
             analytics.record("chat_error", req.anon_id, req.session_id, {"error": str(e)[:200], "query": req.query[:200]})
@@ -318,7 +354,7 @@ def chat_stream(req: QueryRequest, request: Request):
             timings = {**result["timings"], "ttft_ms": ttft, "llm_ms": round((time.time() - t_llm) * 1000),
                        "total_ms": round((time.time() - t0) * 1000)}
             yield _sse("done", {"cached": False, "timings": timings})
-            if key and answer:
+            if key and answer and sources:
                 answer_cache.set(key, {"answer": answer, "model_used": model, "sources": sources},
                                  ttl=DATE_ANSWER_TTL if result["intent"] else ANSWER_TTL)
             _track(req, request, {"query": req.query[:300], "cached": False, "sources": len(sources), "no_context": not sources,
@@ -327,7 +363,7 @@ def chat_stream(req: QueryRequest, request: Request):
         except Exception as e:
             if req.anon_id:
                 analytics.record("chat_error", req.anon_id, req.session_id, {"error": str(e)[:200], "query": req.query[:200]})
-            yield _sse("error", {"message": str(e)[:300]})
+            yield _sse("error", {"message": e.detail if isinstance(e, HTTPException) else str(e)[:300]})
 
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"})

@@ -29,3 +29,6 @@ data/pipeline/
 # local-only: lists private documents; TypeScript cache
 DOWNLOAD_THESE.md
 tsconfig.tsbuildinfo
+.env.*
+AGENTS.md
+CLAUDE.md

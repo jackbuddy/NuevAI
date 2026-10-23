@@ -1,20 +1,20 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowUp, BookOpen, CalendarDays, Check, Copy, GraduationCap, RotateCw, Sparkles, ThumbsDown, ThumbsUp, Trophy, Zap, MapPin, ShieldCheck, Link2, ChevronDown } from 'lucide-react';
+import { ArrowUp, BookOpen, CalendarDays, Check, ChevronDown, Copy, GraduationCap, Link2, MapPin, RotateCw, ShieldCheck, ThumbsDown, ThumbsUp, Trophy, Zap } from 'lucide-react';
 import { Markdown } from './Markdown';
 import { Logo } from './Logo';
 import { track } from '@/lib/analytics';
 import { Message, streamChat, uid } from '@/lib/chat';
-import { CalEvent, iso, timeLabel } from '@/lib/calendar';
+import { CalEvent, iso } from '@/lib/calendar';
 
 const STARTERS = [
-  { icon: Trophy, label: 'What sports are playing this season?', hint: 'Teams & schedules', tone: 'from-orange-500/15 to-amber-400/5 text-orange-600 dark:text-orange-300' },
-  { icon: GraduationCap, label: 'What engineering courses are offered?', hint: 'Course catalog', tone: 'from-brand-500/15 to-sky-400/5 text-brand-600 dark:text-brand-300' },
-  { icon: ShieldCheck, label: 'What is the cell phone policy?', hint: 'Handbook & policies', tone: 'from-emerald-500/15 to-teal-400/5 text-emerald-600 dark:text-emerald-300' },
-  { icon: CalendarDays, label: 'When is the next school break?', hint: 'School calendar', tone: 'from-fuchsia-500/15 to-pink-400/5 text-fuchsia-600 dark:text-fuchsia-300' },
-  { icon: MapPin, label: 'How do I book a campus tour?', hint: 'Visit & admissions', tone: 'from-sky-500/15 to-cyan-400/5 text-sky-600 dark:text-sky-300' },
-  { icon: BookOpen, label: 'What clubs can I join?', hint: 'Student life', tone: 'from-violet-500/15 to-indigo-400/5 text-violet-600 dark:text-violet-300' },
+  { icon: Trophy, label: 'What sports are playing this season?' },
+  { icon: GraduationCap, label: 'What engineering courses are offered?' },
+  { icon: ShieldCheck, label: 'What is the cell phone policy?' },
+  { icon: CalendarDays, label: 'When is the next school break?' },
+  { icon: MapPin, label: 'How do I book a campus tour?' },
+  { icon: BookOpen, label: 'What clubs can I join?' },
 ];
 const STORE_KEY = 'nuevai.chat.v2';
 
@@ -76,7 +76,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
       if (e?.name === 'AbortError') { patch((x) => ({ ...x, streaming: false })); }
       else {
         track('chat_error_ui', { message: String(e?.message ?? e).slice(0, 120), after_ms: Math.round(performance.now() - t0) });
-        patch((x) => ({ ...x, streaming: false, error: true, content: x.content || (String(e?.message).includes('timed out')
+        patch((x) => ({ ...x, streaming: false, error: true, content: x.content || (/knowledge base/i.test(String(e?.message)) ? 'The assistant can’t reach the school’s knowledge base right now — this is a server setup issue, not your question. Please try again later.' : String(e?.message).includes('timed out')
           ? 'The assistant took too long to respond. It may be waking up after being idle — please try again in a moment.'
           : 'I couldn’t reach the assistant just now. Check your connection and try again.') }));
       }
@@ -95,84 +95,76 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
   const games = (today ?? []).filter((e) => e.kind !== 'practice');
   const practices = (today ?? []).length - games.length;
 
+  const composer = (
+    <form onSubmit={(e) => { e.preventDefault(); send(input); }}
+          className="surface shadow-lift flex items-end gap-2 rounded-[1.75rem] p-2 pl-5 transition focus-within:border-brand-400 focus-within:ring-4 focus-within:ring-brand-500/10">
+      <textarea ref={taRef} value={input} rows={1} maxLength={1000} onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); } }}
+                placeholder="Ask about courses, games, policies…" aria-label="Ask NuevAI" autoFocus={empty}
+                className="max-h-40 min-h-[2.75rem] flex-1 resize-none bg-transparent py-3 text-[15px] outline-none placeholder:text-[var(--ink-2)]" />
+      {messages.length > 0 && (
+        <button type="button" onClick={clear} className="ink-2 hidden rounded-full px-3 py-2 text-xs font-semibold hover:bg-[var(--surface-2)] sm:block">New chat</button>
+      )}
+      <button type="submit" disabled={busy || !input.trim()} aria-label="Send"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-900 text-white transition hover:bg-brand-700 disabled:opacity-25">
+        <ArrowUp className="h-5 w-5" />
+      </button>
+    </form>
+  );
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
-      <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-3xl px-4 pb-6 pt-6 md:px-6">
-          {empty ? (
+      {empty ? (
+        <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center px-4 pb-16 pt-10 md:px-6">
             <div className="animate-rise">
-              <section className="relative overflow-hidden rounded-[2rem] px-6 pb-7 pt-8 text-center md:px-12 md:pb-9 md:pt-10">
-                <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-                  <div className="absolute -left-16 -top-24 h-72 w-72 animate-float rounded-full blur-3xl" style={{ background: 'var(--glow-a)' }} />
-                  <div className="absolute -right-10 top-10 h-64 w-64 animate-float-slow rounded-full blur-3xl" style={{ background: 'var(--glow-b)' }} />
-                  <div className="absolute bottom-[-6rem] left-1/3 h-72 w-72 animate-float rounded-full blur-3xl" style={{ background: 'var(--glow-c)' }} />
-                  <div className="bg-dots absolute inset-0 opacity-60 [mask-image:radial-gradient(ellipse_at_center,black,transparent_72%)]" />
-                </div>
-                <div className="mx-auto mb-4 flex justify-center"><Logo size={52} /></div>
-                <p className="mb-2 text-sm font-medium tracking-wide text-brand-600 dark:text-brand-300">{greeting}</p>
-                <h1 className="font-display text-balance text-4xl font-semibold leading-[1.08] tracking-tight md:text-5xl">
-                  Ask anything about <span className="bg-gradient-to-r from-brand-600 via-brand-500 to-amber-500 bg-clip-text text-transparent">Nueva</span>
-                </h1>
-                <p className="ink-2 mx-auto mt-4 max-w-xl text-balance text-base md:text-lg">
-                  Courses, the school calendar, game schedules, policies and campus resources, answered from the school’s own documents.
-                </p>
-              </section>
-
-              {games.length > 0 && (
-                <button onClick={() => { track('today_strip_click'); onOpenCalendar(); }}
-                        className="surface shadow-soft group mx-auto mb-6 flex w-full items-center gap-3 rounded-2xl p-3 text-left transition hover:-translate-y-0.5 hover:shadow-lift md:p-4">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-400/15 text-amber-600 dark:text-amber-300"><Zap className="h-5 w-5" /></span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-300">Today at Nueva</span>
-                    <span className="block truncate text-sm font-medium">{games.slice(0, 3).map((e) => e.summary.trim()).join('  ·  ')}</span>
-                    <span className="ink-2 block text-xs">{games.length} event{games.length === 1 ? '' : 's'}{practices ? ` · ${practices} practices` : ''} · tap to open the calendar</span>
-                  </span>
-                  <ChevronDown className="ink-2 h-4 w-4 -rotate-90 transition group-hover:translate-x-0.5" />
-                </button>
-              )}
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                {STARTERS.map((s, i) => (
-                  <button key={s.label} onClick={() => { track('starter_click', { label: s.label }); send(s.label, 'starter'); }}
-                          style={{ animationDelay: `${i * 60}ms` }}
-                          className="surface shadow-soft group animate-rise flex items-start gap-3 rounded-2xl p-4 text-left transition hover:-translate-y-0.5 hover:shadow-lift">
-                    <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${s.tone}`}><s.icon className="h-5 w-5" /></span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-semibold leading-snug">{s.label}</span>
-                      <span className="ink-2 mt-0.5 block text-xs">{s.hint}</span>
-                    </span>
-                  </button>
-                ))}
-              </div>
+              <p className="mb-1 flex items-center gap-2 text-lg font-semibold text-brand-600"><Logo size={22} />{greeting}</p>
+              <h1 className="text-balance text-4xl font-bold leading-[1.1] tracking-tight text-brand-900 md:text-[3.25rem]">
+                What would you like to know?
+              </h1>
             </div>
-          ) : (
-            <div className="space-y-6">
-              {messages.map((m) => <Bubble key={m.id} m={m} waking={waking && m.streaming && !m.content} onRetry={() => retry(m)} />)}
+
+            <div className="animate-rise mt-8" style={{ animationDelay: '70ms' }}>{composer}</div>
+
+            <div className="animate-rise mt-5 flex flex-wrap gap-2" style={{ animationDelay: '140ms' }}>
+              {STARTERS.map((s) => (
+                <button key={s.label} onClick={() => { track('starter_click', { label: s.label }); send(s.label, 'starter'); }}
+                        className="surface-2 inline-flex items-center gap-2 rounded-full border border-transparent px-4 py-2 text-[13px] font-medium text-brand-800 transition hover:border-[var(--line)] hover:bg-white hover:shadow-soft">
+                  <s.icon className="h-3.5 w-3.5 text-brand-500" />{s.label}
+                </button>
+              ))}
+            </div>
+
+            {games.length > 0 && (
+              <button onClick={() => { track('today_strip_click'); onOpenCalendar(); }}
+                      className="animate-rise surface group mt-8 flex w-full items-center gap-3 rounded-2xl p-3.5 text-left transition hover:shadow-soft" style={{ animationDelay: '210ms' }}>
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-100 text-brand-700"><Zap className="h-4 w-4" /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[11px] font-bold uppercase tracking-wider text-brand-500">Today</span>
+                  <span className="block truncate text-sm font-semibold">{games.slice(0, 3).map((e) => e.summary.trim()).join('  ·  ')}</span>
+                  <span className="ink-2 block text-xs">{games.length} event{games.length === 1 ? '' : 's'}{practices ? ` · ${practices} practices` : ''}</span>
+                </span>
+                <ChevronDown className="ink-2 h-4 w-4 -rotate-90 transition group-hover:translate-x-0.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
+            <div className="mx-auto w-full max-w-3xl space-y-7 px-4 pb-6 pt-8 md:px-6">
+              {messages.map((m) => <Bubble key={m.id} m={m} waking={waking && !!m.streaming && !m.content} onRetry={() => retry(m)} />)}
               <div ref={endRef} />
             </div>
-          )}
-        </div>
-      </div>
-
-      <div className="relative border-t hairline bg-gradient-to-t from-[var(--bg)] via-[var(--bg)] to-transparent px-4 pb-4 pt-3 md:px-6">
-        <div className="mx-auto w-full max-w-3xl">
-          <form onSubmit={(e) => { e.preventDefault(); send(input); }}
-                className="surface shadow-lift flex items-end gap-2 rounded-3xl p-2 pl-4 transition focus-within:border-brand-400 focus-within:ring-4 focus-within:ring-brand-500/10">
-            <textarea ref={taRef} value={input} rows={1} maxLength={1000} onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); } }}
-                      placeholder="Ask about courses, games, policies…" aria-label="Ask NuevAI"
-                      className="max-h-40 min-h-[2.75rem] flex-1 resize-none bg-transparent py-3 text-[15px] outline-none placeholder:text-[var(--ink-2)]" />
-            {messages.length > 0 && (
-              <button type="button" onClick={clear} className="ink-2 hidden rounded-full px-3 py-2 text-xs font-medium hover:bg-[var(--surface-2)] sm:block">New chat</button>
-            )}
-            <button type="submit" disabled={busy || !input.trim()} aria-label="Send"
-                    className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-700 text-white shadow-soft transition hover:bg-brand-600 disabled:opacity-35">
-              <ArrowUp className="h-5 w-5" />
-            </button>
-          </form>
-          <p className="ink-2 mt-2 text-center text-[11px]">NuevAI can make mistakes — verify important dates. Anonymous analytics only; no account or personal data.</p>
-        </div>
-      </div>
+          </div>
+          <div className="border-t hairline bg-white px-4 pb-4 pt-3 md:px-6">
+            <div className="mx-auto w-full max-w-3xl">
+              {composer}
+              <p className="ink-2 mt-2 text-center text-[11px]">NuevAI can make mistakes — verify important dates. Anonymous analytics only; no account or personal data.</p>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -184,18 +176,18 @@ function Bubble({ m, waking, onRetry }: { m: Message; waking: boolean; onRetry: 
   if (m.role === 'user') {
     return (
       <div className="animate-rise flex justify-end">
-        <div className="max-w-[85%] rounded-3xl rounded-br-lg bg-brand-700 px-4 py-2.5 text-[15px] leading-relaxed text-white shadow-soft">{m.content}</div>
+        <div className="max-w-[85%] rounded-3xl rounded-br-lg bg-brand-900 px-4 py-2.5 text-[15px] leading-relaxed text-white">{m.content}</div>
       </div>
     );
   }
   return (
     <div className="animate-rise flex gap-3">
-      <div className="mt-1 shrink-0"><Logo size={30} /></div>
+      <div className="mt-0.5 shrink-0"><Logo size={26} /></div>
       <div className="min-w-0 flex-1">
         {m.error ? (
-          <div className="rounded-2xl border border-rose-500/30 bg-rose-500/5 p-4 text-sm">
-            <p className="text-rose-700 dark:text-rose-300">{m.content}</p>
-            <button onClick={onRetry} className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-rose-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-rose-500"><RotateCw className="h-3.5 w-3.5" />Try again</button>
+          <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4 text-sm">
+            <p className="text-brand-800">{m.content}</p>
+            <button onClick={onRetry} className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-brand-900 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"><RotateCw className="h-3.5 w-3.5" />Try again</button>
           </div>
         ) : !m.content ? (
           <div className="surface rounded-2xl p-4">
@@ -213,7 +205,7 @@ function Bubble({ m, waking, onRetry }: { m: Message; waking: boolean; onRetry: 
             <IconBtn label={copied ? 'Copied' : 'Copy'} onClick={() => { navigator.clipboard?.writeText(m.content); setCopied(true); track('copy_answer'); setTimeout(() => setCopied(false), 1500); }}>{copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}</IconBtn>
             <IconBtn label="Helpful" active={fb === 'up'} onClick={() => { setFb('up'); track('feedback', { value: 'up', query: m.query?.slice(0, 200), cached: !!m.cached }); }}><ThumbsUp className="h-3.5 w-3.5" /></IconBtn>
             <IconBtn label="Not helpful" active={fb === 'down'} onClick={() => { setFb('down'); track('feedback', { value: 'down', query: m.query?.slice(0, 200), cached: !!m.cached }); }}><ThumbsDown className="h-3.5 w-3.5" /></IconBtn>
-            {m.cached && <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-300"><Zap className="h-3 w-3" />Instant</span>}
+            {m.cached && <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-1 text-[11px] font-semibold text-brand-700"><Zap className="h-3 w-3" />Instant</span>}
             {!m.cached && m.ms != null && <span className="ink-2 text-[11px]">{(m.ms / 1000).toFixed(1)}s</span>}
             {m.sources && m.sources.length > 0 && (
               <button onClick={() => { setShowSrc(!showSrc); track('sources_toggle', { open: !showSrc }); }} className="ink-2 ml-auto inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium hover:bg-[var(--surface-2)]">
@@ -226,8 +218,8 @@ function Bubble({ m, waking, onRetry }: { m: Message; waking: boolean; onRetry: 
           <ul className="surface mt-2 space-y-1 rounded-xl p-3 text-xs">
             {(m.sources ?? []).map((s, i) => (
               <li key={i} className="flex items-center gap-2">
-                <Sparkles className="h-3 w-3 shrink-0 text-brand-500" />
-                {s.url ? <a className="truncate font-medium text-brand-600 hover:underline dark:text-brand-300" href={s.url} target="_blank" rel="noopener noreferrer">{s.title || s.url}</a> : <span className="truncate">{s.title || 'School calendar'}</span>}
+                <Link2 className="h-3 w-3 shrink-0 text-brand-500" />
+                {s.url ? <a className="truncate font-medium text-brand-600 hover:underline" href={s.url} target="_blank" rel="noopener noreferrer">{s.title || s.url}</a> : <span className="truncate">{s.title || 'School calendar'}</span>}
                 <span className="ink-2 ml-auto shrink-0">{s.type === 'calendar' ? 'calendar' : s.similarity ? `${Math.round(s.similarity * 100)}% match` : ''}</span>
               </li>
             ))}
@@ -241,7 +233,7 @@ function Bubble({ m, waking, onRetry }: { m: Message; waking: boolean; onRetry: 
 function IconBtn({ children, label, onClick, active }: { children: React.ReactNode; label: string; onClick: () => void; active?: boolean }) {
   return (
     <button onClick={onClick} title={label} aria-label={label}
-            className={`inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11px] font-medium transition ${active ? 'bg-brand-600 text-white' : 'ink-2 hover:bg-[var(--surface-2)]'}`}>
+            className={`inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11px] font-medium transition ${active ? 'bg-brand-900 text-white' : 'ink-2 hover:bg-[var(--surface-2)]'}`}>
       {children}{label === 'Copied' && label}
     </button>
   );

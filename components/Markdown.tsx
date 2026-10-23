@@ -5,7 +5,7 @@ import { track } from '@/lib/analytics';
 
 export function Markdown({ children, className = '' }: { children: string; className?: string }) {
   return (
-    <div className={`prose prose-sm max-w-none dark:prose-invert prose-p:my-2 prose-p:leading-relaxed prose-ul:my-2 prose-li:my-0.5 prose-a:text-brand-600 dark:prose-a:text-brand-300 prose-a:font-medium prose-a:no-underline hover:prose-a:underline prose-strong:font-semibold ${className}`}>
+    <div className={`prose prose-sm max-w-none prose-p:my-2 prose-p:leading-relaxed prose-ul:my-2 prose-li:my-0.5 prose-a:text-brand-600 prose-a:font-medium prose-a:no-underline hover:prose-a:underline prose-strong:font-semibold ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
