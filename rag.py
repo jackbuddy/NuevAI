@@ -1,26 +1,26 @@
 """Retrieval for NuevAI.
 
 For each question, in parallel:
-  1. embed (cached) -> vector search over document_chunks (wide: 24 candidates)
+  1. embed (cached) -> vector search over the chunk table (wide: 24 candidates)
   2. structured calendar lookup when the question has a date / sport / event signal
 Then a small cross-encoder reranks the vector candidates, and everything is
 shaped into a compact, correctly ordered context block for the model.
 """
+import math
 import os
 import re
-import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
 
+import embedder
+import settings
 from cache import TTLCache
 from intent import CalendarIntent, parse_intent
 
-EMBED_MODEL = os.getenv("EMBED_MODEL", "BAAI/bge-large-en-v1.5")
-RERANK_MODEL = os.getenv("RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
-USE_RERANK = os.getenv("RERANK", "1") != "0"
 CANDIDATES = 24
-VECTOR_THRESHOLD = 0.30
+VECTOR_THRESHOLD = 0.0      # gte-small cosine scores sit high (unrelated ~0.75), so rank, do not threshold
+W_VECTOR, W_LEXICAL = 0.5, 0.5
 LIST_WORDS = re.compile(r"\b(list|all|every|which|what (courses?|classes|electives?|sports|clubs|departments?)|offered|options|available)\b", re.I)
 
 LINK_INTENTS = [
@@ -64,46 +64,19 @@ def expand_query(q: str) -> str:
 _pool = ThreadPoolExecutor(max_workers=6)
 
 
-class Models:
-    """Lazy, thread-safe model holder so startup and health checks never block on loading."""
+STOP = set("""a an the is are was were be been do does did can could will would should what when where which who whom how why of for on in at to from
+with about into over under this that these those it its my our your their me us we you i there here any some all more most next last new
+today tomorrow tonight please tell show give list find get have has had am pm""".split())
+TOKEN = re.compile(r"[a-z0-9][a-z0-9'-]*")
 
-    def __init__(self):
-        self._embed = self._rerank = None
-        self._lock = threading.Lock()
-        self.rerank_failed = False
 
-    def embed_model(self):
-        with self._lock:
-            if self._embed is None:
-                from sentence_transformers import SentenceTransformer
-                print("Loading embedding model...", flush=True)
-                self._embed = SentenceTransformer(EMBED_MODEL, device="cpu")
-                print("Embedding model ready.", flush=True)
-        return self._embed
-
-    def rerank_model(self):
-        if not USE_RERANK or self.rerank_failed:
-            return None
-        with self._lock:
-            if self._rerank is None:
-                try:
-                    from sentence_transformers import CrossEncoder
-                    self._rerank = CrossEncoder(RERANK_MODEL, device="cpu", max_length=384)
-                    print("Reranker ready.", flush=True)
-                except Exception as e:     # retrieval still works without it
-                    print(f"Reranker unavailable ({e}); using vector order.", flush=True)
-                    self.rerank_failed = True
-        return self._rerank
-
-    @property
-    def ready(self) -> dict:
-        return {"embedding": self._embed is not None, "reranker": self._rerank is not None}
+def tokens(text: str) -> list[str]:
+    return [t for t in TOKEN.findall(text.lower()) if t not in STOP and len(t) > 1]
 
 
 class Retriever:
     def __init__(self, get_supabase):
         self.sb = get_supabase
-        self.models = Models()
         self.embed_cache = TTLCache(max_items=2000, ttl=24 * 3600)
         self.calendar_cache = TTLCache(max_items=256, ttl=600)
 
@@ -113,28 +86,50 @@ class Retriever:
         hit = self.embed_cache.get(key)
         if hit is not None:
             return hit
-        vec = self.models.embed_model().encode(text, normalize_embeddings=True).tolist()
+        vec = embedder.embed_one(text)
         self.embed_cache.set(key, vec)
         return vec
 
     def vector_search(self, qvec: list[float]) -> list[dict]:
-        r = self.sb().rpc("match_chunks", {"query_embedding": qvec, "match_threshold": VECTOR_THRESHOLD,
-                                           "match_count": CANDIDATES}).execute()
+        r = self.sb().rpc(settings.MATCH_RPC, {"query_embedding": qvec, "match_threshold": VECTOR_THRESHOLD,
+                                               "match_count": CANDIDATES}).execute()
         return r.data or []
 
     def rerank(self, query: str, rows: list[dict]) -> list[dict]:
-        model = self.models.rerank_model()
-        if not model or len(rows) < 2:
+        """Hybrid score = vector similarity + lexical overlap (idf-weighted, title/section boosted), both min-max
+        normalised over the candidates. Cheap, no model, and it fixes exact-wording misses that embeddings blur."""
+        if len(rows) < 2:
             return rows
-        scores = model.predict([(query, r["content"][:1500]) for r in rows], show_progress_bar=False)
-        for r, s in zip(rows, scores):
-            r["rerank"] = float(s)
-            # contents/outline chunks answer "list all ..." questions; nudge them up for those
-            if (r.get("metadata") or {}).get("kind") == "outline" and LIST_WORDS.search(query):
-                r["rerank"] += 3.0
-            # calendar digests are looked up structurally, not by similarity
-            if (r.get("metadata") or {}).get("source") in ("calendar", "calendar_day"):
-                r["rerank"] -= 2.0
+        q = set(tokens(query))
+        docs = []
+        for r in rows:
+            m = r.get("metadata") or {}
+            head = f"{m.get('title', '')} {r['content'].split(chr(10) + chr(10), 1)[0]}"
+            body = tokens(r["content"][:1800])
+            docs.append((body, set(tokens(head))))
+        n = len(rows)
+        df = {t: sum(1 for body, _ in docs if t in set(body)) for t in q}
+        idf = {t: math.log(1 + n / (1 + df[t])) for t in q}
+        lex = []
+        for body, head in docs:
+            tf = {}
+            for t in body:
+                if t in q:
+                    tf[t] = tf.get(t, 0) + 1
+            score = sum(idf[t] * (1 + math.log(c)) for t, c in tf.items()) + 2.0 * sum(idf[t] for t in q & head)
+            lex.append(score / (len(body) ** 0.25 + 1))
+        def norm(xs):
+            lo, hi = min(xs), max(xs)
+            return [(x - lo) / (hi - lo) if hi > lo else 0.0 for x in xs]
+        vec = norm([r.get("similarity", 0.0) for r in rows])
+        lexn = norm(lex)
+        for r, v, l in zip(rows, vec, lexn):
+            m = r.get("metadata") or {}
+            r["rerank"] = W_VECTOR * v + W_LEXICAL * l
+            if m.get("kind") == "outline" and LIST_WORDS.search(query):
+                r["rerank"] += 0.35        # contents lists answer "list all ..." questions
+            if m.get("source") in ("calendar", "calendar_day", "calendar_sheet"):
+                r["rerank"] -= 0.2         # calendar is looked up structurally, not by similarity
         return sorted(rows, key=lambda r: r["rerank"], reverse=True)
 
     def calendar_events(self, intent: CalendarIntent) -> list[dict]:
@@ -144,7 +139,7 @@ class Retriever:
         if cached is not None:
             return cached
         digest = intent.short_range() and not (intent.sport or intent.kind or intent.keywords or intent.category)
-        q = self.sb().table("document_chunks").select("chunk_id,content,metadata") \
+        q = self.sb().table(settings.CHUNKS_TABLE).select("chunk_id,content,metadata") \
             .in_("metadata->>source", ["calendar_day"] if digest else ["calendar", "calendar_sheet"]) \
             .gte("metadata->>event_date" if digest else "metadata->>end_date", intent.start.isoformat()) \
             .lte("metadata->>event_date", intent.end.isoformat())
@@ -186,7 +181,7 @@ class Retriever:
             key = ("links", c)
             hit = self.calendar_cache.get(key)
             if hit is None:
-                hit = self.sb().table("document_chunks").select("chunk_id,content,metadata").eq("metadata->>source", "link_registry") \
+                hit = self.sb().table(settings.CHUNKS_TABLE).select("chunk_id,content,metadata").eq("metadata->>source", "link_registry") \
                     .eq("metadata->>link_category", c).limit(8).execute().data or []
                 self.calendar_cache.set(key, hit, ttl=3600)
             rows += hit

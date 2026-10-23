@@ -8,13 +8,6 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-# Threading overrides must be set before the heavy imports. Locally (Apple Silicon) one thread avoids
-# OpenMP locks; on the Linux server use every core, which makes embedding several times faster.
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-_threads = os.getenv("TORCH_THREADS") or ("1" if os.uname().sysname == "Darwin" else str(os.cpu_count() or 1))
-os.environ["OMP_NUM_THREADS"] = _threads
-os.environ["MKL_NUM_THREADS"] = _threads
-
 from fastapi import FastAPI, HTTPException, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -22,6 +15,7 @@ from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from groq import Groq
 
+import settings
 from analytics import Analytics
 from cache import TTLCache
 from rag import Retriever, build_context
@@ -61,7 +55,7 @@ def data_status() -> dict:
     if time.time() - _data_state["at"] < 60 and _data_state["rows"]:
         return _data_state
     try:
-        res = get_supabase().table("document_chunks").select("chunk_id", count="exact").limit(1).execute()
+        res = get_supabase().table(settings.CHUNKS_TABLE).select("chunk_id", count="exact").limit(1).execute()
         _data_state.update(rows=res.count or 0, error="")
     except Exception as e:
         _data_state.update(rows=0, error=str(e)[:160])
@@ -83,10 +77,8 @@ STARTERS = [
 
 
 def _warm():
-    """Load models, then pre-compute the starter answers so the first click is instant."""
+    """Pre-compute the starter answers (and the most-asked questions) so the first click is instant."""
     try:
-        retriever.models.embed_model()
-        retriever.models.rerank_model()
         time.sleep(2)
         if not data_status()["rows"]:
             print("Warm-up skipped: knowledge base unreadable (check SUPABASE_SERVICE_ROLE_KEY).", flush=True)
@@ -121,7 +113,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False,
 @app.get("/health")
 def health():
     d = data_status()
-    return {"status": "ok", "model_loaded": retriever.models.ready["embedding"], **retriever.models.ready,
+    return {"status": "ok", "model_loaded": True, "embedding": "supabase-edge:gte-small", "table": settings.CHUNKS_TABLE,
             "data_ok": bool(d["rows"]), "data_rows": d["rows"], "answer_cache": answer_cache.stats()}
 
 
@@ -148,7 +140,7 @@ def health_deep():
     key, url = os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""), os.getenv("SUPABASE_URL", "")
     info = {"supabase_host": url.replace("https://", "").split(".")[0][:4] + "…", "key_kind": _key_kind(key)}
     try:
-        res = get_supabase().table("document_chunks").select("chunk_id", count="exact").limit(1).execute()
+        res = get_supabase().table(settings.CHUNKS_TABLE).select("chunk_id", count="exact").limit(1).execute()
         info["chunk_rows_visible"] = res.count
     except Exception as e:
         info["error"] = str(e)[:200]
@@ -449,7 +441,7 @@ def calendar_events(start: str = Query(..., alias="from"), to: str = Query(...),
     key = (start, to, category, q.lower(), limit)
     if (hit := api_cache.get(key)) is not None:
         return hit
-    query = get_supabase().table("document_chunks").select("metadata").in_("metadata->>source", ["calendar", "calendar_sheet"]) \
+    query = get_supabase().table(settings.CHUNKS_TABLE).select("metadata").in_("metadata->>source", ["calendar", "calendar_sheet"]) \
         .gte("metadata->>end_date", start).lte("metadata->>event_date", to)
     if category and re.fullmatch(r"[a-z_]{3,20}", category):
         query = query.eq("metadata->>category", category)
@@ -471,7 +463,7 @@ def calendar_events(start: str = Query(..., alias="from"), to: str = Query(...),
 def important_links():
     if (hit := api_cache.get("links")) is not None:
         return hit
-    rows = get_supabase().table("document_chunks").select("metadata").eq("metadata->>source", "link_registry").limit(300).execute().data or []
+    rows = get_supabase().table(settings.CHUNKS_TABLE).select("metadata").eq("metadata->>source", "link_registry").limit(300).execute().data or []
     links = [{k: (r["metadata"] or {}).get(k) for k in ("label", "url", "link_category", "found_on")} for r in rows]
     out = {"links": [l for l in links if l.get("url")]}
     api_cache.set("links", out, ttl=3600)
@@ -509,7 +501,7 @@ def metrics(request: Request, days: int = 14, token: str = ""):
         raise HTTPException(401, "Invalid metrics token.")
     out = analytics.summary(min(max(days, 1), 60))
     out["server"] = {"answer_cache": answer_cache.stats(), "embed_cache": retriever.embed_cache.stats(),
-                     "models": retriever.models.ready, "llm_model": LLM_MODEL}
+                     "embedding": "supabase-edge:gte-small", "llm_model": LLM_MODEL}
     return out
 
 

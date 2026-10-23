@@ -2,16 +2,13 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
 
+# No ML libraries here: embeddings come from a Supabase Edge Function (gte-small), so the server needs ~100 MB of RAM
+# and fits Render's 512 MB free plan. Cold starts are just the container booting.
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Bake the embedding model into the image so cold starts never download ~1.3GB.
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-large-en-v1.5', device='cpu')"
-RUN python -c "from sentence_transformers import CrossEncoder; CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2', device='cpu')"
 
 COPY . .
 

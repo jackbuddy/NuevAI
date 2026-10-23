@@ -1,10 +1,8 @@
-# Ingestion pipeline only (not needed by the Render web service).
---extra-index-url https://download.pytorch.org/whl/cpu
+# Ingestion pipeline only (not needed by the Render web service). No ML libraries: embedding runs in Supabase.
 requests
 beautifulsoup4
 python-dotenv
 supabase
-sentence-transformers
-torch
+httpx
 python-docx
 pypdf

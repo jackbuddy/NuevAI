@@ -1,10 +1,6 @@
-# CPU-only torch wheels: far smaller than the default CUDA build on Linux.
---extra-index-url https://download.pytorch.org/whl/cpu
-
 fastapi
 uvicorn[standard]
 python-dotenv
 groq
 supabase
-sentence-transformers
-torch
+httpx

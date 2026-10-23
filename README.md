@@ -23,12 +23,11 @@ pip install -r requirements.txt && uvicorn query_server:app --port 8765   # back
 `false` the backend cannot read the knowledge base and chat answers with an explicit error.
 
 ## Hosting
-- **Frontend:** Vercel. Set `BACKEND_URL` to the backend's address.
-- **Backend:** a Hugging Face Docker Space (free, 16 GB RAM; the models need ~1.6 GB, which is why Render's 512 MB free plan
-  crashes). `.github/workflows/deploy-hf-space.yml` pushes it on every change to the backend files. One-time setup:
-  create a Docker Space, add its secrets (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GROQ_API_KEY`, `METRICS_TOKEN`), then add the
-  GitHub secret `HF_TOKEN` (write token) and variable `HF_SPACE` (`username/space-name`). Manual deploy:
-  `HF_SPACE=username/space HF_TOKEN=hf_... ./scripts/push_hf_space.sh`.
-- `Dockerfile` (root) is the original Render setup and only works on a plan with 2 GB+ of RAM.
+- **Frontend:** Vercel (`BACKEND_URL` or `CHAT_API_URL` points at the backend).
+- **Backend:** Render free plan (512 MB RAM). No ML runs on it: questions and documents are embedded by the `embed` Supabase
+  Edge Function (gte-small, 384-d; source in `supabase/functions/embed`), and results are re-ranked with a cheap lexical
+  score, so the server needs ~100 MB. Chunks live in `document_chunks_v2`; set `SUPABASE_SERVICE_ROLE_KEY` to the
+  *secret* key (the Edge Function accepts only callers holding it).
+- A keep-warm GitHub job pings the backend every 10 minutes so the free plan does not sleep.
 
 More: [pipeline/README.md](pipeline/README.md) (ingestion, metrics, environment variables).

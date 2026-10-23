@@ -1,10 +1,10 @@
 name: Keep backend warm
 
-# Free hosts sleep an idle backend (Render after ~15 minutes, Hugging Face Spaces after ~48 hours). A ping keeps it
-# awake. Set the repo variable BACKEND_URL to the Space URL (https://<user>-<space>.hf.space).
+# Render's free plan stops an idle web service after ~15 minutes; a ping every 10 minutes keeps it awake.
+# Optional repo variable BACKEND_URL overrides the address.
 on:
   schedule:
-    - cron: "17 */6 * * *"
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 jobs:
