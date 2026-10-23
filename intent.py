@@ -150,7 +150,7 @@ def parse_intent(question: str, today: date, previous_user_msg: str = "") -> Cal
         category = "athletics"
     rng = parse_range(q, today)
     has_cal_word = bool(re.search(CAL_WORDS, q))
-    dayinfo = bool(re.search(r"\b[AB]['\u2019]?[ -]?day\b", question) or re.search(r"\b(a|b) day (or|and) (a|b) day\b|\bwhich blocks?\b|\bwhat blocks?\b|\bday type\b|\bblock schedule\b|\bwhat day (is|are) (it|we|today|tomorrow)\b", q))
+    dayinfo = bool(re.search(r"\b[AB]['\u2019]?[ -]?day\b", question) or re.search(r"\b(a|b) day (or|and) (a|b) day\b|\bwhich blocks?\b|\bwhat blocks?\b|\bday type\b|\bblock schedule\b|\bwhat day (is|are) (it|we|today|tomorrow)\b|\bblocks?\s*\d\b|\bblock\b|\bbell schedule\b|\bwhen does (school|class|classes) (start|end)\b|\bwhat time (does|do) (school|classes|lunch)\b", q))
 
     # short follow-ups ("what about tomorrow?") inherit the topic of the previous question
     if previous_user_msg and not sport and not category and len(q.split()) <= 8 and rng:
@@ -195,6 +195,6 @@ def parse_intent(question: str, today: date, previous_user_msg: str = "") -> Cal
             span = 300      # concerts, breaks, parent events and named events can be months away
         end = today + timedelta(days=span)
     next_only = bool(re.search(r"\b(next|upcoming|soonest|first)\b", q)) and not rng
-    if not (sport or kind or category or keywords or rng):
+    if not (sport or kind or category or keywords or rng or dayinfo):
         return None
     return CalendarIntent(start, end, sport, kind, category, gender, division, home_away, keywords, date_given, next_only, label, dayinfo)

@@ -224,10 +224,21 @@ def suggestions_for(result: dict, query: str) -> list[dict]:
             out += [{"label": "What's happening this week?", "query": "What events are happening this week?"}]
         out.append({"label": "Open the calendar", "action": "calendar"})
     else:
+        sources = {(d.get("metadata") or {}).get("source", "") for d in docs}
+        ents = result.get("entities") or []
         titles = " ".join((d.get("metadata") or {}).get("title", "") for d in docs).lower()
-        if "catalog" in titles or "course" in titles:
+        if ents:
+            out += [{"label": "What block and room?", "query": f"{query.rstrip('?')} - which blocks and rooms?"},
+                    {"label": "Is tomorrow an A or B day?", "query": "Is tomorrow an A day or B day?"}]
+        elif "school_clubs" in sources:
+            out += [{"label": "Which clubs meet at lunch?", "query": "Which clubs meet at lunch?"},
+                    {"label": "How do I start a club?", "query": "How do I start a club?"}]
+        elif "school_day" in sources or "school_facts" in sources or "school_advisory" in sources:
+            out += [{"label": "What time is each block?", "query": "What time is each block?"},
+                    {"label": "Open the calendar", "action": "calendar"}]
+        elif "catalog" in titles and "club" not in titles:
             out += [{"label": "What are the prerequisites?", "query": f"{query.rstrip('?')} - what are the prerequisites?"},
-                    {"label": "What other departments are there?", "query": "What departments and subjects are offered?"}]
+                    {"label": "Who teaches these?", "query": f"{query.rstrip('?')} - who teaches them?"}]
         elif "handbook" in titles or "policy" in titles:
             out += [{"label": "Who do I contact about this?", "query": "Who do I contact about " + query.rstrip("?").lower() + "?"}]
     return out[:3]
@@ -237,7 +248,7 @@ def _prepare(req: QueryRequest):
     """Retrieval + prompt assembly. Returns everything the LLM step and the logs need."""
     now = datetime.now(PACIFIC)
     try:
-        result = retriever.retrieve(req.query, [t.model_dump() for t in req.history], top_k=min(max(req.top_k, 3), 8), today=now.date())
+        result = retriever.retrieve(req.query, [t.model_dump() for t in req.history], top_k=min(max(req.top_k, 3), 5), today=now.date())
     except Exception as e:
         if not data_status()["rows"]:
             print(f"KNOWLEDGE BASE UNREACHABLE ({str(e)[:80]}) - check SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY", flush=True)
@@ -261,11 +272,21 @@ FALLBACK_MODELS = [m.strip() for m in os.getenv("LLM_FALLBACKS", "openai/gpt-oss
 RETRYABLE_STATUS = {400, 404, 408, 413, 422, 429, 500, 502, 503, 504, 529}
 
 
-def _create(msgs, model: str, stream: bool):
-    """Groq call that moves to the next model on rate limits, missing models, overload or timeouts
-    (each model has its own token budget). If every model is busy the visitor gets a friendly message."""
+def _retry_after(text: str) -> float:
+    """Seconds Groq asks us to wait ('try again in 217.5ms', '1.2s', '2m3.4s'); 0 when unknown."""
+    m = re.search(r"try again in (?:(\d+)m)?(?:([\d.]+)(ms|s))", text)
+    if not m:
+        return 0.0
+    mins, val, unit = m.groups()
+    return (int(mins or 0) * 60) + (float(val) / 1000 if unit == "ms" else float(val))
+
+
+def _create(msgs, model: str, stream: bool, _round: int = 0):
+    """Groq call that moves to the next model on rate limits, missing models, overload or timeouts (each model has its
+    own token budget). If every model is rate limited it waits the few seconds Groq asks for and tries once more,
+    then gives the visitor a friendly message."""
     from groq import APIConnectionError, APIStatusError
-    last, all_rate_limited = None, True
+    last, all_rate_limited, waits = None, True, []
     for m in [model] + [x for x in FALLBACK_MODELS if x != model]:
         try:
             return groq_client.chat.completions.create(messages=msgs, stream=stream, **_llm_kwargs(m)), m
@@ -274,17 +295,24 @@ def _create(msgs, model: str, stream: bool):
             if e.status_code not in RETRYABLE_STATUS:
                 raise
             all_rate_limited &= e.status_code == 429
+            if e.status_code == 429 and _retry_after(str(e)) > 0:
+                waits.append(_retry_after(str(e)))
             print(f"LLM {m} unavailable (HTTP {e.status_code}); trying next model", flush=True)
         except APIConnectionError as e:
             last, all_rate_limited = e, False
             print(f"LLM {m} unreachable ({type(e).__name__}); trying next model", flush=True)
+    wait = min(waits) if waits else 0.0           # the first model to recover is enough
+    if all_rate_limited and _round == 0 and 0 < wait <= 8:
+        print(f"All models rate limited; waiting {wait:.1f}s and retrying once", flush=True)
+        time.sleep(wait + 0.3)
+        return _create(msgs, model, stream, _round=1)
     if all_rate_limited:
         raise HTTPException(429, "The assistant is getting a lot of questions right now - please try again in a few seconds.")
     raise HTTPException(503, "The assistant is temporarily unavailable - please try again in a moment.") from last
 
 
 def _llm_kwargs(model: str) -> dict:
-    kw = dict(model=model, temperature=0.2, max_tokens=800)
+    kw = dict(model=model, temperature=0.2, max_tokens=600)
     if model.startswith("openai/gpt-oss"):
         kw["extra_body"] = {"reasoning_effort": "low"}     # reasoning at "medium" adds seconds for little gain here
     return kw

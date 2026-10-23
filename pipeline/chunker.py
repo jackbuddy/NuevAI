@@ -18,7 +18,7 @@ from datetime import date, timedelta
 from . import config
 from .common import load_pages
 from .links import build as build_links, link_cards
-from . import sheets, workbooks
+from . import facts, sheets, workbooks
 
 HEADING = re.compile(r"^(#{1,6})\s+(.*)$")
 
@@ -172,6 +172,7 @@ def run(log=print) -> list[dict]:
                            "content": content, "source_file": page["url"],
                            "metadata": {"source_url": page["url"], "title": page["title"], "source": page["source"],
                                         "kind": "outline", "content_hash": hashlib.sha1(content.encode()).hexdigest()}})
+    chunks.extend(facts.build_chunks(log))                 # curated, human-confirmed facts (bell schedule, ...)
     chunks.extend(workbooks.build_chunks(log))            # teacher/course map, A/B day calendar, advisors, clubs
     links = build_links(log)
     for i, card in enumerate(link_cards(links)):

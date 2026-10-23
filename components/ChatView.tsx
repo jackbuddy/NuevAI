@@ -66,11 +66,24 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
     abortRef.current = ac;
     const patch = (fn: (m: Message) => Message) => setMessages((p) => p.map((m) => (m.id === aId ? fn(m) : m)));
     try {
-      await streamChat(q, history, {
-        onMeta: (m) => patch((x) => ({ ...x, sources: m.sources, cached: m.cached })),
-        onDelta: (t) => { if (!first) { first = performance.now() - t0; setWaking(false); } patch((x) => ({ ...x, content: x.content + t })); },
-        onDone: (d) => patch((x) => ({ ...x, streaming: false, cached: d.cached, suggestions: d.suggestions ?? [], ms: Math.round(first), totalMs: Math.round(performance.now() - t0) })),
-      }, ac.signal);
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await streamChat(q, history, {
+            onMeta: (m) => patch((x) => ({ ...x, sources: m.sources, cached: m.cached })),
+            onDelta: (t) => { if (!first) { first = performance.now() - t0; setWaking(false); } patch((x) => ({ ...x, content: x.content + t })); },
+            onDone: (d) => patch((x) => ({ ...x, streaming: false, cached: d.cached, suggestions: d.suggestions ?? [], ms: Math.round(first), totalMs: Math.round(performance.now() - t0) })),
+          }, ac.signal);
+          break;
+        } catch (err: any) {
+          // the model provider is briefly at its per-minute limit: wait a few seconds and try once more, quietly
+          if (attempt === 0 && !first && /lot of questions/i.test(String(err?.message))) {
+            track('chat_auto_retry');
+            await new Promise((r) => setTimeout(r, 4500));
+            continue;
+          }
+          throw err;
+        }
+      }
       track('chat_rendered', { first_ms: Math.round(first), total_ms: Math.round(performance.now() - t0) });
     } catch (e: any) {
       if (e?.name === 'AbortError') { patch((x) => ({ ...x, streaming: false })); }

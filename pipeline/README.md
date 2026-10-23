@@ -12,6 +12,7 @@ python run_pipeline.py                    # the real run (needs SUPABASE_* in .e
 |----------|--------------|----------------|
 | `public` | Crawls www.nuevaschool.org from the HTML `/site-map` + link following. Obeys robots.txt (incl. wildcard rules) and its 5 s crawl delay. | No |
 | `nexus`  | Imports pages from `../nexus-scraper`; `--refresh-nexus` re-scrapes with the saved session. Pages containing any term in `data/pipeline/private_terms.txt` are dropped. | Once, to sign in (SSO/2FA). Re-sign-in when the session expires; the run says so and still uses the last good scrape. |
+| `live` | Re-reads public Google Sheets that change during the year: the US Boys Basketball 26-27 tabs (fetched by tab id) and the Course Offerings workbook (downloaded as .xlsx). Configured in `pipeline/config.py` (`LIVE_SHEETS`). | No |
 | `manual` | Indexes files you download yourself into `data/pipeline/manual_docs/` (.docx .pdf .txt .md .html .csv). See `DOWNLOAD_THESE.md`. | You download them |
 | `calendar` | Reads the iCal feed in `NUEVAI_CALENDAR_URL` into dated event chunks + per-day digests; expired events are removed automatically. | No |
 | `google` | Exports every linked Google Doc / Sheet / Slides file (course catalog, handbooks, club lists), following links between docs 2 hops deep. | No, for "anyone with the link" files. Private files are listed in `needs_access.json`. |
@@ -58,3 +59,15 @@ records each answer with its timings. View everything at `/insights` with the `M
 | Render | `LLM_MODEL` (optional) | override the default `openai/gpt-oss-120b` |
 | Vercel | `CHAT_API_URL` or `BACKEND_URL` | backend address (default `https://nuevai-backend.onrender.com`) |
 | GitHub | `NUEVAI_CALENDAR_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | daily calendar refresh |
+
+
+### Curated facts and planning workbooks
+* `knowledge/*.md`: facts confirmed by people (bell times, what A'/B' mean, campus addresses). Each `## heading` becomes one searchable record.
+  Edit the file, then run `python run_pipeline.py --stages chunk,index` (the daily GitHub job also includes them).
+* Planning workbooks (`The Sheet`, clubs catalog; downloaded as .xlsx into `data/pipeline/manual_docs/`) are parsed by `pipeline/workbooks.py` into
+  A/B day records, teacher -> course -> block -> room records, advisor rooms and one record per club. Student-name tabs are never read.
+  Previous-year titles are dropped (`SUPERSEDED_TITLE` in `config.py`).
+* After the Spring 2027 offerings are filled in: `python run_pipeline.py --stages live,chunk,index --prune`.
+
+### Alpha feedback
+Testers use the **Feedback** button (written notes) and the thumbs on answers. Read both at `/insights` (needs `METRICS_TOKEN`).

@@ -48,8 +48,8 @@ class Analytics:
     # ---- ingestion ------------------------------------------------------
     def record(self, event: str, anon_id: str, session_id: str = "", props: dict | None = None,
                path: str = "", ua: str = "", ts: str | None = None) -> bool:
-        if not EVENT_RX.match(event or "") or not ID_RX.match(anon_id or ""):
-            return False
+        if os.getenv("ANALYTICS_DISABLED") or not EVENT_RX.match(event or "") or not ID_RX.match(anon_id or ""):
+            return False                         # ANALYTICS_DISABLED=1 keeps local test runs out of the real metrics
         props = props or {}
         raw = json.dumps(props, default=str)
         if len(raw) > MAX_PROPS_BYTES:
@@ -118,6 +118,7 @@ class Analytics:
         resource_clicks, cal_filters = Counter(), Counter()
         lat_total, lat_ttft, chat_n, cache_hits, errors = [], [], 0, 0, 0
         thumbs = Counter()
+        feedback_msgs, not_helpful = [], Counter()
         user_days = defaultdict(set)
         devices, returning, first_seen = Counter(), set(), set()
         for r in rows:
@@ -148,6 +149,11 @@ class Analytics:
                 tab_views[p.get("tab", "?")] += 1
             elif e == "feedback":
                 thumbs[p.get("value", "?")] += 1
+                if p.get("value") == "down" and p.get("query"):
+                    not_helpful[_norm_query(p["query"])] += 1
+            elif e == "feedback_text":
+                feedback_msgs.append({"ts": r["ts"][:16].replace("T", " "), "kind": p.get("kind", ""), "text": str(p.get("text", ""))[:600],
+                                      "tab": p.get("tab", "")})
             elif e == "resource_click":
                 resource_clicks[p.get("label", "?")] += 1
             elif e in ("calendar_filter", "calendar_search"):
@@ -163,7 +169,8 @@ class Analytics:
             "cache_hit_rate": round(cache_hits / chat_n, 3) if chat_n else None,
             "latency_ms": {"total_p50": _pct(lat_total, .5), "total_p95": _pct(lat_total, .95),
                            "first_token_p50": _pct(lat_ttft, .5), "first_token_p95": _pct(lat_ttft, .95)},
-            "feedback": dict(thumbs), "repeat_users": repeat_users,
+            "feedback": dict(thumbs), "feedback_messages": feedback_msgs[-30:][::-1],
+            "not_helpful_questions": not_helpful.most_common(10), "repeat_users": repeat_users,
             "new_users": len(first_seen), "returning_users": len(returning), "devices": dict(devices),
             "tab_views": dict(tab_views), "events_by_type": dict(ev_counts.most_common(25)),
             "top_questions": prompts.most_common(15), "unanswered_questions": unanswered.most_common(10),

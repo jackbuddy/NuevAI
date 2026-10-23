@@ -6,6 +6,7 @@ import { ChatView } from './ChatView';
 import { CalendarView } from './CalendarView';
 import { ResourcesView } from './ResourcesView';
 import { Logo } from './Logo';
+import { FeedbackButton } from './FeedbackButton';
 import { startAnalytics, track } from '@/lib/analytics';
 
 type Tab = 'calendar' | 'chat' | 'resources';
@@ -56,6 +57,7 @@ export function Shell() {
           <button onClick={() => go('chat', 'logo')} className="flex items-center gap-2 justify-self-start" aria-label="NuevAI home">
             <Logo size={26} />
             <span className="hidden text-[15px] font-bold tracking-tight sm:block">NuevAI</span>
+            <span className="hidden rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-700 sm:block">Alpha</span>
           </button>
 
           <nav role="tablist" aria-label="Sections" className="surface-2 relative grid grid-cols-3 rounded-full p-1">
@@ -69,7 +71,8 @@ export function Shell() {
             ))}
           </nav>
 
-          <div className="flex items-center gap-2 justify-self-end" title={status === 'ready' ? 'Assistant online' : status === 'waking' ? 'Assistant is starting up' : 'Setup needed'}>
+          <div className="flex items-center gap-1.5 justify-self-end" title={status === 'ready' ? 'Assistant online' : status === 'waking' ? 'Assistant is starting up' : 'Setup needed'}>
+            <FeedbackButton tab={tab} />
             <span className={`h-2 w-2 rounded-full ${status === 'ready' ? 'animate-pulse-ring bg-brand-700' : status === 'waking' ? 'bg-brand-300' : 'bg-amber-500'}`} />
           </div>
         </div>

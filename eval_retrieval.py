@@ -53,6 +53,12 @@ CASES = [
     ("Who leads the AMC/AIME club?", r"Alex Yang", "clubs: leaders"),
     ("When is the next US boys basketball game?", r"US Boys Basketball (Varsity|JV) - Game", "live team schedule"),
     ("What courses are offered in Block 3?", r"Block 3 .*offerings", "offerings by block"),
+    ("What time is Block 3?", r"12:35", "bell schedule fact"),
+    ("What order are the blocks on an A' day?", r"1, 2, 4, 3", "A' order fact"),
+    ("What time is Block 7 tomorrow?", r"B' day.*Block 8 12:35-1:50 PM; Block 7 1:55-3:10 PM", "per-day block times (B' flips 7/8)"),
+    ("Who teaches Chemistry?", r"Jeremy Jacquot", "confirmed spelling"),
+    ("Where is the upper school located?", r"131 E 28th", "campus fact"),
+    ("What is the phone number for the front desk?", r"650-235-7100", "campus fact"),
 ]
 
 

@@ -42,7 +42,7 @@ BLOCKED_TITLE = re.compile(r"diploma|rsvp|sign[- ]?up|roster|responses|attendanc
 SYNONYMS = {
     r"\blate\b|\bleft early\b": "tardy tardies attendance",
     r"\babsent\b|\bmiss(ing)? school\b|\bsick\b": "absence absences attendance illness",
-    r"\bphones?\b|\bairpods?\b|\bearbuds?\b": "cell phone policy devices",
+    r"\bphones?\b(?!\s+numbers?)|\bairpods?\b|\bearbuds?\b": "cell phone policy devices",
     r"\bai\b|\bchatgpt\b|\bgpt\b": "artificial intelligence generative AI academic integrity",
     r"\bcheat(ing)?\b|\bcopy(ing)?\b": "plagiarism academic integrity honor",
     r"\bhomework\b": "homework assignments late work",
@@ -58,6 +58,7 @@ SYNONYMS = {
     r"\blaptop\b|\bwi-?fi\b|\bprint\w*\b|\bpassword\b|\bwifi\b": "technology IT help desk laptop wifi printing",
     r"\bgraduat\w*\b": "graduation requirements credits",
     r"\belective\b": "elective courses",
+    r"\bphone number\b|\bcall\b|\bmain office\b|\bfront desk\b|\baddress\b|\blocated\b|\blocation\b|\bdirections\b|\bwhere is (the )?(school|campus|nueva)\b": "campus locations and main phone numbers address front desk main office",
     r"\badvis(ory|or|ors|er|ers)\b": "advisory advisors advising team room",
     r"\bclubs?\b|\baffinity\b|\bstudent organi[sz]ations?\b": "clubs and affinity groups list",
     r"\bmakeup\b|\bmake[- ]up\b|\bretake\b": "make-up retake assessment policy",
@@ -379,7 +380,7 @@ def build_context(result: dict, max_events: int = 14) -> tuple[str, list[dict]]:
             sources.append({"chunk_id": e["chunk_id"], "title": (e.get("metadata") or {}).get("title"), "type": "schedule"})
     for d in result["docs"]:
         m = d.get("metadata") or {}
-        parts.append(d["content"][:1400])          # keeps prompts small: the LLM plan is token-rate limited
+        parts.append(d["content"][:1100])          # keeps prompts small: the LLM plan is token-rate limited
         sources.append({"chunk_id": d["chunk_id"], "title": m.get("title"), "url": m.get("source_url") if str(m.get("source_url", "")).startswith("http") else None,
                         "similarity": round(d.get("similarity", 0), 3), "type": m.get("source", "doc")})
     return "\n\n---\n\n".join(parts), sources

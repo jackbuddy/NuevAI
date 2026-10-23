@@ -7,7 +7,7 @@ interface Metrics {
   days: number; storage: string; events_total: number; unique_users: number; sessions: number; chats: number; chat_errors: number;
   cache_hit_rate: number | null; repeat_users: number; new_users: number; returning_users: number;
   latency_ms: { total_p50: number | null; total_p95: number | null; first_token_p50: number | null; first_token_p95: number | null };
-  feedback: Record<string, number>; devices: Record<string, number>; tab_views: Record<string, number>; events_by_type: Record<string, number>;
+  feedback: Record<string, number>; feedback_messages: { ts: string; kind: string; text: string; tab: string }[]; not_helpful_questions: [string, number][]; devices: Record<string, number>; tab_views: Record<string, number>; events_by_type: Record<string, number>;
   top_questions: [string, number][]; unanswered_questions: [string, number][]; resource_clicks: [string, number][]; calendar_filters: [string, number][];
   daily: { day: string; users: number; chats: number }[];
   server?: { answer_cache: Record<string, number>; llm_model: string; models: Record<string, boolean> };
@@ -68,6 +68,17 @@ export default function Insights() {
               <Kpi label="Devices" value={Object.entries(m.devices).map(([k, v]) => `${v} ${k}`).join(' · ') || '—'} small />
             </div>
 
+            <Card title={`Written feedback (${m.feedback_messages?.length ?? 0})`}>
+              {(m.feedback_messages?.length ?? 0) === 0 ? <p className="ink-2 text-sm">None yet.</p> : (
+                <ul className="space-y-3">
+                  {m.feedback_messages.map((f, i) => (
+                    <li key={i} className="text-sm"><span className="surface-2 mr-2 rounded-full px-2 py-0.5 text-[11px] font-semibold">{f.kind || 'Other'}</span>
+                      <span className="ink-2 text-xs">{f.ts} · {f.tab}</span><p className="mt-1">{f.text}</p></li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+
             <Card title="Questions per day">
               <div className="flex h-36 items-end gap-1.5">
                 {m.daily.map((d) => (
@@ -83,6 +94,7 @@ export default function Insights() {
             <div className="grid gap-6 md:grid-cols-2">
               <Card title="Top questions"><List rows={m.top_questions} /></Card>
               <Card title="Questions it struggled with"><List rows={m.unanswered_questions} empty="None — nice." /></Card>
+              <Card title="Marked not helpful (👎)"><List rows={m.not_helpful_questions ?? []} empty="None yet." /></Card>
               <Card title="Tab views"><List rows={Object.entries(m.tab_views)} /></Card>
               <Card title="Resource clicks"><List rows={m.resource_clicks} /></Card>
               <Card title="Calendar filters & searches"><List rows={m.calendar_filters} /></Card>

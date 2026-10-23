@@ -20,7 +20,12 @@ import openpyxl
 
 from . import config
 
-BLOCK_RULE = "Blocks 1-4 meet on A and A' days; Blocks 5-8 meet on B and B' days (A' is an A-type day, B' is a B-type day)."
+BLOCK_RULE = ("Blocks 1-4 meet on A and A' days; Blocks 5-8 meet on B and B' days. A' and B' flip the last two blocks "
+              "(A' order 1, 2, 4, 3; B' order 5, 6, 8, 7).")
+SLOT_TIMES = ["8:55-10:10 AM", "10:15-11:30 AM", "12:35-1:50 PM", "1:55-3:10 PM"]     # confirmed bell times (lunch 11:30-12:00/12:30)
+ORDER = {"A": [1, 2, 3, 4], "A'": [1, 2, 4, 3], "B": [5, 6, 7, 8], "B'": [5, 6, 8, 7]}
+# spellings the school confirmed: the Roles tab has a typo
+NAME_FIXES = {"Jeremy Jaquot": "Jeremy Jacquot"}
 DAY_TYPES = {"A", "A'", "B", "B'"}
 STUDENT_TABS = re.compile(r"roster|group(s)?$|advisee|student", re.I)        # never parsed
 
@@ -141,8 +146,11 @@ def day_chunks(wb, file: str) -> list[dict]:
         label = ", ".join(info.get("labels", []))
         t = info.get("type", "")
         if t in DAY_TYPES:
-            lead = f"{t} day: Blocks 1-4 meet." if t[0] == "A" else f"{t} day: Blocks 5-8 meet."
-            status = lead + (f" Schedule notes: {label}." if label else "")
+            order = ORDER[t]
+            slots = [f"Block {order[0]} {SLOT_TIMES[0]}", f"Block {order[1]} {SLOT_TIMES[1]}", "Lunch 11:30 AM-12:00/12:30 PM",
+                     f"Block {order[2]} {SLOT_TIMES[2]}", f"Block {order[3]} {SLOT_TIMES[3]}"]
+            lead = f"{t} day: Blocks {order[0]}-{max(order)} meet, in the order {', '.join(map(str, order))}. Times: {'; '.join(slots)}."
+            status = lead + (f" Schedule notes: {label} (special events can adjust the regular times)." if label else "")
             kind = "class_day"
         elif t or "no class" in label.lower():
             status = f"No classes{(' (' + t + ')') if t else ''}." + (f" {label}." if label and label.lower() != "no classes" else "")
@@ -234,7 +242,7 @@ def parse_roles(wb, tab: str, semester: str, known_last: frozenset = frozenset()
     room_col = next((j for j, c in enumerate(rows[hdr - 1]) if cell(c).lower() == "room"), None)
     out, dept = [], ""
     for r in rows[hdr + 1:]:
-        name = cell(r[0])
+        name = NAME_FIXES.get(cell(r[0]), cell(r[0]))
         blocks = {b: cell(r[j]) for b, j in cols.items() if cell(r[j]) not in ("", "/")}
         if not name or name.lower() in ("type", "room"):
             continue
