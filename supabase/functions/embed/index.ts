@@ -15,7 +15,7 @@ async function authorized(key: string): Promise<boolean> {
   const until = validated.get(key);
   if (until && until > Date.now()) return true;
   const base = Deno.env.get("SUPABASE_URL")!;
-  const r = await fetch(`${base}/rest/v1/document_chunks?select=chunk_id&limit=1`, {
+  const r = await fetch(`${base}/rest/v1/document_chunks_v2?select=chunk_id&limit=1`, {
     headers: { apikey: key, Authorization: `Bearer ${key}` },
   });
   if (!r.ok) return false;
