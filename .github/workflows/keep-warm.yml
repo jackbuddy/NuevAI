@@ -1,11 +1,10 @@
 name: Keep backend warm
 
-# Render stops an idle web service after ~15 minutes; the next visitor then waits ~1.5 minutes while the
-# 1.3 GB embedding model reloads. A ping every 10 minutes prevents that. (Skip this job if the Render
-# service is on an always-on paid plan.)
+# Free hosts sleep an idle backend (Render after ~15 minutes, Hugging Face Spaces after ~48 hours). A ping keeps it
+# awake. Set the repo variable BACKEND_URL to the Space URL (https://<user>-<space>.hf.space).
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "17 */6 * * *"
   workflow_dispatch:
 
 jobs:
@@ -14,4 +13,4 @@ jobs:
     timeout-minutes: 3
     steps:
       - name: Ping /health
-        run: curl -fsS --max-time 90 --retry 2 https://nuevai-backend.onrender.com/health
+        run: curl -fsS --max-time 120 --retry 2 "${{ vars.BACKEND_URL || 'https://nuevai-backend.onrender.com' }}/health"
