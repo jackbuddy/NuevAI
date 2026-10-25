@@ -2764,5 +2764,77 @@
     "content": "Jim Munzenrider teaches Jazz Ensemble."
    }
   ]
+ },
+ {
+  "category": "courses",
+  "q": "Who teaches meche",
+  "expect": [
+   "Norgan"
+  ],
+  "forbid": [],
+  "src": "usage"
+ },
+ {
+  "category": "teachers",
+  "q": "how long has dan norgren worked here",
+  "expect": [
+   "Norgan"
+  ],
+  "forbid": [],
+  "src": "usage"
+ },
+ {
+  "category": "greetings",
+  "q": "who made you",
+  "expect": [
+   "student project"
+  ],
+  "forbid": [],
+  "src": "usage"
+ },
+ {
+  "category": "greetings",
+  "q": "Are you school approved?",
+  "expect": [
+   "not an official"
+  ],
+  "forbid": [],
+  "src": "usage"
+ },
+ {
+  "category": "greetings",
+  "q": "That is wrong",
+  "expect": [
+   "thumbs-down|which part"
+  ],
+  "forbid": [],
+  "src": "usage"
+ },
+ {
+  "category": "greetings",
+  "q": "good answer",
+  "expect": [
+   "Glad"
+  ],
+  "forbid": [],
+  "src": "usage"
+ },
+ {
+  "category": "clubs",
+  "q": "How to join pinball club",
+  "expect": [
+   "Tuesday"
+  ],
+  "forbid": [],
+  "src": "usage"
+ },
+ {
+  "category": "clubs",
+  "q": "Who leads HTI club",
+  "expect": [
+   "Human Technology Interaction|HTI"
+  ],
+  "forbid": [],
+  "src": "usage"
  }
 ]

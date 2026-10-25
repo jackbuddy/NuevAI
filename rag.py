@@ -107,6 +107,28 @@ def _tmatch(a: str, b: str) -> bool:
     return len(a) >= 7 and len(b) >= 7 and difflib.SequenceMatcher(None, a, b).ratio() >= 0.85
 
 
+COURSE_ALIASES = {"meche": "mechanical engineering", "mech e": "mechanical engineering", "compsci": "computer science",
+                  "comp sci": "computer science", "econ": "economics", "calc": "calculus", "bio": "biology", "orgo": "organic chemistry"}
+
+
+def _alias_expand(qn: str) -> str:
+    """Student shorthand for courses ('meche', 'comp sci') -> the catalog words."""
+    out = f" {qn} "
+    for a, full in COURSE_ALIASES.items():
+        out = out.replace(f" {a} ", f" {full} ")
+    return out.strip()
+
+
+def _fuzzy_last(first: str, last: str, tokens_q: list[str]) -> bool:
+    """'dan norgren' -> Dan Norgan: the first name is present and a neighbouring token is a near-spelling of the last name."""
+    for i, t in enumerate(tokens_q):
+        if t == first and i + 1 < len(tokens_q):
+            nxt = tokens_q[i + 1]
+            if len(nxt) >= 5 and len(last) >= 5 and difflib.SequenceMatcher(None, nxt, last).ratio() >= 0.75:
+                return True
+    return False
+
+
 def _course_loose_match(qcontent: set[str], course_key: str) -> bool:
     ct = [t for t in course_key.split() if t not in STOP]
     if not ct:
@@ -266,8 +288,9 @@ class Retriever:
     def entity_chunks(self, query: str, today: date) -> list[dict]:
         """Direct lookup for 'who teaches Chemistry', 'what does Wes Chao teach', 'which room is Mr. Lee in'.
         Matches teacher names and course names against the question, so it never depends on semantic search."""
-        qn = norm_words(query)
+        qn = _alias_expand(norm_words(query))
         tokens_q = set(qn.split())
+        tok_list = qn.split()
         cue = bool(TEACH_CUE.search(query))
         hits = []
         loose = bool(re.search(r"\b(who|teach\w*|taught|instructor|prof\w*|room|which block|what block|when is|offered|sections?)\b", query, re.I))
@@ -279,6 +302,8 @@ class Retriever:
                 names = {m.get("teacher_last", "")} | set(m.get("aliases", []))
                 ok = bool(full) and f" {full} " in f" {qn} "
                 ok = ok or any(n and n in tokens_q and (len(n) >= 6 or cue) for n in names)
+                parts = full.split()
+                ok = ok or (len(parts) >= 2 and _fuzzy_last(parts[0], parts[-1], tok_list))
                 if ok:
                     hits.append((0, r))
             elif m.get("kind") == "course":

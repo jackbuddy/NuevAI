@@ -81,6 +81,15 @@ CASES = [
     ("On the calendar it shows a fika, what is it?", r"US Parent Fika", "any-keyword fallback when the strict keyword match is empty"),
     ("wat time is blok 3", r"12:35-1:50", "typo 'blok' still pins the bell facts"),
     ("What languages can I study?", r"(?i)chinese", "language synonym expansion"),
+    # added by usage review (prompt 04): real questions from alpha testers
+    ("Who teaches meche", r"(?s)Mechanical Engineering \(Fall 2026\).*Dan Norgan", "student shorthand 'meche' resolves to the course"),
+    ("how long has dan norgren worked here", r"Dan Norgan", "misspelled last name next to the right first name"),
+    ("Who teaches Mechanical Engineering - which blocks and rooms?", r"Block 1 \(A/A' days\): Dan Norgan, room 112", "course sections"),
+    ("Who leads HTI club", r"(?i)Human Technology Interaction", "club acronym"),
+    ("who is the leader of chemlab club", r"(?i)chem", "club lookup without 'the' prefix"),
+    ("When does the ethics bowl club meet", r"(?i)ethics bowl", "club lookup"),
+    ("What is the cell phone policy? can have my phone in class", r"(?i)phone", "ungrammatical phone question"),
+    ("Who leads it?", r"(?i)ethics bowl", "club follow-up", [{"role": "user", "content": "When does the ethics bowl club meet"}]),
 ]
 
 

@@ -175,6 +175,7 @@ STYLE (house style, follow exactly)
 - Bold only the one or two key facts (a time, room or deadline) and only in longer answers; never bold labels or whole lines.
 - Links are markdown links [short label](exact-url) and only when the context has the URL: when the user asks how or where to book, register, sign up, pay, log in, fill out a form or open a document, include it. Copy URLs exactly, character for character; never write a bare URL, and never invent, shorten or guess one.
 - Never mention the context, sources, documents, file names, chunk ids, or "provided information". Say "I don't have that" instead of "the context does not say".
+- Phone numbers, emails and URLs: only copy ones that appear in the context, exactly. Never write a placeholder or made-up number such as "(415) 555-1234"; if none is listed, name the office without a number. Never say "in the current context" or "in the context".
 - When unsure or the answer is missing: "I don't have that" plus the best next step in the same sentence (the relevant office, its phone number, or a link from the context). Do not guess.
 
 GROUNDING
@@ -204,8 +205,21 @@ THANKS = re.compile(r"^\s*(thanks|thank you|thx|ty|cool thanks|great thanks|awes
 CAPABILITIES = re.compile(r"^\s*(what can you do|what do you do|who are you|help|how does this work|what are you)\b[\s!.?]*$", re.I)
 
 
+IDENTITY = re.compile(r"^\s*(who (made|built|created|programmed|designed|owns|runs|trained) (you|this|nuevai)( ai| bot| chatbot| assistant| app| site| website)?|who do you work for|who (are you|is behind (you|this|nuevai))( made by)?|are you (an? )?(official|school[- ]approved|approved|endorsed)( by (the school|nueva|an admin|admin))?|(were|are) you (school )?(approved|endorsed|authorized) by (the school|nueva|an? admin\w*|admin\w*)|but were you approved by (the school|nueva|an? admin\w*)|is (this|nuevai) (official|school[- ]approved|approved))\b[\s!.?]*$", re.I)
+PRAISE = re.compile(r"^\s*(good|great|nice|perfect|awesome|amazing|excellent|cool|ok|okay|wow)( (answer|job|work|one|bot))?\b[\s!.]*$", re.I)
+COMPLAINT = re.compile(r"^\s*(that('s| is) (wrong|incorrect|not right|not true)|(this|it)('s| is) (wrong|incorrect)|wrong|no that('s| is) wrong|you('re| are) wrong)\b[\s!.]*$", re.I)
+
+
 def smalltalk(q: str) -> str | None:
     """Instant, free replies for greetings and 'what can you do' - no retrieval, no LLM call."""
+    if IDENTITY.match(q):
+        return ("I'm NuevAI, an AI assistant for the Nueva community built as a student project. I'm not an official school service, "
+                "so I can't speak for the school or confirm any approval. For official answers, check with the relevant office or the handbook.")
+    if PRAISE.match(q):
+        return "Glad that helped! Ask me anything else about Nueva."
+    if COMPLAINT.match(q):
+        return ("Sorry about that. Tell me which part is wrong, or tap the thumbs-down on that answer so it gets fixed. "
+                "For anything official, double-check with the relevant office.")
     if GREETING.match(q):
         return "Hi! I'm NuevAI. Ask me about courses, the school calendar and game schedules, policies in the handbook, or how to book, register or pay for things."
     if THANKS.match(q):
@@ -217,6 +231,9 @@ def smalltalk(q: str) -> str | None:
                 "- Handbook policies: attendance, phones, dress code, academic integrity\n"
                 "- Links: booking a tour, applying, giving, the store, key documents")
     return None
+
+
+POLICY_TOPIC = re.compile(r"\b(polic\w*|rules?|allowed|attendance|absen\w*|tard\w*|late|phones?|dress code|uniform|discipline|plagiar\w*|cheat\w*|honor|graduat\w*|grading|grades?|homework|late work|make-?up|retake|laptops?|ai|excused)\b", re.I)
 
 
 def suggestions_for(result: dict, query: str) -> list[dict]:
@@ -249,8 +266,12 @@ def suggestions_for(result: dict, query: str) -> list[dict]:
         elif "catalog" in titles and "club" not in titles:
             out += [{"label": "What are the prerequisites?", "query": f"{query.rstrip('?')} - what are the prerequisites?"},
                     {"label": "Who teaches these?", "query": f"{query.rstrip('?')} - who teaches them?"}]
-        elif "handbook" in titles or "policy" in titles:
-            out += [{"label": "Who do I contact about this?", "query": "Who do I contact about " + query.rstrip("?").lower() + "?"}]
+        elif ("handbook" in titles or "policy" in titles) and (pm := POLICY_TOPIC.search(query)) \
+                and not re.match(r"\s*(who|when|what time|where|how long)\b", query, re.I):
+            # only for real policy questions, and phrased from the matched topic: pasting the whole question read as nonsense
+            topic = pm.group(0).lower()
+            topic = topic if topic.endswith("policy") or topic in ("dress code", "uniform") else topic + " policy"
+            out += [{"label": "Who do I contact about this?", "query": f"Who do I contact about the {topic}?"}]
     return out[:3]
 
 

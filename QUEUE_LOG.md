@@ -73,3 +73,26 @@ Numbers
 Follow-ups
 - When quota recovers: `python eval_golden.py --limit 15 --sleep 15`, then `python format_lint.py <new json>`; expect near-zero.
 - Source-leak phrases like "the context" are only prompt-enforced; a server-side rewrite of the final answer could be added if they persist.
+
+## 04 - learn from real usage (2026-10-25)
+
+Data: Supabase analytics_events, last 14 days. Real traffic exists, all from 2026-10-23: 12 visitors, 151 answered chats (8 visitors), 6 thumbs-down, 4 chat_error (all 429), 1 feedback_text ("Test"). Full write-up in data/eval/usage_review_2026-10-25.md (data/ is gitignored, so it stays local).
+
+Changed
+- query_server.py: instant canned replies (no retrieval, no LLM) for identity/approval questions ("who made you", "are you school approved"), praise ("good answer") and complaints ("That is wrong"); these took 7-9 s and hit 429 before. The "Who do I contact about <whole question>?" chip now appears only for real policy topics and is phrased from the topic. Prompt: only copy phone numbers/emails/URLs from the context (a local check produced an invented "(415) 555-1234"), and never say "in the current context".
+- rag.py: course shorthand aliases ("meche" -> Mechanical Engineering, "comp sci", "econ", ...), and teacher lookup tolerates a misspelled last name when the first name is present ("dan norgren" -> Dan Norgan).
+- eval_retrieval.py: 60 -> 68 cases; eval_golden.json: 274 -> 282 (src "usage").
+- NEEDS_USER.md: league names, tutorial booking steps, swim, homecoming info, superlatives/AlphaGen, IT help contact, and confirmation of the identity wording.
+
+Numbers
+- eval_retrieval: 66/68 before the rag.py fix (the two new cases failed), 68/68 after.
+- 44-question retrieval probe of real usage questions: remaining misses are data gaps (swim, wifi password, superlatives, league, AlphaGen), listed in NEEDS_USER.
+- Gates: py_compile ok; no frontend changes (tsc ok); /health data_ok true (5897 rows).
+
+Not verified (honest limits)
+- Groq returned 429 on almost every live call again, so gate 4 (eval_answers.py) was NOT run and I could not read new answers. Verified live: "Who teaches meche" -> "Mechanical Engineering is taught by Dan Norgan in room 112."; canned replies via curl. Unverified: the no-invented-phone-number prompt line, the new chip phrasing end to end, and the thumbs-down questions (tutorial, block-5 math, sports lists, events this week), which predate the prompt 02/03 fixes.
+- Suggested rerun when quota recovers: `python eval_golden.py --category greetings,clubs,teachers --sleep 15` then spot-check "when does nueva swim season start" for a fabricated number.
+
+Follow-ups
+- Consider a server-side check that strips phone numbers not present in the retrieved context.
+- Daily Groq quota is the main user-visible failure (4 of 4 errors on alpha day).
