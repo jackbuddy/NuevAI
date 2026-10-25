@@ -56,3 +56,20 @@ Not completed / honest limits
 Follow-ups
 - Cut tokens per answer (contexts are about 3k tokens) so a full golden run fits the free quota, or use a separate Groq key for evals.
 - Remaining soft spots: staff-by-last-name only; Spring 2027 offerings not filled in; follow-up resolution relies on one previous user turn.
+
+## 03 - consistent, polished answer formatting (2026-10-25)
+
+Changed
+- SYSTEM_PERSONA STYLE block rewritten as one house style: direct answer first; 1-2 sentences / under ~60 words for simple questions; "-" bullets only for 3+ items; no headings; compact "Thu, Oct 22 - 3:45-4:50 PM - Home, place" lines or small tables; dates "Thu, Oct 22", times "8:55-10:10 AM"; bold only 1-2 key facts; `[label](exact-url)` links only from context, never bare; never mention context/sources/file names ("I don't have that" + next step instead); no filler/emoji.
+- components/Markdown.tsx: table renderer (horizontal scroll wrapper, compact cells), nested-list spacing, long-word wrapping (`overflow-wrap:anywhere`), links already open in a new tab with rel noopener noreferrer. Checked in the browser pane at 375px: no horizontal page overflow (scrollWidth 375), table fits, long URL and 70-char word wrap, nested bullets fine.
+- Streaming: new `stabilize()` used while a message streams hides an unfinished trailing table row / header-only table, a dangling `[label](partial-url`, and unpaired `**`, so half-built markdown never flashes. Unit-checked with 7 partial strings. ChatView passes `streaming`.
+- format_lint.py (`python format_lint.py [golden json...]`, `--selftest`): flags too_long, heading_in_short, bare_url, missing_link (how/where to book/register/etc. with no link), source_leak, unclosed_markdown, bullets_under_3, filler_opener, emoji, overbold. Default run merges the newest stored answer per question from data/eval/golden_*.json (274 answers).
+
+Numbers
+- Lint on the 274 stored answers (produced under the OLD prompt): 10 violations in 10 answers (bullets_under_3 3, source_leak 3 "the context does not...", overbold 2, bare_url 1, too_long 1). I fixed one lint false positive (noun "book fair" flagged as missing link) so the starting figure was 11 -> 10.
+- After: NOT measurable. Groq quota is still exhausted (every live call returned 429 on all three models), so no answers were generated under the new prompt. The prompt rules target each of those 10 categories directly, but this is unverified.
+- Gates: eval_retrieval 60/60; py_compile ok; tsc and next build ok; /health data_ok true. Gate 4 answer-reading could not be done (429).
+
+Follow-ups
+- When quota recovers: `python eval_golden.py --limit 15 --sleep 15`, then `python format_lint.py <new json>`; expect near-zero.
+- Source-leak phrases like "the context" are only prompt-enforced; a server-side rewrite of the final answer could be added if they persist.

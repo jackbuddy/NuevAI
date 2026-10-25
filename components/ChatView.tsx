@@ -224,7 +224,7 @@ function Bubble({ m, waking, onRetry }: { m: Message; waking: boolean; onRetry: 
             {waking && <p className="ink-2 mt-3 text-xs">Waking up the assistant — the first question after a quiet period can take up to a minute. After this it’s fast.</p>}
           </div>
         ) : (
-          <div className={m.streaming ? 'caret' : ''}><Markdown>{m.content}</Markdown></div>
+          <div className={m.streaming ? 'caret' : ''}><Markdown streaming={!!m.streaming}>{m.content}</Markdown></div>
         )}
 
         {!m.streaming && !m.error && m.content && (
