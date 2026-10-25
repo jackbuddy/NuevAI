@@ -22,6 +22,7 @@ from analytics import Analytics
 from cache import TTLCache
 from answer_store import AnswerStore
 from rag import Retriever, build_context
+from followup import grade_relevant, valid_grade
 import guard
 
 load_dotenv()
@@ -191,6 +192,8 @@ class QueryRequest(BaseModel):
     top_k: int = 6
     model: str | None = None
     history: list[Turn] = Field(default_factory=list, max_length=8)
+    # optional 9-12 preference kept only in the browser; used for this request and never logged, cached or stored
+    grade: int | None = Field(default=None, ge=9, le=12)
     anon_id: str = Field(default="", max_length=64)
     session_id: str = Field(default="", max_length=64)
 
@@ -295,42 +298,76 @@ def smalltalk(q: str) -> str | None:
 POLICY_TOPIC = re.compile(r"\b(polic\w*|rules?|allowed|attendance|absen\w*|tard\w*|late|phones?|dress code|uniform|discipline|plagiar\w*|cheat\w*|honor|graduat\w*|grading|grades?|homework|late work|make-?up|retake|laptops?|ai|excused)\b", re.I)
 
 
-def suggestions_for(result: dict, query: str) -> list[dict]:
-    """Two or three follow-ups that fit what was just answered."""
+def _asked(label_q: str, asked: list[str]) -> bool:
+    """True when a suggested question is (nearly) something the student already asked."""
+    from rag import tokens
+    t = set(tokens(label_q))
+    return any(t and len(t & set(tokens(a))) / len(t | set(tokens(a))) >= 0.6 for a in asked)
+
+
+def suggestions_for(result: dict, query: str, grade: int | None = None, history=None) -> list[dict]:
+    """Two or three follow-ups that fit what was just answered (never one the student already asked)."""
     intent, docs, events = result.get("intent"), result.get("docs", []), result.get("events", [])
+    q_eff = (result.get("resolved") or query).strip()
+    asked = [query] + [t.content for t in (history or []) if t.role == "user"]
+    grade = valid_grade(grade)
     out = []
+    ents = result.get("entities") or []
     if events and intent:
         if intent.kind == "game":
             sport = intent.sport or ""
             out += [{"label": "Show all home games", "query": f"What are all the {sport} home games?".replace("  ", " ")},
                     {"label": "When is practice?", "query": f"What time is {sport or 'team'} practice?"}]
-        elif intent.sport:
+        elif intent.kind == "practice" and intent.sport:
             out += [{"label": "When is the next game?", "query": f"When is the next {intent.sport} game?"}]
+        elif intent.sport:
+            out += [{"label": "When is the next game?", "query": f"When is the next {intent.sport} game?"},
+                    {"label": "When is practice?", "query": f"What time is {intent.sport} practice?"}]
+        elif intent.dayinfo:
+            out += [{"label": "What time is each block?", "query": "What time is each block?"},
+                    {"label": "What about tomorrow?", "query": "Is tomorrow an A day or B day?"}]
         elif intent.category == "no_school":
             out += [{"label": "What's happening this week?", "query": "What events are happening this week?"}]
         out.append({"label": "Open the calendar", "action": "calendar"})
     else:
         sources = {(d.get("metadata") or {}).get("source", "") for d in docs}
-        ents = result.get("entities") or []
         titles = " ".join((d.get("metadata") or {}).get("title", "") for d in docs).lower()
-        if ents:
-            out += [{"label": "What block and room?", "query": f"{query.rstrip('?')} - which blocks and rooms?"},
-                    {"label": "Is tomorrow an A or B day?", "query": "Is tomorrow an A day or B day?"}]
+        courses = [(e.get("metadata") or {}) for e in ents if (e.get("metadata") or {}).get("kind") == "course"]
+        teachers = [(e.get("metadata") or {}) for e in ents if (e.get("metadata") or {}).get("kind") == "teacher"]
+        if courses:
+            name = courses[0].get("course", "").strip()
+            if name:
+                out += [{"label": "Who teaches it?", "query": f"Who teaches {name}?"},
+                        {"label": "Which blocks and rooms?", "query": f"What blocks and rooms is {name} in?"}]
+                if grade and grade_relevant(query, grade):
+                    out.append({"label": f"Courses for grade {grade}", "query": f"What courses can I take in grade {grade}?"})
+        elif teachers:
+            who = teachers[0].get("teacher", "").strip()
+            if who:
+                out += [{"label": "What else do they teach?", "query": f"What courses does {who} teach?"},
+                        {"label": "Which blocks and rooms?", "query": f"What blocks and rooms does {who} teach in?"}]
         elif "school_clubs" in sources:
             out += [{"label": "Which clubs meet at lunch?", "query": "Which clubs meet at lunch?"},
                     {"label": "How do I start a club?", "query": "How do I start a club?"}]
-        elif "school_day" in sources or "school_facts" in sources or "school_advisory" in sources:
+        elif "school_advisory" in sources or re.search(r"\badvisory\b", q_eff, re.I):
+            if grade and grade_relevant(query, grade):
+                out.append({"label": "When is my advisory?", "query": "When is advisory in the next two weeks?"})
+            out += [{"label": "What time is each block?", "query": "What time is each block?"}]
+        elif "school_day" in sources or "school_facts" in sources:
             out += [{"label": "What time is each block?", "query": "What time is each block?"},
                     {"label": "Open the calendar", "action": "calendar"}]
         elif "catalog" in titles and "club" not in titles:
-            out += [{"label": "What are the prerequisites?", "query": f"{query.rstrip('?')} - what are the prerequisites?"},
-                    {"label": "Who teaches these?", "query": f"{query.rstrip('?')} - who teaches them?"}]
-        elif ("handbook" in titles or "policy" in titles) and (pm := POLICY_TOPIC.search(query)) \
-                and not re.match(r"\s*(who|when|what time|where|how long)\b", query, re.I):
+            out += [{"label": "What are the prerequisites?", "query": f"{q_eff.rstrip('?')} - what are the prerequisites?"},
+                    {"label": "Who teaches these?", "query": f"{q_eff.rstrip('?')} - who teaches them?"}]
+            if grade and grade_relevant(query, grade):
+                out.append({"label": f"Courses for grade {grade}", "query": f"What courses can I take in grade {grade}?"})
+        elif ("handbook" in titles or "policy" in titles) and (pm := POLICY_TOPIC.search(q_eff)) \
+                and not re.match(r"\s*(who|when|what time|where|how long)\b", q_eff, re.I):
             # only for real policy questions, and phrased from the matched topic: pasting the whole question read as nonsense
             topic = pm.group(0).lower()
             topic = topic if topic.endswith("policy") or topic in ("dress code", "uniform") else topic + " policy"
             out += [{"label": "Who do I contact about this?", "query": f"Who do I contact about the {topic}?"}]
+    out = [c for c in out if "query" not in c or not _asked(c["query"], asked)]
     return out[:3]
 
 
@@ -338,7 +375,7 @@ def _prepare(req: QueryRequest):
     """Retrieval + prompt assembly. Returns everything the LLM step and the logs need."""
     now = datetime.now(PACIFIC)
     try:
-        result = retriever.retrieve(req.query, [t.model_dump() for t in req.history], top_k=min(max(req.top_k, 3), 5), today=now.date())
+        result = retriever.retrieve(req.query, [t.model_dump() for t in req.history], top_k=min(max(req.top_k, 3), 5), today=now.date(), grade=req.grade)
     except Exception as e:
         if not data_status()["rows"]:
             print(f"KNOWLEDGE BASE UNREACHABLE ({str(e)[:80]}) - check SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY", flush=True)
@@ -352,10 +389,17 @@ def _prepare(req: QueryRequest):
         if result.get("degraded"):          # search was down and nothing structured matched: do not claim "not found"
             raise SearchUnavailable()
         context = "No relevant documentation was found for this question."
-    system = (f"{SYSTEM_PERSONA}\n\nToday is {now.strftime('%A, %B %-d, %Y')} (Pacific time).\n\n"
+    grade_note = ""
+    if grade_relevant(req.query, req.grade):
+        grade_note = (f"\n\nThe student says they are in grade {req.grade}. Where it matters (courses, prerequisites, advisory, "
+                      f"graduation requirements) answer for that grade and prefer options open to it; do not mention that you were told their grade.")
+    standalone = result.get("resolved") or req.query
+    follow_note = (f"\n\nThe student's latest message is a follow-up. Treat it as: \"{standalone[:300]}\"."
+                   if standalone.strip().lower() != req.query.strip().lower() and req.history else "")
+    system = (f"{SYSTEM_PERSONA}\n\nToday is {now.strftime('%A, %B %-d, %Y')} (Pacific time).{grade_note}{follow_note}\n\n"
               f"CONTEXT:\n{context}")
     msgs = [{"role": "system", "content": system}]
-    msgs += [{"role": t.role if t.role in ("user", "assistant") else "user", "content": t.content} for t in req.history[-6:]]
+    msgs += [{"role": t.role if t.role in ("user", "assistant") else "user", "content": t.content[:700]} for t in req.history[-4:]]
     msgs.append({"role": "user", "content": req.query})
     return msgs, sources, result, now
 
@@ -451,6 +495,8 @@ def _track(req: QueryRequest, request: Request | None, props: dict):
 def _cache_key(req: QueryRequest, now: datetime):
     if req.history:
         return None                    # follow-ups depend on the conversation; never cached
+    if grade_relevant(req.query, req.grade):
+        return None                    # tailored to the grade: must not be served to (or learned from) anyone else
     return (_norm(req.query), now.strftime("%Y-%m-%d"), req.model or LLM_MODEL)
 
 
@@ -507,7 +553,7 @@ def _answer(req: QueryRequest, request: Request | None) -> dict:
         print("OUTPUT LEAK BLOCKED", flush=True)
         answer = guard.LEAK_REPLY
     timings = {**result["timings"], "llm_ms": round((time.time() - t_llm) * 1000), "total_ms": round((time.time() - t0) * 1000)}
-    payload = {"answer": answer, "model_used": model, "sources": sources, "suggestions": suggestions_for(result, req.query)}
+    payload = {"answer": answer, "model_used": model, "sources": sources, "suggestions": suggestions_for(result, req.query, req.grade, req.history)}
     if key and sources:       # never cache an answer that had nothing behind it
         intent = result["intent"]
         _cache_put(req, key, payload, intent)
@@ -632,7 +678,7 @@ def chat_stream(req: QueryRequest, request: Request):
             answer = "".join(parts)
             timings = {**result["timings"], "ttft_ms": ttft, "llm_ms": round((time.time() - t_llm) * 1000),
                        "total_ms": round((time.time() - t0) * 1000)}
-            suggestions = suggestions_for(result, req.query)
+            suggestions = suggestions_for(result, req.query, req.grade, req.history)
             yield _sse("done", {"cached": False, "timings": timings, "suggestions": suggestions})
             if key and answer and sources and not broke:
                 _cache_put(req, key, {"answer": answer, "model_used": model, "sources": sources, "suggestions": suggestions}, result["intent"])

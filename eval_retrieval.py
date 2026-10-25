@@ -100,12 +100,13 @@ def golden_cases() -> list:
     from pathlib import Path
     from eval_golden import normalize, pattern
     from eval_recall import usable
-    seen = {c[0].lower() for c in CASES}
+    seen = {(c[0].lower(), repr(c[3] if len(c) > 3 else None)) for c in CASES}
     out = []
     for g in json.loads((Path(__file__).parent / "eval_golden.json").read_text()):
-        if not usable(g) or g["q"].lower() in seen:
+        k = (g["q"].lower(), repr(g.get("history")))
+        if not usable(g) or k in seen:
             continue
-        seen.add(g["q"].lower())
+        seen.add(k)
         out.append((g["q"], g["expect"], f"golden/{g['category']}", g.get("history")))
     return out
 

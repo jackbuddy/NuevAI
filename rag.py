@@ -18,6 +18,7 @@ import embedder
 import guard
 import settings
 from cache import TTLCache
+from followup import apply_grade, rewrite_followup, valid_grade
 from intent import CalendarIntent, parse_intent
 
 CANDIDATES = 32
@@ -452,15 +453,19 @@ class Retriever:
         return [r for _, r in hits[:2]]
 
     # ---- orchestration ----------------------------------------------------
-    def retrieve(self, query: str, history: list[dict] | None = None, top_k: int = 6, today: date | None = None) -> dict:
+    def retrieve(self, query: str, history: list[dict] | None = None, top_k: int = 6, today: date | None = None, grade: int | None = None) -> dict:
         t0 = time.time()
         today = today or datetime.now().date()
         history = history or []
         query = fix_typos(query)
         prev_user = next((m["content"] for m in reversed(history) if m.get("role") == "user"), "")
+        # follow-ups ("what about JV?", "who teaches it?") become standalone questions for every lookup below
+        standalone = rewrite_followup(query, history)
+        resolved = apply_grade(standalone, valid_grade(grade))
+        followed = resolved != query
         # short follow-ups ("what about tomorrow?") borrow the previous question for search
-        search_q = expand_query(f"{prev_user} {query}" if prev_user and len(query.split()) <= 6 else query)
-        intent = parse_intent(query, today, prev_user)
+        search_q = expand_query(resolved if followed else f"{prev_user} {query}" if prev_user and len(query.split()) <= 6 else query)
+        intent = (parse_intent(resolved, today, prev_user) if followed else None) or parse_intent(query, today, prev_user)
         timings = {}
 
         def vec_task():
@@ -481,21 +486,21 @@ class Retriever:
             return rows
 
         try:
-            ents = self.entity_chunks(query, today)
+            ents = self.entity_chunks(resolved, today)
         except Exception as e:
             ents = []
             print(f"entity lookup failed: {e}", flush=True)
         pinned = []
         try:
-            pinned = self.pinned_facts(query) + self.advisory_lines(query)
-            clubs = self.club_chunks(query)
+            pinned = self.pinned_facts(resolved) + self.advisory_lines(resolved)
+            clubs = self.club_chunks(resolved)
             if not clubs and prev_user and len(query.split()) <= 6:
                 clubs = self.club_chunks(prev_user)
             pinned += clubs
         except Exception as e:
             print(f"pinned lookup failed: {e}", flush=True)
         self.sb()      # create the client once, before worker threads import it concurrently
-        f_vec, f_cal, f_links, f_fts = _pool.submit(vec_task), _pool.submit(cal_task), _pool.submit(self.link_cards, query), _pool.submit(self.fts_search, search_q)
+        f_vec, f_cal, f_links, f_fts = _pool.submit(vec_task), _pool.submit(cal_task), _pool.submit(self.link_cards, resolved), _pool.submit(self.fts_search, search_q)
         vec_rows, degraded = [], False
         try:
             vec_rows = f_vec.result(timeout=VECTOR_BUDGET_S)
@@ -537,7 +542,7 @@ class Retriever:
             events, intent = [], None      # "advisory 11.1" is not a date question; the two-week digest would only add noise
         pin_ids = {p["chunk_id"] for p in pinned}
         docs = [d for d in docs if d["chunk_id"] not in ent_ids | pin_ids]
-        return {"pinned": pinned, "docs": docs, "events": events, "intent": intent, "timings": timings, "candidates": len(rows), "entities": ents, "degraded": degraded}
+        return {"pinned": pinned, "docs": docs, "events": events, "intent": intent, "timings": timings, "candidates": len(rows), "entities": ents, "degraded": degraded, "resolved": standalone}
 
 
 def fmt_event(r: dict) -> str:

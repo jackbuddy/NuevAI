@@ -203,3 +203,24 @@ Link checker (plain GET, 22 curated URLs from lib/resources.ts): 21 return 200. 
 Gates: eval_retrieval 254/254; tsc clean; next build ok; no Python changed (py_compile and gate 4 not applicable).
 
 Not done / follow-ups: real-device checks (iOS Safari keyboard/safe area, VoiceOver) were not possible here; the chat markdown table/long-answer layout was only checked with one live answer; Lighthouse was run without a backend.
+
+## 09 - conversation quality (2026-10-25)
+
+Finding: the backend already used prior turns (history sent by the client, previous user question prepended to short queries, "next day" date resolution, club follow-ups). It had no real follow-up rewriting and no grade.
+
+Changed
+- followup.py (new, no LLM, no network): rewrites a follow-up into a standalone question from the previous user turns. Handles variant swaps ("what about JV?", "and girls?"), bare dates ("and tomorrow?", "what about Friday"), pronouns ("who teaches it?", "what room is that in?", "when do they meet?"), same-question-new-subject ("and Block 4?", "what about Intro to Film + Video?"), attribute-only ("what room?"), chains of follow-ups. Self-contained questions ("and how do I donate?") are left alone. "Next/previous day" stays with intent.py. rag.retrieve uses the rewritten text for entity, club, pinned-fact, link, advisory lookups, vector search and (first) intent parsing; result["resolved"] carries it. No LLM rewrite was added (not needed; saves tokens).
+- Context kept short: client sends the last 4 messages (each cut to 700 chars); server uses the last 4 and cuts to 700; when a follow-up was rewritten the system prompt carries one line "treat it as: ...".
+- Grade (9-12): optional pill row under the composer, stored only in localStorage (nuevai.grade), sent as `grade` with a request. Server: validated 9-12; only used when the question is grade-sensitive (courses, advisory, graduation, schedule...) to append the grade to retrieval text and a short prompt note; such requests bypass both caches; never put in analytics props, answers cache or logs.
+- Suggestion chips: built from the resolved question and the entities actually found (course -> "Who teaches it?"/"Which blocks and rooms?" with the real course name, teacher -> "What else do they teach?", game/practice/day-type specific), and any chip the student already asked (this or earlier turns) is dropped. Grade chips only appear for grade-sensitive questions.
+- eval_golden.json: +30 follow_ups cases (history included). eval_retrieval.py dedupe now keys on (question, history) so same-text follow-ups with different history all run.
+
+Measured (offline retrieval, no LLM)
+- New 30 follow-up cases: 30/30 pass; with the rewriter disabled (old prev-question concat only) 27/30 (failed: "And varsity?", "Who teaches it?" after a catalog question, "What else does he teach?").
+- eval_retrieval: 286/286 (was 254 + 30 new + 2 previously hidden by the dedupe). test_resilience: 40/40. tsc clean, next build ok, py_compile ok.
+
+Unverified
+- Gate 4: the local backend returned a few real LLM answers (a follow-up with grade=10 returned "Rob Zomber." for "Who teaches it?" after "What is Intro to CAD?" and chips adapted), then Groq 429s began again so eval_answers.py ended in degraded fallbacks. Live answer quality is NOT verified. "What events are coming up this week?" got "I don't have that" from the model on one run (not related to this change; worth a look when quota returns).
+- Grade pills not checked in a browser at 375/1440 widths; touch target 44px set on mobile via classes only.
+
+Follow-ups: run eval_golden.py with the new follow_ups category once Groq quota is back; consider a deploy then check /insights for follow-up error rates.

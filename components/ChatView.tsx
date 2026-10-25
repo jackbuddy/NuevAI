@@ -5,7 +5,7 @@ import { ArrowDown, ArrowUp, BookOpen, CalendarDays, Check, ChevronDown, Copy, G
 import { Markdown } from './Markdown';
 import { Logo } from './Logo';
 import { track } from '@/lib/analytics';
-import { Message, streamChat, uid } from '@/lib/chat';
+import { Message, loadGrade, saveGrade, streamChat, uid } from '@/lib/chat';
 import { CalEvent, nowLA } from '@/lib/calendar';
 
 const STARTERS = [
@@ -35,6 +35,9 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
   const [away, setAway] = useState(false);          // reader scrolled up: offer a jump back
   const [announce, setAnnounce] = useState('');     // screen-reader status, not the streaming text itself
   const composing = useRef(false);
+  const [grade, setGrade] = useState<number | null>(null);   // optional preference, browser-only
+  const gradeRef = useRef<number | null>(null);
+  gradeRef.current = grade;
   const [hydrated, setHydrated] = useState(false);   // do not save until the saved chat has been read back
 
   // restore conversation for this browser tab
@@ -44,6 +47,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
       // an answer that was still empty when the page was refreshed would show a loading skeleton forever: drop it
       if (raw) setMessages((JSON.parse(raw) as Message[]).filter((m) => m.role === 'user' || m.content).map((m) => ({ ...m, streaming: false })));
     } catch {}
+    setGrade(loadGrade());
     setHydrated(true);
     const { date: d, hour: h } = nowLA();
     setGreeting(h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening');
@@ -99,7 +103,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
             onMeta: (m) => patch((x) => ({ ...x, sources: m.sources, cached: m.cached })),
             onDelta: (t) => { if (!first) { first = performance.now() - t0; setWaking(false); } patch((x) => ({ ...x, content: x.content + t })); },
             onDone: (d) => { setAnnounce('Answer ready'); patch((x) => ({ ...x, streaming: false, cached: d.cached, degraded: !!d.degraded, suggestions: d.suggestions ?? [], ms: Math.round(first), totalMs: Math.round(performance.now() - t0) })); },
-          }, ac.signal);
+          }, ac.signal, gradeRef.current);
           break;
         } catch (err: any) {
           // the model provider is briefly at its per-minute limit: wait a few seconds and try once more, quietly
@@ -132,9 +136,22 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
 
   const retry = (m: Message) => { if (m.query) { setMessages((p) => p.filter((x) => x.id !== m.id).slice(0, -1)); setTimeout(() => send(m.query!, 'retry'), 0); } };
   const clear = () => { abortRef.current?.abort(); setMessages([]); track('chat_cleared'); };
+  const chooseGrade = (g: number | null) => { setGrade(g); saveGrade(g); };
   const empty = messages.length === 0;
   const games = (today ?? []).filter((e) => e.kind !== 'practice');
   const practices = (today ?? []).length - games.length;
+
+
+  const gradePicker = (
+    <div role="group" aria-label="Your grade (optional)" className="flex flex-wrap items-center gap-1.5">
+      <span className="ink-2 mr-1 text-[12px] font-medium">My grade</span>
+      {[9, 10, 11, 12].map((g) => (
+        <button key={g} type="button" aria-pressed={grade === g} onClick={() => chooseGrade(grade === g ? null : g)}
+                className={`tap-box h-8 min-w-8 rounded-full px-2.5 text-[12px] font-semibold transition max-sm:h-11 max-sm:min-w-11 ${grade === g ? 'bg-brand-900 text-white' : 'surface-2 text-brand-800 hover:bg-white hover:shadow-soft'}`}>{g}</button>
+      ))}
+      <span className="ink-2 text-[11px]">{grade ? 'Saved on this device only' : 'Optional, tailors course answers'}</span>
+    </div>
+  );
 
   const composer = (
     <form onSubmit={(e) => { e.preventDefault(); send(input); }}
@@ -179,6 +196,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
             </div>
 
             <div className="animate-rise mt-8" style={{ animationDelay: '70ms' }}>{composer}</div>
+            <div className="animate-rise mt-3 pl-1" style={{ animationDelay: '100ms' }}>{gradePicker}</div>
 
             <div className="animate-rise mt-5 flex flex-wrap gap-2" style={{ animationDelay: '140ms' }}>
               {STARTERS.map((s) => (
@@ -234,6 +252,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
             )}
             <div className="mx-auto w-full max-w-3xl">
               {composer}
+              <div className="mt-2 flex justify-center">{gradePicker}</div>
               <p className="ink-2 mt-2 text-center text-[11px] leading-snug">NuevAI can make mistakes — verify important dates. Anonymous analytics only; no account or personal data.</p>
             </div>
           </div>

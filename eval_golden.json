@@ -2836,5 +2836,605 @@
   ],
   "forbid": [],
   "src": "usage"
+ },
+ {
+  "category": "follow_ups",
+  "q": "What about JV?",
+  "expect": [
+   "(?i)JV"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "When is the next US boys basketball game?"
+   },
+   {
+    "role": "assistant",
+    "content": "The next US Boys Basketball Varsity game is ..."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "And varsity?",
+  "expect": [
+   "(?i)Varsity - Game"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "When is the JV boys basketball game?"
+   },
+   {
+    "role": "assistant",
+    "content": "The next US Boys Basketball JV game is ..."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "What about girls?",
+  "expect": [
+   "US Girls Basketball - Game"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "When is the next boys basketball game?"
+   },
+   {
+    "role": "assistant",
+    "content": "The next boys game is ..."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "And the girls team?",
+  "expect": [
+   "US Girls Volleyball - Game"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "When does the boys volleyball team play next?"
+   },
+   {
+    "role": "assistant",
+    "content": "Boys volleyball ..."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "And tomorrow?",
+  "expect": [
+   "(?i)tomorrow|October 23"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "Is today an A day or B day?"
+   },
+   {
+    "role": "assistant",
+    "content": "Today, October 22, is a B day."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "What about the day after that?",
+  "expect": [
+   "October 6, 2026 - B day"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "Is October 5 an A day or B day?"
+   },
+   {
+    "role": "assistant",
+    "content": "October 5 is an A day."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "And the day before?",
+  "expect": [
+   "October 5, 2026 - A day"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "Is October 6 an A day or B day?"
+   },
+   {
+    "role": "assistant",
+    "content": "October 6 is a B day."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "Who teaches it?",
+  "expect": [
+   "Zomber"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "What is Intro to CAD?"
+   },
+   {
+    "role": "assistant",
+    "content": "Intro to CAD is a course ..."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "Who teaches it?",
+  "expect": [
+   "Hilary Fenton"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "Tell me about Art of Repair"
+   },
+   {
+    "role": "assistant",
+    "content": "Art of Repair ..."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "What room is it in?",
+  "expect": [
+   "240"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "Who teaches Computer Security?"
+   },
+   {
+    "role": "assistant",
+    "content": "Wes Chao teaches Computer Security."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "Which blocks is it?",
+  "expect": [
+   "(?i)block 2"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "Who teaches Software Engineering?"
+   },
+   {
+    "role": "assistant",
+    "content": "Wes Chao teaches Software Engineering."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "And what block?",
+  "expect": [
+   "(?i)block 3|block 7"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "Who teaches Intro to Psychology?"
+   },
+   {
+    "role": "assistant",
+    "content": "Amy Hunt teaches Intro to Psychology."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "What about Immunology?",
+  "expect": [
+   "Ballmer"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "Who teaches Chemistry?"
+   },
+   {
+    "role": "assistant",
+    "content": "David Eik teaches Chemistry."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "And Linguistics?",
+  "expect": [
+   "Theodosopoulos"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "Who teaches Jazz Ensemble?"
+   },
+   {
+    "role": "assistant",
+    "content": "Jim Munzenrider teaches Jazz Ensemble."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "Who teaches that?",
+  "expect": [
+   "Ting Zhang"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "Is Chinese 5 offered?"
+   },
+   {
+    "role": "assistant",
+    "content": "Yes, Chinese 5 is offered."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "What else does he teach?",
+  "expect": [
+   "Computer Vision"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "Who is Wes Chao?"
+   },
+   {
+    "role": "assistant",
+    "content": "Wes Chao is a computer science teacher."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "When does it meet?",
+  "expect": [
+   "Tuesday"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "Tell me about Model UN"
+   },
+   {
+    "role": "assistant",
+    "content": "Nueva Model United Nations ..."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "Who advises it?",
+  "expect": [
+   "Hesby"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "When does the AI/ML club meet?"
+   },
+   {
+    "role": "assistant",
+    "content": "The AI/ML club meets ..."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "Who leads it?",
+  "expect": [
+   "Alex Yang"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "Tell me about the AMC/AIME club"
+   },
+   {
+    "role": "assistant",
+    "content": "The AMC/AIME club ..."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "Where do they meet?",
+  "expect": [
+   "318"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "Who leads the AMC/AIME club?"
+   },
+   {
+    "role": "assistant",
+    "content": "Alex Yang ..."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "What about the Chess Club?",
+  "expect": [
+   "Chess"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "When does Model UN meet?"
+   },
+   {
+    "role": "assistant",
+    "content": "Tuesday at lunch."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "And Block 4?",
+  "expect": [
+   "1:55"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "What time is Block 3?"
+   },
+   {
+    "role": "assistant",
+    "content": "Block 3 meets 12:35-1:50."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "What about Block 2?",
+  "expect": [
+   "10:15"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "What time is Block 1?"
+   },
+   {
+    "role": "assistant",
+    "content": "Block 1 meets 8:55-10:10."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "And lunch?",
+  "expect": [
+   "11:30"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "What time is Block 2?"
+   },
+   {
+    "role": "assistant",
+    "content": "Block 2 meets 10:15-11:30."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "What about B' days?",
+  "expect": [
+   "5, 6, 8, 7"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "What order are the blocks on an A' day?"
+   },
+   {
+    "role": "assistant",
+    "content": "1, 2, 4, 3."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "And how do I donate?",
+  "expect": [
+   "givecampus"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "How do I book a campus tour?"
+   },
+   {
+    "role": "assistant",
+    "content": "Use the Ravenna booking page."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "What's the phone number?",
+  "expect": [
+   "650-350-4600"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "Where is the Hillsborough campus?"
+   },
+   {
+    "role": "assistant",
+    "content": "6565 Skyline Blvd."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "What about Hillsborough?",
+  "expect": [
+   "6565 Skyline"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "Where is the upper school located?"
+   },
+   {
+    "role": "assistant",
+    "content": "131 E 28th Ave."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "Which room is advisory 9.1?",
+  "expect": [
+   "215"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "Who are the advisors of advisory 9.2?"
+   },
+   {
+    "role": "assistant",
+    "content": "..."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "follow_ups",
+  "q": "And 11.5?",
+  "expect": [
+   "Sarah Ruddy"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "Who are the advisors of advisory 11.1?"
+   },
+   {
+    "role": "assistant",
+    "content": "Alexa Hart and Jen Paull."
+   }
+  ],
+  "note": "prompt 09 multi-turn"
  }
 ]
