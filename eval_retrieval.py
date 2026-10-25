@@ -93,7 +93,33 @@ CASES = [
 ]
 
 
+def golden_cases() -> list:
+    """Every golden question whose expectation is a plain fact (not a refusal phrasing) must have that fact
+    in the retrieved context. Built from eval_golden.json so the set grows with the golden set."""
+    import json
+    from pathlib import Path
+    from eval_golden import normalize, pattern
+    from eval_recall import usable
+    seen = {c[0].lower() for c in CASES}
+    out = []
+    for g in json.loads((Path(__file__).parent / "eval_golden.json").read_text()):
+        if not usable(g) or g["q"].lower() in seen:
+            continue
+        seen.add(g["q"].lower())
+        out.append((g["q"], g["expect"], f"golden/{g['category']}", g.get("history")))
+    return out
+
+
+def has_facts(ctx: str, rx) -> bool:
+    if isinstance(rx, str):
+        return bool(re.search(rx, ctx))
+    from eval_golden import normalize, pattern
+    ctx = normalize(ctx)
+    return all(any(pattern(a).search(ctx) for a in (e if isinstance(e, list) else [e])) for e in rx)
+
+
 def main() -> int:
+    CASES.extend(golden_cases())
     r = Retriever(get_supabase)
     r.embed("warm up")
     # fixed date: the calendar checks refer to dates in the 2026-27 school year
@@ -105,7 +131,7 @@ def main() -> int:
         t = time.time()
         res = r.retrieve(q, history, today=today)
         ctx, _ = build_context(res)
-        ok = bool(re.search(rx, ctx))
+        ok = has_facts(ctx, rx)
         passed += ok
         print(f"{'PASS' if ok else 'FAIL'}  {int((time.time() - t) * 1000):5}ms  {q[:52]:54} [{note}]"
               f"{'' if ok else '   docs=' + str([ (d.get('metadata') or {}).get('title', '')[:25] for d in res['docs'][:3]])}")

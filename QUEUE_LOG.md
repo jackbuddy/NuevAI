@@ -96,3 +96,32 @@ Not verified (honest limits)
 Follow-ups
 - Consider a server-side check that strips phone numbers not present in the retrieved context.
 - Daily Groq quota is the main user-visible failure (4 of 4 errors on alpha day).
+
+## 05 - retrieval and chunk quality (2026-10-25)
+
+Measured with new eval_recall.py (retrieval only, no LLM): 236 golden questions with plain-fact expectations; "docs" metrics ignore the structured paths (pinned facts, teacher/club lookups, calendar) and score only vector+rerank results.
+
+| metric | before | after |
+|---|---|---|
+| recall@5 (all retrieved items) | 1.000 | 1.000 |
+| MRR (all items) | 0.910 | 0.911 |
+| docs-only recall@5 | 0.508 | 0.542 (0.623 simulated with keyword search, not installed yet) |
+| docs-only MRR | 0.422 | 0.459 (0.506 simulated) |
+| retrieval p50 / p95 (236 queries) | 416 / 526 ms | 431 / 585 ms (small regression, within run-to-run noise but not nothing) |
+| eval_retrieval.py cases | 68/68 | 254/254 (186 added from golden facts; loaded from eval_golden.json) |
+| chunks in plan | 5904 | 5376 |
+
+Changed
+- eval_retrieval.py: now also loads every golden question with a plain-fact expectation (254 cases). eval_recall.py (new) and sweep_rerank.py (new, offline knob sweep on cached candidates).
+- Chunk inspection found: 2112/5904 chunks above the 1100-char context cut, 116 "Student : Directory" contact-card chunks, login-page shells, ~880 near-duplicate chunks (same document imported under two URLs or with #anchors, shown as several identical results), ~850 Nexus Google Doc chunks titled with a bare URL and a BOM. pipeline/chunker.py now: strips BOM/rule lines/UI chrome, derives a title from the first line when the title is a URL, skips login/directory pages, drops near-duplicates (same first AND last 200 normalised chars, best copy kept by source rank). pipeline/config.py: NOISE_TITLE, BOILERPLATE_LINE.
+- Re-embedded only changed chunks: 907 + 258 (additive, no --prune, one expired calendar row removed by the indexer as usual). 1,131 superseded rows remain until you prune (NEEDS_USER).
+- rag.py: rerank knobs exposed and tuned by sweep (vector weight 0.5 -> 0.3, head boost 2.0 -> 1.0, length exponent 0.25 -> 0.4, outline boost 0.35 -> 0.2), candidates 24 -> 32, runtime dedupe of repeated chunks (dedupe_rows), optional Postgres full-text candidates (fts_search, needs supabase/fts.sql), typo fix for event/sport words ("labr day"), club acronym in parentheses with spaces ("ChemLab Club"), intergrade group lookup ("Where does intergrade Group A meet?"). Race fix: Supabase client is created before worker threads start.
+- Tried and not kept: larger head/title boost (worse), calendar penalty (no effect), candidate counts above 32 (no gain).
+
+Not done / honest limits
+- Keyword search (FTS) is written but not live; the migration was denied, so only the simulation (local weighted keyword scan) supports the gain.
+- Gate 4: eval_answers.py ran against local backend but 31 of 35 answers returned 429, so answer quality was not read. /health data_ok true; one live answer (cell phone policy) was fine.
+- Golden expectations are loose regexes, so total recall@5 is near ceiling; the docs-only metric is the informative one. Weight sweep used the same 236 questions it is scored on (mild overfit risk; gains are small and the knobs moved modestly).
+- Chunk context cut (1100 chars) still truncates the tail of ~35% of chunks; not changed because larger context costs Groq tokens.
+
+Follow-ups: run supabase/fts.sql, then prune; re-run `python eval_recall.py` to confirm the real FTS numbers.

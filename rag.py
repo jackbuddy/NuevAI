@@ -19,9 +19,12 @@ import settings
 from cache import TTLCache
 from intent import CalendarIntent, parse_intent
 
-CANDIDATES = 24
+CANDIDATES = 32
+FTS_ENABLED = os.getenv("FTS_ENABLED", "1") != "0"
+FTS_CANDIDATES = 12
 VECTOR_THRESHOLD = 0.0      # gte-small cosine scores sit high (unrelated ~0.75), so rank, do not threshold
-W_VECTOR, W_LEXICAL = 0.5, 0.5
+W_VECTOR, W_LEXICAL = 0.3, 0.7
+OUTLINE_BOOST, CAL_PENALTY, HEAD_BOOST, LEN_EXP = 0.2, 0.2, 1.0, 0.4   # rerank knobs (tuned by sweep_rerank.py)
 TEACH_CUE = re.compile(r"\b(teach\w*|taught|class(es)?|room|block|course|prof|instructor|mr|mrs|ms|dr)\b|'s\b", re.I)
 
 
@@ -72,6 +75,24 @@ SYNONYMS = {
     r"\blanguages?\b|\bforeign language\b": "world languages Chinese Spanish French Japanese Latin Korean language courses",
     r"\bmakeup\b|\bmake[- ]up\b|\bretake\b": "make-up retake assessment policy",
 }
+
+
+DOMAIN_WORDS = ["labor", "thanksgiving", "memorial", "veterans", "juneteenth", "presidents", "columbus", "indigenous", "holiday",
+                "vacation", "graduation", "homecoming", "orientation", "assembly", "concert", "volleyball", "basketball", "baseball",
+                "softball", "lacrosse", "badminton", "swimming", "wrestling", "tutorial", "advisory", "chemistry", "calculus"]
+
+
+def fix_typos(q: str) -> str:
+    """Correct one-letter slips in the few event/sport words the calendar and course lookups key on
+    ('labr day' -> 'labor day'). Tokens that are not close to a domain word are left alone."""
+    import difflib
+    def fix(m):
+        w = m.group(0)
+        if len(w) < 4 or w.lower() in DOMAIN_WORDS:
+            return w
+        near = difflib.get_close_matches(w.lower(), DOMAIN_WORDS, n=1, cutoff=0.82)
+        return near[0] if near else w
+    return re.sub(r"[A-Za-z]+", fix, q)
 
 
 def expand_query(q: str) -> str:
@@ -138,11 +159,36 @@ def _course_loose_match(qcontent: set[str], course_key: str) -> bool:
     return False
 
 
+def dedupe_rows(rows: list[dict]) -> list[dict]:
+    """Drop lower-ranked rows whose text repeats a higher-ranked one (the same document indexed under two
+    URLs or titles). Compared on the normalised body: same first and last 200 characters and a similar length."""
+    seen, out = {}, []
+    for r in rows:
+        body = re.sub(r"[^a-z0-9]+", " ", r["content"].split("\n\n", 1)[-1].lower()).strip()
+        key = (body[:200], body[-200:])
+        if key in seen and 0.8 < (len(body) + 1) / (seen[key] + 1) < 1.25:
+            continue
+        seen[key] = len(body)
+        out.append(r)
+    return out
+
+
+def merge_fts_rows(rows: list[dict], fts: list[dict]) -> list[dict]:
+    have = {r["chunk_id"] for r in rows}
+    floor = min((r.get("similarity", 0.0) for r in rows), default=0.0)
+    for r in fts:
+        if r["chunk_id"] not in have:         # keyword-only hit: neutral vector score, the lexical rerank decides
+            r["similarity"] = floor
+            rows.append(r)
+    return rows
+
+
 class Retriever:
     def __init__(self, get_supabase):
         self.sb = get_supabase
         self.embed_cache = TTLCache(max_items=2000, ttl=24 * 3600)
         self.calendar_cache = TTLCache(max_items=256, ttl=600)
+        self._fts_off = False
 
     # ---- pieces -----------------------------------------------------------
     def embed(self, text: str) -> list[float]:
@@ -158,6 +204,22 @@ class Retriever:
         r = self.sb().rpc(settings.MATCH_RPC, {"query_embedding": qvec, "match_threshold": VECTOR_THRESHOLD,
                                                "match_count": CANDIDATES}).execute()
         return r.data or []
+
+    def fts_search(self, query: str) -> list[dict]:
+        """Keyword candidates from Postgres full-text search (RPC search_chunks_fts, see supabase/fts.sql). They catch
+        rare words (names, room numbers, event titles) that embeddings blur. Silently disabled if the RPC is missing."""
+        if not FTS_ENABLED or self._fts_off:
+            return []
+        terms = [t for t in dict.fromkeys(re.findall(r"[a-z0-9]{3,}", query.lower())) if t not in STOP][:12]
+        if not terms:
+            return []
+        try:
+            r = self.sb().rpc("search_chunks_fts", {"query_text": " | ".join(terms), "match_count": FTS_CANDIDATES}).execute()
+            return r.data or []
+        except Exception as e:
+            self._fts_off = True            # function not installed (or DB error): fall back to vector-only, do not retry per request
+            print(f"fts disabled: {str(e)[:120]}", flush=True)
+            return []
 
     def rerank(self, query: str, rows: list[dict]) -> list[dict]:
         """Hybrid score = vector similarity + lexical overlap (idf-weighted, title/section boosted), both min-max
@@ -180,8 +242,8 @@ class Retriever:
             for t in body:
                 if t in q:
                     tf[t] = tf.get(t, 0) + 1
-            score = sum(idf[t] * (1 + math.log(c)) for t, c in tf.items()) + 2.0 * sum(idf[t] for t in q & head)
-            lex.append(score / (len(body) ** 0.25 + 1))
+            score = sum(idf[t] * (1 + math.log(c)) for t, c in tf.items()) + HEAD_BOOST * sum(idf[t] for t in q & head)
+            lex.append(score / (len(body) ** LEN_EXP + 1))
         def norm(xs):
             lo, hi = min(xs), max(xs)
             return [(x - lo) / (hi - lo) if hi > lo else 0.0 for x in xs]
@@ -191,9 +253,9 @@ class Retriever:
             m = r.get("metadata") or {}
             r["rerank"] = W_VECTOR * v + W_LEXICAL * l
             if m.get("kind") == "outline" and LIST_WORDS.search(query):
-                r["rerank"] += 0.35        # contents lists answer "list all ..." questions
+                r["rerank"] += OUTLINE_BOOST        # contents lists answer "list all ..." questions
             if m.get("source") in ("calendar", "calendar_day", "calendar_sheet"):
-                r["rerank"] -= 0.2         # calendar is looked up structurally, not by similarity
+                r["rerank"] -= CAL_PENALTY         # calendar is looked up structurally, not by similarity
         return sorted(rows, key=lambda r: r["rerank"], reverse=True)
 
     def calendar_events(self, intent: CalendarIntent) -> list[dict]:
@@ -342,6 +404,10 @@ class Retriever:
     def advisory_lines(self, query: str) -> list[dict]:
         """'Which room is advisory 11.1' -> the exact advisor line(s) for that advisory number."""
         nums = {m.group(0) for m in ADVISORY_NO.finditer(query)}
+        if re.search(r"\bintergrade\b", query, re.I) and not re.search(r"\bclub\b", query, re.I):
+            # 'Where does intergrade Group A meet?' -> the intergrade groups record (advisors and meeting place per group)
+            recs = [r for r in self._by_source("school_advisory", ["intergrade"])]
+            return recs[:1]
         if not nums or not re.search(r"advis|room|who|where|teacher", query, re.I):
             return []
         lines = []
@@ -369,8 +435,9 @@ class Retriever:
         for r in self._by_source("school_clubs", ["club"]):
             name = (r.get("metadata") or {}).get("club", "")
             # acronym in parentheses, e.g. "Nueva Model United Nations (MUN)"; "AMC/AIME"
-            acr = re.findall(r"\(([A-Za-z0-9/&]+)\)", name)
-            acr_t = {a.lower() for x in acr for a in re.split(r"[/&]", x)}
+            acr = re.findall(r"\(([^)]+)\)", name)
+            acr_t = {a.lower() for x in acr for a in re.split(r"[/&\s]+", x) if a and a.lower() not in CLUB_GENERIC}
+            acr_t.discard("club")
             nt = [t for t in norm_words(re.sub(r"\([^)]*\)", " ", name)).split() if t not in CLUB_GENERIC]
             if not nt:
                 continue
@@ -385,6 +452,7 @@ class Retriever:
         t0 = time.time()
         today = today or datetime.now().date()
         history = history or []
+        query = fix_typos(query)
         prev_user = next((m["content"] for m in reversed(history) if m.get("role") == "user"), "")
         # short follow-ups ("what about tomorrow?") borrow the previous question for search
         search_q = expand_query(f"{prev_user} {query}" if prev_user and len(query.split()) <= 6 else query)
@@ -422,8 +490,9 @@ class Retriever:
             pinned += clubs
         except Exception as e:
             print(f"pinned lookup failed: {e}", flush=True)
-        f_vec, f_cal, f_links = _pool.submit(vec_task), _pool.submit(cal_task), _pool.submit(self.link_cards, query)
-        rows, events = f_vec.result(), []
+        self.sb()      # create the client once, before worker threads import it concurrently
+        f_vec, f_cal, f_links, f_fts = _pool.submit(vec_task), _pool.submit(cal_task), _pool.submit(self.link_cards, query), _pool.submit(self.fts_search, search_q)
+        rows, events = merge_fts_rows(f_vec.result(), f_fts.result()), []
         try:
             link_rows = f_links.result()
         except Exception as e:
@@ -443,7 +512,7 @@ class Retriever:
         rows = [r for r in rows if (r.get("metadata") or {}).get("source") not in ("calendar", "calendar_day", "school_day")] if events else rows
 
         t = time.time()
-        ranked = self.rerank(search_q, rows)
+        ranked = dedupe_rows(self.rerank(search_q, rows))
         timings["rerank_ms"] = round((time.time() - t) * 1000)
         link_rows = link_rows[:3]
         docs = (link_rows + [d for d in ranked if d["chunk_id"] not in {l["chunk_id"] for l in link_rows}])[:top_k + len(link_rows)]
