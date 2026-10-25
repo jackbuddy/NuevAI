@@ -1,0 +1,39 @@
+name: Nightly quality
+
+# Runs the golden question set against the LIVE backend, serially (one request at a time, a pause between them) so it
+# stays under Groq's free-tier limits. Fails, so GitHub emails the owner, when the score falls below eval_baseline.json
+# minus its tolerance, or when too many questions errored to grade. No secrets are needed (the backend URL is public).
+on:
+  schedule:
+    - cron: "15 10 * * *"      # 10:15 UTC, after the daily refresh (13:30 UTC the day before has long finished)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  golden:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      BACKEND: ${{ vars.BACKEND_URL || 'https://nuevai-backend.onrender.com' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Wake backend and check data
+        run: |
+          curl -fsS --max-time 120 --retry 3 --retry-delay 10 "$BACKEND/health" | tee health.json
+          python -c "import json,sys; d=json.load(open('health.json')); sys.exit(0 if d.get('data_ok', True) else 1)"
+      - name: Golden set (serial)
+        run: python -u eval_golden.py "$BACKEND" --sleep 6 --threshold 0
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-report
+          path: data/eval/golden_*.json
+          if-no-files-found: warn
+      - name: Compare with baseline
+        run: python scripts/check_baseline.py --report "$(ls -t data/eval/golden_*.json | head -1)"

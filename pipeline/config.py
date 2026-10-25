@@ -116,3 +116,8 @@ LIVE_SHEETS = [
 
 # Pages whose title matches are from a previous school year and are never indexed (they would contradict the current ones).
 SUPERSEDED_TITLE = re.compile(r"25\s*[\u2013-]\s*26.{0,40}(clubs?|catalog)|(clubs?|catalog).{0,40}25\s*[\u2013-]\s*26", re.I)
+
+# Pages that are navigation/login shells or people directories (contact cards): never worth embedding.
+NOISE_TITLE = re.compile(r"^(login\b|student\s*:\s*directory$)", re.I)
+# Lines that are UI chrome from copied web pages, not content.
+BOILERPLATE_LINE = re.compile(r"^[-*\s]*(message|add to contacts|contact card|skip to (main )?content|share|print|back to top)\s*$|^[_\-=\u2500]{4,}$", re.I)

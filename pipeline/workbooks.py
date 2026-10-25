@@ -24,6 +24,7 @@ BLOCK_RULE = ("Blocks 1-4 meet on A and A' days; Blocks 5-8 meet on B and B' day
               "(A' order 1, 2, 4, 3; B' order 5, 6, 8, 7).")
 SLOT_TIMES = ["8:55-10:10 AM", "10:15-11:30 AM", "12:35-1:50 PM", "1:55-3:10 PM"]     # confirmed bell times (lunch 11:30-12:00/12:30)
 ORDER = {"A": [1, 2, 3, 4], "A'": [1, 2, 4, 3], "B": [5, 6, 7, 8], "B'": [5, 6, 8, 7]}
+OFFERINGS_ONLY = " (listed only on the course offerings sheet; the master schedule does not confirm it)"
 # spellings the school confirmed: the Roles tab has a typo
 NAME_FIXES = {"Jeremy Jaquot": "Jeremy Jacquot"}
 DAY_TYPES = {"A", "A'", "B", "B'"}
@@ -98,6 +99,13 @@ def parse_days(wb) -> dict[date, dict]:
             i += 1
             continue
         nums = [(j, r[j]) for j in range(1, 6) if isinstance(r[j], (int, float)) and 1 <= r[j] <= 31]
+        if nums:
+            # a date cell that someone typed text into ("24 Community (90')") is a string, not a number: still the day number
+            for j in range(1, 6):
+                m = re.match(r"\s*(\d{1,2})\b", r[j]) if isinstance(r[j], str) else None
+                if m and 1 <= int(m.group(1)) <= 31 and all(j != k for k, _ in nums):
+                    nums.append((j, int(m.group(1))))
+            nums.sort()
         if nums and ym and i + 2 < len(rows):
             ev, ty = rows[i + 1] + [None] * 8, rows[i + 2] + [None] * 8
             for j, d in nums:
@@ -152,6 +160,14 @@ def day_chunks(wb, file: str) -> list[dict]:
             lead = f"{t} day: Blocks {order[0]}-{max(order)} meet, in the order {', '.join(map(str, order))}. Times: {'; '.join(slots)}."
             status = lead + (f" Schedule notes: {label} (special events can adjust the regular times)." if label else "")
             kind = "class_day"
+        elif re.search(r"dismissal|early release", t + " " + label, re.I):
+            # e.g. the last day of school: students come in, school ends at noon; the sheet gives no A/B day type for it
+            status = f"{label + '. ' if label else ''}{t} (early dismissal; the master schedule does not list an A/B day type for this day)."
+            kind = "short_day"
+        elif label.lower().startswith("full-day") and "no class" not in label.lower():
+            status = (f"Full-day special event: {t or label}. The regular A/B class blocks do not meet; the master schedule lists this "
+                      f"date as a full-day event instead of an A, A', B or B' day.")
+            kind = "full_day_event"
         elif t or "no class" in label.lower():
             status = f"No classes{(' (' + t + ')') if t else ''}." + (f" {label}." if label and label.lower() != "no classes" else "")
             kind = "no_classes"
@@ -318,13 +334,24 @@ def last_name(full: str) -> str:
 def course_chunks(master_wb, off_wb, file_master: str, file_off: str) -> list[dict]:
     recs = []                                  # unified assignments
     off_recs = parse_offerings(off_wb) if off_wb is not None else []
-    known_last = frozenset(r["teacher_last"].lower().strip() for r in off_recs if r["teacher_last"])
+    known_last = frozenset(x.strip().lower() for r in off_recs for x in re.split(r"\s*\+\s*|\s*,\s*|\s+and\s+", r["teacher_last"]) if x.strip())
     extra_names: set[str] = set()
     if master_wb is not None:
         for tab, sem in (("Fall Roles", "Fall 2026"), ("Spring Roles", "Spring 2027 (draft: still being updated)")):
             if tab in master_wb.sheetnames:
                 recs += [{**r, "src": "roles"} for r in parse_roles(master_wb, tab, sem, known_last, extra_names)]
-    recs += [{**r, "src": "offerings", "teacher": "", "room": "", "dept": "", "home": ""} for r in off_recs]
+    for r in off_recs:                     # joint classes are written "Jensen + Ronan": one assignment per teacher
+        parts = [x.strip() for x in re.split(r"\s*\+\s*|\s*,\s*|\s+and\s+", r["teacher_last"]) if x.strip()] or [""]
+        for part in parts:
+            recs.append({**r, "teacher_last": part, "src": "offerings", "teacher": "", "room": "", "dept": "", "home": ""})
+    # The Roles tabs say, for each named teacher, what they teach in which block (with rooms). The offerings sheet is a
+    # second, partly different draft. One teacher cannot teach two courses in the same block, so wherever the two disagree
+    # about a (teacher, block) the Roles entry wins and the offerings entry is dropped (reported by scripts/audit_data.py).
+    # An offerings entry for a block the Roles tab leaves empty is kept but marked, since it cannot be confirmed.
+    roles_at = {(r["semester"], r["teacher"], r["block"]): norm(r["course"]) for r in recs if r["src"] == "roles"}
+    roles_teachers = defaultdict(set)
+    for (sem_, t_, b_) in roles_at:
+        roles_teachers[(sem_, last_name(t_))].add(t_)
     full_by_last: dict[str, set] = defaultdict(set)
     for n in extra_names:
         full_by_last[last_name(n)].add(n)
@@ -348,6 +375,11 @@ def course_chunks(master_wb, off_wb, file_master: str, file_off: str) -> list[di
                     aliases[r["teacher"]].add(r["teacher_last"].strip())
             else:
                 r["teacher"] = r["teacher_last"]
+            if " " in r["teacher"] and (r["semester"], r["teacher"], r["block"]) in roles_at:
+                if roles_at[(r["semester"], r["teacher"], r["block"])] != norm(r["course"]):
+                    continue                    # Roles has this teacher on a different course in that block
+            elif " " in r["teacher"]:
+                r["offerings_only"] = True      # a named teacher, but the Roles tab has nothing for them in this block
         key = (r["semester"], norm(r["course"]), r["block"], last_name(r.get("teacher", "")))
         cur = merged.get(key)
         if cur is None:
@@ -375,7 +407,7 @@ def course_chunks(master_wb, off_wb, file_master: str, file_off: str) -> list[di
         rs.sort(key=lambda x: (x["block"], x["course"]))
         dept = next((x["dept"] for x in rs if x["dept"]), "")
         home = next((x["home"] for x in rs if x["home"]), "")
-        lines = [f"- Block {x['block']} ({day_of(x['block'])}): {x['course']}" + (f", room {x['room']}" if x["room"] else "") for x in rs]
+        lines = [f"- Block {x['block']} ({day_of(x['block'])}): {x['course']}" + (f", room {x['room']}" if x["room"] else "") + OFFERINGS_ONLY * bool(x.get("offerings_only")) for x in rs]
         alt = sorted(aliases.get(teacher, set()))
         body = (f"{teacher} teaches ({sem})" + (f" in {dept}" if dept else "") + (f"; assigned room {home}" if home else "") + ":\n"
                 + "\n".join(lines))
@@ -390,7 +422,7 @@ def course_chunks(master_wb, off_wb, file_master: str, file_off: str) -> list[di
         lines = []
         for x in rs:
             who = x.get("teacher") or "teacher to be announced"
-            lines.append(f"- Block {x['block']} ({day_of(x['block'])}): {who}" + (f", room {x['room']}" if x["room"] else ""))
+            lines.append(f"- Block {x['block']} ({day_of(x['block'])}): {who}" + (f", room {x['room']}" if x["room"] else "") + OFFERINGS_ONLY * bool(x.get("offerings_only")))
         teachers = sorted({x["teacher"] for x in rs if x.get("teacher")})
         body = f"{name} ({sem}) is offered in these sections:\n" + "\n".join(lines)
         if teachers:

@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: 'NuevAI',
   description: 'Courses, calendar, sports schedules and campus resources for The Nueva School community.',
 };
-export const viewport: Viewport = { themeColor: '#ffffff', width: 'device-width', initialScale: 1 };
+export const viewport: Viewport = { themeColor: '#ffffff', width: 'device-width', initialScale: 1, viewportFit: 'cover' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

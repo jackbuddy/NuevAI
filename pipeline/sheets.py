@@ -71,13 +71,19 @@ def sports_events(page: dict, keep_from: date, keep_to: date) -> list[dict]:
     c = _cols(rows[hdr])
     if c["date"] is None or c["home"] is None:
         return []
-    out = []
+    out, seen = [], set()
     get = lambda r, k: (r[c[k]].strip() if c[k] is not None and c[k] < len(r) else "")
     for r in rows[hdr + 1:]:
         d = _date(get(r, "date"))
         home, away = get(r, "home"), get(r, "away")
         if not d or not (keep_from <= d <= keep_to) or not (home or away):
             continue
+        if away and _date(home) and not _date(away):        # a date pasted into the Home cell ("Tue 9/8/26 | Nueva"): the opponent is the location
+            home = get(r, "loc") or home
+        key = (d, (home + "|" + away).lower())
+        if key in seen:                                      # sheets repeat the home games in a second "Home schedule" table
+            continue
+        seen.add(key)
         title = page["title"]
         if not away:                                    # a note row such as "First Day of Practice"
             summary, kind, ha, opp = f"{title} - {home.title() if home.isupper() else home}", "event", "", ""

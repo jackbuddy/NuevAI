@@ -97,7 +97,7 @@ def parse_ics(text: str) -> list[dict]:
                 if name == "DTSTART":
                     cur["start"], cur["all_day"] = _parse_dt(value, params)
                 elif name == "DTEND":
-                    cur["end"], _ = _parse_dt(value, params)
+                    cur["end"], cur["end_all_day"] = _parse_dt(value, params)
                 elif name == "SUMMARY":
                     cur["summary"] = _unescape(value)
                 elif name == "LOCATION":
@@ -127,7 +127,13 @@ def describe(e: dict) -> dict:
     start, end = e["start"], e.get("end")
     d0 = _day(start)
     if e["all_day"]:
-        last = _day(end) - timedelta(days=1) if end else d0   # iCal all-day DTEND is exclusive
+        # an all-day DTEND is exclusive (the day after the last day); a few feed events pair an all-day start with a timed
+        # end on the same day ("Daylight Saving Time Ends": DTEND 01:00 on the start date), which is inclusive
+        if end and e.get("end_all_day", True):
+            last = _day(end) - timedelta(days=1)
+        else:
+            last = _day(end) if end else d0
+        last = max(last, d0)
         when = d0.strftime("%A, %B %-d, %Y") + (f" through {last.strftime('%A, %B %-d, %Y')}" if last > d0 else "")
         time = "all day"
     else:

@@ -7,6 +7,8 @@ export interface Message {
   content: string;
   sources?: Source[];
   cached?: boolean;
+  degraded?: boolean;   // the model was unavailable: sources and facts only
+  stopped?: boolean;
   error?: boolean;
   streaming?: boolean;
   ms?: number;          // time to first words
@@ -21,17 +23,26 @@ export interface Suggestion { label: string; query?: string; action?: 'calendar'
 export interface StreamHandlers {
   onMeta?: (m: { sources: Source[]; cached: boolean }) => void;
   onDelta: (text: string) => void;
-  onDone?: (d: { cached: boolean; timings: Record<string, number>; suggestions?: Suggestion[] }) => void;
+  onDone?: (d: { cached: boolean; degraded?: boolean; timings: Record<string, number>; suggestions?: Suggestion[] }) => void;
 }
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
 /** Streams an answer. Throws on transport/server failure so the caller can show a retry. */
-export async function streamChat(query: string, history: { role: string; content: string }[], h: StreamHandlers, signal?: AbortSignal) {
+const GRADE_KEY = 'nuevai.grade';
+/** Optional 9-12 preference. Lives only in this browser's localStorage; it is sent with a question, never saved or logged. */
+export function loadGrade(): number | null {
+  try { const g = Number(localStorage.getItem(GRADE_KEY)); return g >= 9 && g <= 12 ? g : null; } catch { return null; }
+}
+export function saveGrade(g: number | null) {
+  try { if (g) localStorage.setItem(GRADE_KEY, String(g)); else localStorage.removeItem(GRADE_KEY); } catch {}
+}
+
+export async function streamChat(query: string, history: { role: string; content: string }[], h: StreamHandlers, signal?: AbortSignal, grade?: number | null) {
   const res = await fetch('/api/chat/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, history: history.slice(-6), ...currentIds() }),
+    body: JSON.stringify({ query, history: history.slice(-4).map((t) => ({ role: t.role, content: t.content.slice(0, 700) })), ...(grade ? { grade } : {}), ...currentIds() }),
     signal,
   });
   if (!res.ok || !res.body) {

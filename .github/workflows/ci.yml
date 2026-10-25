@@ -1,0 +1,58 @@
+name: CI
+
+# py_compile, retrieval checks (read-only Supabase SELECTs + the embed function, no LLM quota), offline tests, tsc, next build.
+on:
+  pull_request:
+  push:
+    branches: [main, "auto/**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      ANALYTICS_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-pipeline.txt
+      - run: pip install -r requirements.txt -r requirements-pipeline.txt
+      - name: Compile every Python file
+        run: python -m compileall -q -x 'node_modules|\.next' . 
+      - name: Retrieval regression checks (reads the live index, read-only)
+        # Secrets are not given to PRs from forks; the step is skipped there instead of failing.
+        if: ${{ env.SUPABASE_URL != '' }}
+        run: python eval_retrieval.py
+      - name: Offline tests
+        run: |
+          python test_pipeline_fixes.py
+          python test_resilience.py
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx next build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
