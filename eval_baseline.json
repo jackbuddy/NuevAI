@@ -1,0 +1,9 @@
+{
+  "_comment": "Nightly quality baseline for eval_golden.py against the live backend. Committed because data/eval/ is gitignored.",
+  "score": 0.872,
+  "score_source": "MEASURED: prompt 01 live run, 239/274 = 87.2% (queue log 01)",
+  "estimated_not_measured": "Prompt 02 reported ~98% after fixes; that figure was an ESTIMATE from partial runs and is NOT used here. No full live run exists at the current code because Groq's daily quota was exhausted. The golden set has since grown (about 300 cases).",
+  "tolerance": 0.05,
+  "min_graded_fraction": 0.6,
+  "how_to_update": "After a full nightly run with few errors, raise score to the measured value (never to an estimate): python scripts/check_baseline.py --report <report.json> --write-baseline"
+}

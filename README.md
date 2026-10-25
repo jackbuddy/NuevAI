@@ -30,4 +30,21 @@ pip install -r requirements.txt && uvicorn query_server:app --port 8765   # back
   *secret* key (the Edge Function accepts only callers holding it).
 - A keep-warm GitHub job pings the backend every 10 minutes so the free plan does not sleep.
 
+## Operations
+Automations (all free: GitHub Actions + the existing Supabase/Render/Groq free plans). Secrets used are only the existing
+`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `NUEVAI_CALENDAR_URL`; none are ever echoed.
+
+| Automation | When | What it does | Rerun it |
+|---|---|---|---|
+| `ci.yml` | every PR and push to main / `auto/**` | compiles all Python, runs `eval_retrieval.py` (read-only against the live index; skipped on fork PRs without secrets), `test_pipeline_fixes.py`, `test_resilience.py`, then `tsc --noEmit` and `next build` | locally: `python eval_retrieval.py`, `npx tsc --noEmit && npx next build`; on GitHub: Actions > CI > Re-run |
+| `nightly-quality.yml` | daily 10:15 UTC | wakes the backend, runs `eval_golden.py` serially (6 s between questions, uses Groq quota, about 30-40 min), uploads the report as the `golden-report` artifact, then `scripts/check_baseline.py` fails the run (GitHub emails the owner) if the score is below `eval_baseline.json` score minus tolerance (now 0.872 - 0.05), or if fewer than 60% of questions could be graded (rate limits) | Actions > Nightly quality > Run workflow; locally `python eval_golden.py <backend-url>` then `python scripts/check_baseline.py --report data/eval/golden_*.json` |
+| `refresh-knowledge-base.yml` | daily 13:30 UTC | iCal + live team sheets -> chunk -> index. Around it: `scripts/index_guard.py before/after` fails the job if the chunk table loses more than 10% of its rows (a bad scrape), then `scripts/audit_data.py` re-checks the index against its sources (known conflicts live in `scripts/audit_known.json`). The workbooks and documents are refreshed by hand, so in CI the audit covers the calendar feed, live team sheets and database checks; run it locally for the full 27 groups | Actions > Refresh calendar > Run workflow; locally `python run_pipeline.py --stages calendar,live,chunk,index` and `python scripts/audit_data.py` |
+| `keep-warm.yml` | every 10 min | pings `/health` so Render's free plan stays awake | - |
+| `scripts/weekly_digest.py` | by hand, weekly | prints a markdown digest (visitors, top questions, failures, feedback; grader traffic excluded, emails/numbers masked); read-only, sends nothing | `python scripts/weekly_digest.py --days 7` (needs `.env`) and paste the output into a chat |
+
+Baseline: `eval_baseline.json` records which number is measured (239/274 = 87.2%, prompt 01) and which was only an estimate
+(~98%, prompt 02, not used). After a full nightly run with few errors, record the real score with
+`python scripts/check_baseline.py --report <report.json> --write-baseline` and commit the file. A red nightly run means a
+regression or an exhausted Groq quota (the message says which); open the `golden-report` artifact for the failing questions.
+
 More: [pipeline/README.md](pipeline/README.md) (ingestion, metrics, environment variables).
