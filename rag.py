@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
 
 import embedder
+import freshness
 import guard
 import settings
 from cache import TTLCache
@@ -28,6 +29,8 @@ FTS_CANDIDATES = 12
 VECTOR_THRESHOLD = 0.0      # gte-small cosine scores sit high (unrelated ~0.75), so rank, do not threshold
 W_VECTOR, W_LEXICAL = 0.3, 0.7
 OUTLINE_BOOST, CAL_PENALTY, HEAD_BOOST, LEN_EXP = 0.2, 0.2, 1.0, 0.4   # rerank knobs (tuned by sweep_rerank.py)
+OLD_COPY_SOURCES = ("nexus", "google_doc", "google_slides", "google_sheet", "manual", "public_site")
+STALE_PENALTY, OLDER_VERSION_PENALTY = 0.25, 0.15      # documents written for an earlier school year; older twin of a newer document
 TEACH_CUE = re.compile(r"\b(teach\w*|taught|class(es)?|room|block|course|prof|instructor|mr|mrs|ms|dr)\b|'s\b", re.I)
 
 
@@ -261,6 +264,20 @@ class Retriever:
                 r["rerank"] += OUTLINE_BOOST        # contents lists answer "list all ..." questions
             if m.get("source") in ("calendar", "calendar_day", "calendar_sheet"):
                 r["rerank"] -= CAL_PENALTY         # calendar is looked up structurally, not by similarity
+            if freshness.meta_of(r)["stale"]:
+                r["rerank"] -= STALE_PENALTY       # written for an earlier school year: only wins when nothing current matches
+        # the same document in two years ("2025-26 Course Catalog" / "2026-27 Course Catalog"): the older copy loses
+        newest: dict[str, int] = {}
+        for r in rows:
+            f = freshness.meta_of(r)
+            k = freshness.title_key((r.get("metadata") or {}).get("title", ""))
+            if k and f["school_year"]:
+                newest[k] = max(newest.get(k, 0), int(f["school_year"][:4]))
+        for r in rows:
+            f = freshness.meta_of(r)
+            k = freshness.title_key((r.get("metadata") or {}).get("title", ""))
+            if k in newest and f["school_year"] and int(f["school_year"][:4]) < newest[k]:
+                r["rerank"] -= OLDER_VERSION_PENALTY
         return sorted(rows, key=lambda r: r["rerank"], reverse=True)
 
     def calendar_events(self, intent: CalendarIntent) -> list[dict]:
@@ -349,6 +366,7 @@ class Retriever:
         if hit is None:
             hit = self.sb().table(settings.CHUNKS_TABLE).select("chunk_id,content,metadata").eq("metadata->>source", "school_courses") \
                 .in_("metadata->>kind", ["teacher", "course"]).limit(1000).execute().data or []
+            hit = [r for r in hit if not (r.get("metadata") or {}).get("superseded")]      # records the current workbooks no longer produce
             self.calendar_cache.set("entities", hit, ttl=1800)
         return hit
 
@@ -391,7 +409,7 @@ class Retriever:
         hit = self.calendar_cache.get(key)
         if hit is None:
             q = self.sb().table(settings.CHUNKS_TABLE).select("chunk_id,content,metadata").eq("metadata->>source", source)
-            hit = q.limit(1000).execute().data or []
+            hit = [r for r in (q.limit(1000).execute().data or []) if not (r.get("metadata") or {}).get("superseded")]
             self.calendar_cache.set(key, hit, ttl=1800)
         return [r for r in hit if not kinds or (r.get("metadata") or {}).get("kind") in kinds]
 
@@ -523,11 +541,16 @@ class Retriever:
             print(f"calendar lookup failed: {e}", flush=True)
 
         rows = [r for r in rows if not BLOCKED_TITLE.search((r.get("metadata") or {}).get("title", "") or "")
-                and not BLOCKED_CONTENT.search(r.get("content") or "")]
+                and not BLOCKED_CONTENT.search(r.get("content") or "") and not (r.get("metadata") or {}).get("superseded")]
         # Prefer rows written by the current pipeline; old-pipeline rows (no source_url) only as a fallback.
         fresh = [r for r in rows if (r.get("metadata") or {}).get("source_url")]
         if len(fresh) >= 3:
             rows = fresh
+        # Document rows without indexed_at were written by an older chunker (superseded copies with URL titles, repeated pages):
+        # every row the current pipeline produces carries it, so the old copies stay out of the context until they are pruned.
+        current = [r for r in rows if (r.get("metadata") or {}).get("indexed_at") or (r.get("metadata") or {}).get("source") not in OLD_COPY_SOURCES]
+        if len(current) >= 3:
+            rows = current
         # calendar chunks come from the structured lookup, not from similarity
         rows = [r for r in rows if (r.get("metadata") or {}).get("source") not in ("calendar", "calendar_day", "school_day")] if events else rows
 
@@ -540,6 +563,9 @@ class Retriever:
         ent_ids = {e["chunk_id"] for e in ents}
         if intent and intent.label == "the next two weeks" and any(p["chunk_id"] == "advisory-lines" for p in pinned):
             events, intent = [], None      # "advisory 11.1" is not a date question; the two-week digest would only add noise
+        if intent and events and ents and intent.category == "athletics" and not (intent.sport or intent.kind or intent.date_given or intent.holidays) \
+                and any(re.search(r"\bteams?\b", ((e.get("metadata") or {}).get("course") or ""), re.I) for e in ents):
+            events, intent = [], None      # "Biology Research Teams 2" is a course, not a sports-team question: no team overview
         pin_ids = {p["chunk_id"] for p in pinned}
         docs = [d for d in docs if d["chunk_id"] not in ent_ids | pin_ids]
         return {"pinned": pinned, "docs": docs, "events": events, "intent": intent, "timings": timings, "candidates": len(rows), "entities": ents, "degraded": degraded, "resolved": standalone}
@@ -628,7 +654,14 @@ def build_context(result: dict, max_events: int = 14) -> tuple[str, list[dict]]:
         sources.append({"chunk_id": p["chunk_id"], "title": pm.get("title"), "type": pm.get("source", "doc")})
     for d in result["docs"]:
         m = d.get("metadata") or {}
-        parts.append(d["content"][:1100])          # keeps prompts small: the LLM plan is token-rate limited
+        f = freshness.meta_of(d)
+        tag = ""
+        if f["stale"]:
+            why = f["reason"] or (f"written for the {f['school_year']} school year or earlier" if f["school_year"] else "dated before this school year")
+            tag = f"[OUTDATED: {why}; use only if nothing current answers, and say it may have changed]\n"
+        elif f["source_date"]:
+            tag = f"[as of {f['source_date']}]\n"
+        parts.append(tag + d["content"][:1100])          # keeps prompts small: the LLM plan is token-rate limited
         sources.append({"chunk_id": d["chunk_id"], "title": m.get("title"), "url": m.get("source_url") if str(m.get("source_url", "")).startswith("http") else None,
                         "similarity": round(d.get("similarity", 0), 3), "type": m.get("source", "doc")})
     # retrieved text is data, never instructions: drop lines that try to command the model

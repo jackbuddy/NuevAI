@@ -90,6 +90,17 @@ CASES = [
     ("When does the ethics bowl club meet", r"(?i)ethics bowl", "club lookup"),
     ("What is the cell phone policy? can have my phone in class", r"(?i)phone", "ungrammatical phone question"),
     ("Who leads it?", r"(?i)ethics bowl", "club follow-up", [{"role": "user", "content": "When does the ethics bowl club meet"}]),
+    # added by the source-of-truth audit (prompt 10): parsing bugs and source conflicts found by scripts/audit_data.py
+    ("What kind of day is February 24, 2027?", r"February 24, 2027 - A day: Blocks 1-4", "date cell typed as text ('24 Community (90')') was skipped by the day parser"),
+    ("Is there school on June 4, 2027?", r"Last Day of School\. Noon Dismissal \(early dismissal", "last day is a noon-dismissal day, not 'No classes'"),
+    ("Is there school on October 28?", r"October 28, 2026 - No classes \(Parent Teacher Conferences\)", "no-classes day from the master sheet (the iCal feed has no no-school event)"),
+    ("Is there school on November 18?", r"Full-day special event: CSL Day", "full-day event, not 'No classes'"),
+    ("Who teaches Biology Research Teams 2?", r"(?s)\A(?!.*TEAMS ON THE SCHOOL CALENDAR).*Jehnna Ronan.*Lindy Jensen", "joint class 'Jensen + Ronan' split into two teachers; 'Teams' in a course name is not a sports question"),
+    ("What does Laura Mendez-Ortiz teach?", r"Block 7 \(B/B' days\): Spanish 3, room 1206", "Roles tab wins over the offerings sheet for the same teacher and block"),
+    ("What does Laura Mendez-Ortiz teach?", r"(?s)\A(?!.*Block 7 \(B/B' days\): Spanish 4)", "offerings entry that double-books a Roles block is not shown"),
+    ("What does Laura Mendez-Ortiz teach?", r"listed only on the course offerings sheet", "unconfirmed offerings-only assignment is labelled"),
+    ("When does daylight saving time end?", r"Sunday, November 1, 2026, all day: Daylight Saving Time Ends", "all-day event with a timed DTEND keeps its date"),
+    ("What is the 2025-26 year at a glance calendar?", r"(?s)\A(?!.*2025.2026 Year-at-a-Glance).*2026.2027 Year-at-a-Glance", "current-year calendar document wins over last year's copy"),
 ]
 
 

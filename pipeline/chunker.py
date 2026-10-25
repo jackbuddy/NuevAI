@@ -13,12 +13,17 @@ indexer skip chunks whose text did not change.
 import hashlib
 import json
 import re
-from datetime import date, timedelta
+import sys
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 
 from . import config
 from .common import load_pages
 from .links import build as build_links, link_cards
 from . import facts, sheets, workbooks
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))     # freshness.py lives at the repo root (shared with rag.py)
+import freshness      # noqa: E402
 
 HEADING = re.compile(r"^(#{1,6})\s+(.*)$")
 
@@ -180,6 +185,63 @@ def chunk_page(page: dict):
             n += 1
 
 
+def _day_of_file(path: Path) -> str | None:
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).date().isoformat()
+    except OSError:
+        return None
+
+
+def annotate_freshness(chunks: list[dict], pages: list[dict], today: date | None = None) -> dict:
+    """Add indexed_at / source_date / school_year / stale to every chunk's metadata (not part of content_hash, so
+    unchanged text is never re-embedded; index.py patches the metadata of rows that already exist).
+
+      source_date  when the source was last captured or edited: a page's scrape date, a workbook's file date,
+                   the day the calendar feed was read, a knowledge file's date
+      school_year  the school year the text was written for, from its own wording ("2025-26 Course Catalog")
+      stale        true when that is an earlier year than the current one (document level: every chunk of a page
+                   shares the page's verdict, so a catalog whose later chunks never repeat the year is still caught)
+    """
+    today = today or date.today()
+    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    by_url = {}
+    for p in pages:
+        text = (p.get("title") or "") + "\n" + (p.get("text") or "")
+        by_url[p["url"]] = (freshness.parse_day(p.get("scraped_at")),
+                            freshness.classify(text, p.get("source", ""), today, whole_page=freshness.is_public_site(p["url"])))
+    wb_days = {p.stem: _day_of_file(p) for paths in workbooks.find_workbooks().values() for p in paths}
+    cal_day = _day_of_file(config.CALENDAR_FILE) or today.isoformat()
+    stats = {"annotated": 0, "stale": 0}
+    for c in chunks:
+        m = c["metadata"]
+        url, src = m.get("source_url", ""), m.get("source", "")
+        if url in by_url:
+            day, cls = by_url[url]
+        else:
+            cls = freshness.classify(c["content"], src, today)
+            if url.startswith("workbook://"):
+                day = wb_days.get(url[len("workbook://"):])
+            elif url.startswith("facts://"):
+                day = _day_of_file(facts.DIR / url[len("facts://"):])
+            elif src in ("calendar", "calendar_day"):
+                day = cal_day
+            else:
+                day = None
+        if src == "calendar_sheet" and url in by_url:        # a team schedule page: structured and current, dated by its fetch
+            cls = freshness.classify("", "calendar_sheet", today)
+        m["indexed_at"] = now
+        m["source_date"] = day or today.isoformat()
+        m["school_year"] = cls["school_year"]
+        m["stale"] = cls["stale"]
+        if cls["stale"]:
+            m["stale_reason"] = cls["stale_reason"]
+        else:
+            m.pop("stale_reason", None)
+        stats["annotated"] += 1
+        stats["stale"] += bool(cls["stale"])
+    return stats
+
+
 def run(log=print) -> list[dict]:
     chunks, seen_bodies, seen_anchors = [], set(), {}
     skipped_private = skipped_old = skipped_noise = skipped_dup = 0
@@ -248,6 +310,8 @@ def run(log=print) -> list[dict]:
             seen_ids.add(c["chunk_id"])
             unique.append(c)
     chunks = unique
+    fstats = annotate_freshness(chunks, load_pages())
+    log(f"freshness metadata: {fstats}")
     config.CHUNKS_FILE.write_text(json.dumps(chunks, ensure_ascii=False), encoding="utf-8")
     sizes = sorted(len(c["content"]) for c in chunks)
     if skipped_old:

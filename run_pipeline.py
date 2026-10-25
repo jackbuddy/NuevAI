@@ -30,6 +30,7 @@ def main() -> int:
     ap.add_argument("--refresh-nexus", action="store_true", help="re-run the Nexus scraper with the saved session")
     ap.add_argument("--prune", action="store_true", help="delete chunks this pipeline wrote that no longer exist")
     ap.add_argument("--prune-legacy", action="store_true", help="delete rows from the old pipeline")
+    ap.add_argument("--keep-expired", action="store_true", help="do not delete expired calendar events during indexing")
     ap.add_argument("--dry-run", action="store_true", help="do not embed or write to Supabase")
     args = ap.parse_args()
     load_dotenv()
@@ -63,7 +64,7 @@ def main() -> int:
     stage("manual", manual_import.run)
     stage("calendar", calendar_feed.run)
     stage("chunk", lambda: {"chunks": len(chunker.run())})
-    stage("index", lambda: index.run(args.prune, args.prune_legacy, args.dry_run))
+    stage("index", lambda: index.run(args.prune, args.prune_legacy, args.dry_run, keep_expired=args.keep_expired))
 
     report["finished"] = datetime.now(timezone.utc).isoformat()
     config.REPORT_FILE.write_text(json.dumps(report, indent=1), encoding="utf-8")

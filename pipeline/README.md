@@ -69,5 +69,10 @@ records each answer with its timings. View everything at `/insights` with the `M
   Previous-year titles are dropped (`SUPERSEDED_TITLE` in `config.py`).
 * After the Spring 2027 offerings are filled in: `python run_pipeline.py --stages live,chunk,index --prune`.
 
+### Audit and freshness
+* `python scripts/audit_data.py` re-derives A/B days, bell times, teacher-course-block-room records, clubs, team schedules and the iCal feed straight from the source files and compares them with the index (read-only). Exit 1 on a mismatch; known source conflicts are listed in `scripts/audit_known.json`. `--offline` skips network and database.
+* Every chunk carries `indexed_at`, `source_date`, `school_year` and `stale` (see `freshness.py`). `stale` marks documents written for an earlier school year; retrieval demotes them and the prompt tags them OUTDATED. Existing rows get the new metadata by a metadata-only patch on the next index run (no re-embedding). `--keep-expired` skips deleting expired calendar rows.
+* Rows the pipeline no longer produces from the workbooks are flagged `metadata.superseded` (ignored by retrieval) instead of deleted.
+
 ### Alpha feedback
 Testers use the **Feedback** button (written notes) and the thumbs on answers. Read both at `/insights` (needs `METRICS_TOKEN`).

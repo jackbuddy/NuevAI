@@ -1,0 +1,22 @@
+{
+  "days.sheet": {
+    "max": 2,
+    "reason": "(1) 2026-10-13: the two calendar tabs of 'The Sheet' name it differently ('All School PD Day - SM' vs 'Accreditation Work Day'); both say no classes. (2) 2027-05-31 (Memorial Day) is only on the 'Calendar AB + Special Schedule' tab. Asked in NEEDS_USER.md."
+  },
+  "courses.rooms_vs_roles": {
+    "max": 169,
+    "reason": "The Fall Rooms tab and the Fall Roles tab of 'The Sheet' give different rooms (or different teachers) for the same course and block; the index follows the Roles tab. Needs a person to say which tab is current (NEEDS_USER.md)."
+  },
+  "courses.offerings_vs_roles": {
+    "max": 148,
+    "reason": "The Course Offerings sheet and the Fall Roles tab disagree about who teaches what in which block (only ~29 of 229 offerings entries match Roles). The index keeps Roles, drops offerings entries that double-book a Roles block and marks the rest 'listed only on the course offerings sheet'. Needs a person (NEEDS_USER.md)."
+  },
+  "courses.offerings_teachers_not_in_roles": {
+    "max": 11,
+    "reason": "Eleven teachers appear on the offerings sheet by last name only and are not in the Roles tab (HANDOFF section 7, item 2: some left or are from last year)."
+  },
+  "courses.catalog_names": {
+    "max": 18,
+    "reason": "Roles-tab course names that are abbreviations or typos of the 2026-27 Course Catalog titles (e.g. 'Capitalism & Apolcalypse', 'Psychologcal Disorders'). Lookups match them fuzzily; fixing the sheet would make the bot show the catalog spelling (NEEDS_USER.md)."
+  }
+}
