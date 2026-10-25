@@ -47,7 +47,15 @@ body { background: var(--bg); color: var(--ink); font-family: var(--font-sans); 
   .shadow-soft { box-shadow: 0 1px 2px rgb(11 33 69 / .04), 0 4px 14px -6px rgb(11 33 69 / .10); }
   .shadow-lift { box-shadow: 0 1px 2px rgb(11 33 69 / .05), 0 12px 32px -12px rgb(11 33 69 / .22); }
   .text-balance { text-wrap: balance; }
-  .scroll-thin { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  .scroll-thin { scrollbar-width: thin; scrollbar-color: var(--line) transparent; overscroll-behavior: contain; }
+  /* 44px minimum touch target on phones and touch screens; desktop sizes are unchanged */
+  .tap { position: relative; }
+  .tap-box { display: inline-flex; align-items: center; justify-content: center; }
+  @media (pointer: coarse), (max-width: 767px) { .tap-box { min-height: 44px; min-width: 44px; } .tap-h { min-height: 44px; } }
+  .pb-safe { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .px-safe { padding-left: max(1rem, env(safe-area-inset-left)); padding-right: max(1rem, env(safe-area-inset-right)); }
+  .sr-only-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .no-scrollbar { scrollbar-width: none; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
 }
@@ -58,4 +66,8 @@ body { background: var(--bg); color: var(--ink); font-family: var(--font-sans); 
 @keyframes shimmer { to { background-position: -200% 0; } }
 
 @media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; } }
-:focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: 2px; border-radius: 6px; }
+:focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: 2px; }
+.bare:focus-visible { outline: none; }   /* the wrapper shows a focus ring instead */
+.on-navy:focus-visible { outline-color: var(--color-brand-300); }
+html { -webkit-text-size-adjust: 100%; }
+.wrap-any { overflow-wrap: anywhere; word-break: break-word; }

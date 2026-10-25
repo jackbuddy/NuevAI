@@ -179,3 +179,27 @@ Not done / follow-ups
 - Frontend does not yet style the `degraded` flag in the done event (it renders as a normal answer).
 - Re-measure ttft/full-answer by category with `python bench_speed.py https://nuevai-backend.onrender.com --repeat` when Groq quota returns; verify warm-up logs on Render after deploy.
 - An optional cleanup of expired answer_cache rows: `delete from public.answer_cache where expires_at < now();` (not run).
+
+## 08 - frontend quality pass (2026-10-25)
+
+Checked Chat, Calendar, Resources, Feedback modal and /insights at 375, 768 and 1440 px in the browser pane (local Next dev server against the local backend).
+
+Measured
+- Touch targets under 44px at 375 px (buttons, links, tabs, inputs): Chat 11, Calendar 17, Resources 70+ before; 0 after (only the search inputs inside 48px wrappers, then given a 44px height too). No horizontal overflow at any width before or after.
+- Contrast (script, computed colours): only out-of-month calendar day numbers failed (4.36:1, raised by lifting their opacity). Active tab label flagged by the script is a false positive (white on the sliding navy pill).
+- Lighthouse 12 (mobile, production build, backend deliberately unreachable): performance 0.96, accessibility 1.00, best-practices 0.96, SEO 1.00. The two soft misses are LCP (0.86) and console errors, which came from /api/warm failing because the test had no backend.
+
+Fixed
+- Shell: tabs are a real tablist (roving tabindex, arrow/Home/End keys, aria-controls, tabpanels); tab changes push history so Back/Forward move between tabs (was replaceState); offline banner; status dot has an accessible name; skip link; safe-area insets (viewport-fit=cover); 44px targets.
+- Chat: IME-safe Enter (composition Enter no longer sends; Shift+Enter newline), 16px inputs (stops iOS zoom), stop button while streaming, scroll follows the answer only while the reader is at the bottom (no more fighting the user), "jump to latest" button, reduced-motion aware scrolling, screen-reader status line instead of announcing every token, mobile New chat (icon) button (was hidden below 640 px), long unbroken strings wrap and Shift+Enter newlines show in the user bubble, no autofocus on touch screens, shorter follow-up placeholder (it wrapped), subtle note under degraded answers, "Stopped" state. Bug fixed: a refresh while an answer was still empty restored a skeleton forever; also dev StrictMode erased the saved chat on load (saves now wait until the saved chat is read).
+- Calendar: "today" and month start use America/Los_Angeles, not the device clock (verified with TZ=Asia/Tokyo: 2026-10-26 12:00 JST is Oct 25 in LA); rolls over at midnight; stale fetch responses ignored when paging months fast; month navigation moves the detail panel to a visible day; tapping a day on phones scrolls to its detail; day cells have aria labels (date, today, event count) and aria-pressed; filters/view toggle have group labels and pressed state; empty-with-filters message and agenda skeleton; event text wraps long strings and descriptions are 13px; .ics export now includes a VTIMEZONE block and a collision-safe UID.
+- Resources: search matches every word and also searches the extra links found on school pages; result count announced; duplicate arrow link removed from the tab order; ask buttons no longer 60% opacity.
+- Feedback modal: focus trap, Escape, focus returns to the button, page scroll lock, aria-labelledby, safe-area padding, scrollable on short screens, close timer cleared, 16px textarea.
+- Insights: main landmark, labelled chart, wrapping long questions instead of truncating, 16px inputs, focus rings.
+- Global: focus ring no longer changes the element's radius, `.bare` inputs defer to the wrapper's ring (no double ring), overscroll containment, app/error.tsx (uses `retry`, this Next version's prop name, per node_modules/next/dist/docs) and app/not-found.tsx.
+
+Link checker (plain GET, 22 curated URLs from lib/resources.ts): 21 return 200. givecampus.com returns 403 with a Cloudflare bot challenge (not dead; kept). The Nueva Store link redirects to teamlocker.squadlocker.com (works; left unchanged). Also GET-checked the 45 extra links the backend serves: all 200 except 15 Google Forms that answer 401 (restricted to Nueva sign-in, expected) and the same givecampus 403. Nothing removed.
+
+Gates: eval_retrieval 254/254; tsc clean; next build ok; no Python changed (py_compile and gate 4 not applicable).
+
+Not done / follow-ups: real-device checks (iOS Safari keyboard/safe area, VoiceOver) were not possible here; the chat markdown table/long-answer layout was only checked with one live answer; Lighthouse was run without a backend.

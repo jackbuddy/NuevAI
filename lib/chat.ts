@@ -7,6 +7,8 @@ export interface Message {
   content: string;
   sources?: Source[];
   cached?: boolean;
+  degraded?: boolean;   // the model was unavailable: sources and facts only
+  stopped?: boolean;
   error?: boolean;
   streaming?: boolean;
   ms?: number;          // time to first words
@@ -21,7 +23,7 @@ export interface Suggestion { label: string; query?: string; action?: 'calendar'
 export interface StreamHandlers {
   onMeta?: (m: { sources: Source[]; cached: boolean }) => void;
   onDelta: (text: string) => void;
-  onDone?: (d: { cached: boolean; timings: Record<string, number>; suggestions?: Suggestion[] }) => void;
+  onDone?: (d: { cached: boolean; degraded?: boolean; timings: Record<string, number>; suggestions?: Suggestion[] }) => void;
 }
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);

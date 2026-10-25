@@ -38,20 +38,20 @@ export default function Insights() {
   const up = m?.feedback.up ?? 0, down = m?.feedback.down ?? 0;
 
   return (
-    <div className="min-h-dvh px-4 py-8 md:px-8">
+    <main className="px-safe min-h-dvh py-8 md:px-8">
       <div className="mx-auto max-w-5xl">
         <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <a href="/" className="flex items-center gap-3"><Logo size={36} /><div><h1 className="text-2xl font-bold leading-none">Insights</h1><p className="ink-2 text-xs">NuevAI usage &amp; performance</p></div></a>
+          <a href="/" className="tap-h flex items-center gap-3 rounded-lg"><Logo size={36} /><div><h1 className="text-2xl font-bold leading-none">Insights</h1><p className="ink-2 text-xs">NuevAI usage &amp; performance</p></div></a>
           <form onSubmit={(e) => { e.preventDefault(); load(token, days); }} className="flex flex-wrap items-center gap-2">
-            <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Metrics token" aria-label="Metrics token" className="surface w-44 rounded-full px-4 py-2 text-sm outline-none" />
-            <select value={days} onChange={(e) => { const d = Number(e.target.value); setDays(d); if (token) load(token, d); }} className="surface rounded-full px-3 py-2 text-sm" aria-label="Range">
+            <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Metrics token" aria-label="Metrics token" autoComplete="off" className="bare surface tap-h w-44 rounded-full px-4 py-2 text-base outline-none focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 sm:text-sm" />
+            <select value={days} onChange={(e) => { const d = Number(e.target.value); setDays(d); if (token) load(token, d); }} className="surface tap-h rounded-full px-3 py-2 text-base sm:text-sm" aria-label="Range">
               {[1, 7, 14, 30, 60].map((d) => <option key={d} value={d}>Last {d}d</option>)}
             </select>
-            <button className="rounded-full bg-brand-900 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">{loading ? 'Loading…' : 'Load'}</button>
+            <button disabled={loading} className="tap-box rounded-full bg-brand-900 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">{loading ? 'Loading…' : 'Load'}</button>
           </form>
         </header>
 
-        {err && <div className="mb-5 rounded-2xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-800">{err}</div>}
+        {err && <div role="alert" className="mb-5 rounded-2xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-800">{err}</div>}
         {!m && !err && <p className="ink-2 text-sm">Enter the metrics token (the METRICS_TOKEN set on the backend) to view usage.</p>}
 
         {m && (
@@ -73,18 +73,18 @@ export default function Insights() {
                 <ul className="space-y-3">
                   {m.feedback_messages.map((f, i) => (
                     <li key={i} className="text-sm"><span className="surface-2 mr-2 rounded-full px-2 py-0.5 text-[11px] font-semibold">{f.kind || 'Other'}</span>
-                      <span className="ink-2 text-xs">{f.ts} · {f.tab}</span><p className="mt-1">{f.text}</p></li>
+                      <span className="ink-2 text-xs">{f.ts} · {f.tab}</span><p className="wrap-any mt-1">{f.text}</p></li>
                   ))}
                 </ul>
               )}
             </Card>
 
             <Card title="Questions per day">
-              <div className="flex h-36 items-end gap-1.5">
+              <div role="img" aria-label={`Questions per day: ${m.daily.map((d) => `${d.day} ${d.chats}`).join(', ') || 'no data'}`} className="flex h-36 items-end gap-1.5">
                 {m.daily.map((d) => (
                   <div key={d.day} className="group flex flex-1 flex-col items-center justify-end gap-1" title={`${d.day}: ${d.chats} questions, ${d.users} users`}>
                     <div className="w-full rounded-t-md bg-brand-800" style={{ height: `${Math.max(4, (d.chats / maxChats) * 100)}%` }} />
-                    <span className="ink-2 text-[9px]">{d.day.slice(5)}</span>
+                    <span className="ink-2 text-[10px] leading-none">{d.day.slice(5)}</span>
                   </div>
                 ))}
                 {m.daily.length === 0 && <p className="ink-2 text-sm">No data yet.</p>}
@@ -104,7 +104,7 @@ export default function Insights() {
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }
 
@@ -112,7 +112,7 @@ function Kpi({ label, value, sub, small }: { label: string; value: string | numb
   return (
     <div className="surface shadow-soft rounded-2xl p-4">
       <p className="ink-2 text-xs font-medium">{label}</p>
-      <p className={`mt-1 font-bold ${small ? 'text-lg' : 'text-3xl'}`}>{value}</p>
+      <p className={`wrap-any mt-1 font-bold ${small ? 'text-lg' : 'text-3xl'}`}>{value}</p>
       {sub && <p className="ink-2 mt-0.5 text-xs">{sub}</p>}
     </div>
   );
@@ -122,5 +122,5 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 }
 function List({ rows, empty = 'No data yet.' }: { rows: [string, number][]; empty?: string }) {
   if (!rows.length) return <p className="ink-2 text-sm">{empty}</p>;
-  return <ul className="space-y-1.5 text-sm">{rows.map(([k, v]) => <li key={k} className="flex items-baseline justify-between gap-3"><span className="truncate">{k}</span><span className="ink-2 tabular-nums">{v}</span></li>)}</ul>;
+  return <ul className="space-y-1.5 text-sm">{rows.map(([k, v]) => <li key={k} className="flex items-baseline justify-between gap-3"><span className="wrap-any min-w-0">{k}</span><span className="ink-2 tabular-nums">{v}</span></li>)}</ul>;
 }
