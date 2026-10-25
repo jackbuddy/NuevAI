@@ -1,0 +1,186 @@
+NUEVAI PROJECT HANDOFF  (paste this whole file into a new chat)
+Rewritten 25 Oct 2026 after the unattended quality queue (prompts 01-12). Status: production (main) is the 23 Oct build and is in alpha;
+all queue work is on the LOCAL branch auto/queue (11 commits + this wrap-up), NOT merged, NOT deployed. See QUEUE_SUMMARY.md first.
+
+You are continuing work on NuevAI, an AI assistant for The Nueva School community (focus: the Upper School, grades 9-12,
+San Mateo campus). The user (Jack) is a student/builder who owns the project. Be direct and practical. Read this fully
+before acting. Verify claims against the repo and the live system, because things may have changed since this was written.
+
+======================================================================================================================
+1. WHERE EVERYTHING LIVES
+======================================================================================================================
+Live site ............ https://nuev-ai.vercel.app            (Next.js 16, Tailwind 4, Vercel; auto-deploys from GitHub main)
+Metrics dashboard .... https://nuev-ai.vercel.app/insights   (needs the METRICS_TOKEN the user set; usage, speed, feedback)
+Backend .............. https://nuevai-backend.onrender.com   (FastAPI in Docker, Render FREE plan, 512 MB RAM, auto-deploys from main)
+                       Render service id srv-db38sbt9fdbs73abuk70, workspace id tea-db2jo31srm7s73bmg6mg
+Database ............. Supabase project "Project NuevAI", ref xteifrcfclajllovrqqo (us-west-2, Postgres 17 + pgvector)
+Code ................. GitHub jackbuddy/NuevAI, branch main (production). Local working copy: ~/Developer/NuevAI; improvements sit on auto/queue
+Nexus scraper ........ ~/Developer/nexus-scraper (separate project; holds a saved login session auth.json = PRIVATE, never commit)
+LLM .................. Groq (free tier). Calendar feed: private iCal URL stored only in env (NUEVAI_CALENDAR_URL).
+NEVER keep project files under ~/Desktop: it is iCloud-synced and files turn into slow "dataless" placeholders (this wrecked
+build speed earlier). ~/Developer is safe.
+
+Connectors available in the Claude session (check they are connected): Render MCP (list_services/deploys/events/logs/metrics,
+trigger_deploy, update_environment_variables), Supabase MCP (execute_sql, apply_migration, deploy_edge_function, get_advisors),
+Vercel MCP, the GitHub CLI `gh` (logged in as jackbuddy), and a browser pane for visual checks.
+
+======================================================================================================================
+2. ARCHITECTURE (how a question is answered)
+======================================================================================================================
+Browser -> Vercel Next.js routes (/api/chat/stream etc., same-origin proxy) -> Render FastAPI (query_server.py)
+  1. smalltalk? ("hi", "thanks", "what can you do") -> canned reply, no retrieval, no LLM.
+  1b. guard.py: canned replies (self-harm, privacy, injection, homework) with no LLM; follow-up rewritten by followup.py
+  2. answer cache hit? L1 memory then L2 Supabase (6 h; 10 min for date-dependent; never cached without sources, degraded, follow-up or grade-specific answers)
+  3. retrieval (rag.py), in parallel:
+       a. embed the question with the Supabase Edge Function `embed` (gte-small, 384-d)  [source: supabase/functions/embed]
+          then vector search RPC match_chunks_v2 on table document_chunks_v2 (24 candidates)
+       b. structured calendar lookup (intent.py parses dates / sport / gender / home-away / A-B-day / advisory) on metadata
+       c. link cards (booking/payment) and direct teacher/course lookup (entity_chunks) from school_courses records
+     then a hybrid lexical+vector rerank (no ML on the server; 32 candidates, tuned weights, stale docs demoted, optional FTS) -> pinned KEY FACTS + top 5 docs + calendar block -> context
+  4. Groq chain: openai/gpt-oss-120b -> openai/gpt-oss-20b -> qwen/qwen3.8-27b (the ONLY chat models this Groq key can use;
+     llama-3.3-70b does NOT exist for it). max_retries=0; on 429 it moves to the next model, waits once, then (new) returns a DEGRADED answer
+     built from retrieved calendar lines/facts/links with an honest note instead of an error. Streaming SSE to the browser (meta -> delta* -> done with suggestions).
+  5. analytics events (anonymous anon_id + session_id) go to Supabase table analytics_events via /api/track.
+WHY no ML on the server: Render free = 512 MB; bge-large + reranker needed ~1.6 GB and was OOM-killed. Server now uses ~75 MB.
+Hugging Face Docker Spaces were rejected by the user (paid). Stay on free plans; ask before suggesting anything paid.
+
+Key files (repo root unless noted):
+  query_server.py   API: /api/chat, /api/chat/stream, /api/calendar, /api/links, /api/track, /api/metrics, /health, /health/deep;
+                    prompt (SYSTEM_PERSONA), rate limit (20/min per visitor, 150/min global), LLM chain, suggestions, warm-up
+  rag.py            retrieval, synonym expansion (SYNONYMS), lexical rerank, calendar lookup, entity (teacher/course) lookup, context
+  intent.py         question -> structured calendar intent (dates are school-year aware: Aug-Jul)
+  embedder.py       client for the embed Edge Function (batches of <=4 texts; splits on HTTP 546)
+  settings.py       CHUNKS_TABLE=document_chunks_v2, MATCH_RPC=match_chunks_v2
+  analytics.py      event intake + /api/metrics summary; ANALYTICS_DISABLED=1 keeps local tests out of real metrics
+  cache.py          tiny TTL/LRU cache (L1, in-memory)
+  answer_store.py   persistent L2 answer cache in Supabase table answer_cache (supabase/answer_cache.sql, applied); TTL, no PII, circuit breaker
+  guard.py          pre-LLM safety layer (self-harm care reply, student/staff privacy, injection, homework/essay, harmful), context scrubbing, output leak check
+  followup.py       deterministic follow-up rewriting ("what about JV?", "who teaches it?") from previous user turns; no LLM
+  freshness.py      chunk freshness metadata (indexed_at, source_date, school_year, stale); retrieval demotes prior-year docs
+  eval_retrieval.py 296 offline cases (68 hand-written + plain-fact golden questions + follow-ups; fixed "today" 2026-10-22, EVAL_TODAY overrides). RUN BEFORE EVERY PUSH.
+  eval_golden.py + eval_golden.json   312 graded questions in 18 categories, run against a base URL (default localhost:8765 or GOLDEN_BASE); --category, --limit,
+                    --sleep, --only-failed; writes data/eval/golden_*.json (gitignored). Costs Groq quota (~3.5k tokens/answer).
+  eval_recall.py / sweep_rerank.py   retrieval-only metrics (no LLM) and offline rerank knob sweep
+  eval_redteam.py   258 safety/privacy checks (16 need the LLM); format_lint.py answer-style linter; bench_speed.py SSE latency by category
+  test_resilience.py (40 failure drills) and test_pipeline_fixes.py (22 parser tests), both offline
+  eval_answers.py   35 realistic questions printed for reading (against http://localhost:8765 or a URL arg)
+  scripts/          audit_data.py (27 source-of-truth check groups, read-only; audit_known.json = accepted conflicts), check_baseline.py (nightly gate),
+                    index_guard.py (fails refresh if row count drops >10%), weekly_digest.py (analytics digest), check_manual_docs.py
+  run_pipeline.py + pipeline/   the knowledge-base ingestion (see section 4)
+  knowledge/*.md    curated, human-confirmed facts (bell schedule, A'/B' meaning, campus addresses/phones)
+  supabase/         analytics.sql, schema_v2.sql, functions/embed/index.ts
+  app/ components/ lib/   frontend (Shell with Calendar/Chat/Resources tabs, ChatView, CalendarView, ResourcesView,
+                    FeedbackButton, /insights page). Tokens in app/globals.css.
+  .github/workflows/   refresh-knowledge-base.yml (daily 13:30 UTC: calendar + live team schedules -> chunk -> index, then index_guard + audit),
+                    keep-warm.yml (pings /health every 10 min), ci.yml (compile, eval_retrieval, offline tests, tsc, next build),
+                    nightly-quality.yml (eval_golden live vs eval_baseline.json). ci and nightly have NEVER run on GitHub yet.
+  data/pipeline/    LOCAL ONLY, gitignored: crawled pages, chunks.json, manual_docs/, live/, download checklist, backups
+
+======================================================================================================================
+3. SECRETS AND CONFIG (values are NOT in this file; never print or commit them)
+======================================================================================================================
+  Render env:  SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (must be the SECRET key "sb_secret_..."; the anon key breaks it silently),
+               GROQ_API_KEY, METRICS_TOKEN. Optional: LLM_MODEL, LLM_FALLBACKS, CHUNKS_TABLE, RATE_PER_USER_PER_MIN.
+  Local .env (~/Developer/NuevAI/.env, gitignored): the same + NUEVAI_CALENDAR_URL.
+  GitHub Actions secrets (set): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, NUEVAI_CALENDAR_URL.
+  Vercel env: BACKEND_URL (or CHAT_API_URL) pointing at the Render URL.
+RULES: the assistant must not type secrets into dashboards for the user; the user pastes them. Render env edits need
+"Save, rebuild and deploy" (a canceled deploy leaves the old env running). Check /health/deep: key_kind must read
+"secret (server)" and chunk_rows_visible ~6000.
+Health checks: GET /health -> data_ok true, data_rows ~5900. If data_ok is false the site shows an amber banner.
+
+======================================================================================================================
+4. DATA: WHAT IS INDEXED AND HOW TO REFRESH IT
+======================================================================================================================
+All chunks live in document_chunks_v2 (~5,900 rows). metadata.source values:
+  public_site (nuevaschool.org, crawled ONCE, 200 pages; user said it has little value and does not need refreshing)
+  nexus (pages imported from the scraper; contact cards/profiles filtered out)         google_doc / google_sheet / google_slides
+  manual (files the user downloads into data/pipeline/manual_docs/)                     link_registry (booking/form/payment links + PINNED links)
+  calendar + calendar_day (private iCal feed, refreshed daily)                          calendar_sheet (US team schedules parsed from sheets)
+  school_day (A/B day + events + advisory times for every date, from "The Sheet")        school_courses (teacher/course/block/room records)
+  school_clubs (2026-27 clubs, leaders kept on purpose)                                 school_advisory (advisor rooms, intergrade groups, BTSN)
+  school_facts (knowledge/*.md)
+Pipeline stages: public(once), nexus, google, live, manual, calendar, chunk, index. Typical commands (from ~/Developer/NuevAI, with a venv
+that has requirements.txt + requirements-pipeline.txt installed; the temporary venv from this session may be gone):
+  python run_pipeline.py --stages chunk,index --prune        after editing knowledge/*.md or any local data
+  python run_pipeline.py --stages live,chunk,index --prune   re-read live sheets (e.g. when Spring 2027 course offerings are filled in)
+  python run_pipeline.py --stages manual,chunk,index         after dropping new files into data/pipeline/manual_docs/
+  python run_pipeline.py --stages index --dry-run            show what would be embedded/deleted (ALWAYS look before --prune)
+Embedding goes through the Supabase edge function, so it needs no ML libraries and takes ~1 min for a few hundred chunks.
+Live sheets (pipeline/config.py LIVE_SHEETS): US Boys Basketball 26-27 Varsity/JV tabs (fetched by tab id; the workbook ALSO contains
+rosters with student+parent emails, which are never fetched) and the Course Offerings workbook (public link; Spring 2027 tab says
+"to be updated Fall 2026").
+Planning workbooks parsed by pipeline/workbooks.py (the user exports .xlsx into data/pipeline/manual_docs/):
+  "The Sheet - Master Schedule 2026-27.xlsx" (A/B calendar, advisory, Fall/Spring Roles, advisor rooms) and "Clubs Catalog 2026-27.xlsx".
+  The tabs "Advisory Rosters" and "Intergrade Groups" contain STUDENT NAMES and are never parsed.
+
+Confirmed school facts (also in knowledge/): each student has 4 blocks/day. Blocks 1-4 meet on A and A' days, 5-8 on B and B' days.
+A' = A with the last two blocks flipped (order 1,2,4,3); B' = 5,6,8,7. Times: B1/B5 8:55-10:10, B2/B6 10:15-11:30, lunch from 11:30
+to 12:00 or 12:30 (advisory can take the second half), B3/B7 12:35-1:50, B4/B8 1:55-3:10. San Mateo campus (Upper School):
+131 E 28th Ave, San Mateo CA 94403, 650-235-7100. Hillsborough (PreK-8): 6565 Skyline Blvd, 650-350-4600.
+Teacher spelling confirmed by the school: Jeremy JACQUOT (the Roles tab has the typo "Jaquot"; fixed via NAME_FIXES in workbooks.py).
+
+======================================================================================================================
+5. PRIVACY RULES (important; they came from real near-misses)
+======================================================================================================================
+- Everything indexed is answerable by anyone who uses the public site. Never index student names, rosters, advisee lists, emails of
+  students/parents, salary data, RSVP/diploma-name sheets. Protections: pipeline/sheets.py is_sensitive(), manual_import tab filter,
+  rag.BLOCKED_TITLE, live_sheets refuses any tab containing "@". Faculty Salary Matrix and old 2022 parent-email PDFs sit in
+  data/pipeline/manual_docs/_skipped/ (ignored by the importer).
+- The user wants advisor names/rooms (staff) and club leader names kept, but NOT advisee names.
+- The user's Google "US Boys Basketball" workbook is shared "anyone with the link" and contains roster tabs (student + parent emails).
+  They were warned to restrict it or copy the two schedule tabs to their own sheet. Check whether they did.
+- Google silently returns TAB 1 (a roster) if a tab name does not match (tab names have trailing spaces). Always fetch tabs by gid.
+
+======================================================================================================================
+6. HOW TO WORK ON THIS PROJECT (process the user likes)
+======================================================================================================================
+- Before pushing: run eval_retrieval.py, test_resilience.py, test_pipeline_fixes.py (all must pass; add a case for every bug you fix), type-check (npx tsc --noEmit),
+  `next build` for frontend changes. After pushing: wait for Vercel + Render, then test the LIVE site with real questions and
+  read the answers. Local servers: backend `ANALYTICS_DISABLED=1 uvicorn query_server:app --port 8765`; frontend
+  `BACKEND_URL=http://localhost:8765 npx next dev -p 3100`.
+- Commit messages end with: Co-Authored-By: Claude (model name) <noreply@anthropic.com>. Queue work was told not to push main or merge; the user reviews and merges auto/queue; ask first for destructive, paid, or risky actions.
+- The permission system denied my bulk DELETEs on Supabase before; when a delete is needed, give the user the exact SQL to run.
+- Do not use `open(p,"w").write(open(p).read())` (it truncates files). Avoid `sleep` chains in shell; use until-loops/monitors.
+- zsh quirks: a loop var holding "a b" is not word-split; `timeout` does not exist on macOS (use perl -e 'alarm N; exec @ARGV').
+- Design: white-to-navy palette (brand-* tokens), Manrope font, light mode ONLY (user dislikes dark mode), subtle branding
+  (wordmark "NuevAI" + small "Alpha" badge, no heavy school logos), Gemini-style home (greeting, big input, suggestion chips).
+  Resources page = search first, 6 tiles, filter chips, compact list. User praised the current design; do not redo it.
+
+======================================================================================================================
+7. STATE OF THE QUEUE WORK AND OPEN ITEMS
+======================================================================================================================
+Scores (be honest about these):
+  - Golden answer score: only the 01 baseline is MEASURED, 239/274 = 87.2% (live data, local backend). Prompt 02 claimed ~98% but that was an
+    ESTIMATE (re-ran only the 50 failures). No full run exists at the current code or on the now 312-question set: Groq's free quota (200k tokens/day
+    per model, 8k/min) was exhausted from prompt 02 on, and a full run costs ~1M tokens.
+  - Offline: eval_retrieval 296/296, test_resilience 40/40, test_pipeline_fixes 22/22, redteam 242 pass / 0 fail / 16 unverified (need LLM),
+    audit_data 27 groups, 330 accepted source conflicts, recall@5 0.996, docs-only recall@5 0.556.
+  - eval_answers.py (reading real answers) was blocked by 429 in most prompts; real-answer quality of the new prompt/format/guard is largely unverified.
+Pending USER actions (details in NEEDS_USER.md): run supabase/fts.sql (keyword search, not live; rag.py degrades gracefully); review then prune ~1,130
+  superseded chunk rows (python run_pipeline.py --stages index --dry-run, then --prune) and optional delete SQL; content gaps (league names, tutorial booking,
+  swim, homecoming, IT help contact, identity wording); source-sheet conflicts (Rooms vs Roles tabs etc.); Groq quota / separate eval key.
+Not deployed: everything on auto/queue. Render needs no new env vars (optional WARM_TOP, LLM_BUDGET_S, DB_TIMEOUT_S, ANSWER_L2_DISABLED).
+Automation caveats: nightly-quality is red-by-design when quota is out (INCONCLUSIVE); after the first healthy nightly run set the baseline to the measured
+  score with scripts/check_baseline.py --write-baseline; index guard alerts but cannot undo deletions (restore from data/backup).
+Other known limits:
+ 1. Groq free tier caps tokens/minute and tokens/day: ~10 simultaneous questions, and the daily quota is the main user-visible failure (4/4 alpha errors).
+    Degraded answers now soften this. RECOMMEND Groq pay-as-you-go before wide rollout (user must do it).
+ 2. Eleven teachers appear by last name only (Alan, Becerra-Hernandez, Carpenter, Carter, Chau, Frost, Jemmot, Lawrence, Muszynski, Torrance, Treseler).
+ 3. Spring 2027 offerings/roles not filled in. Re-run the live stage later.
+ 4. No current tennis/swim schedules. Honor Code text not indexed. Check private docs with: python scripts/check_manual_docs.py
+ 5. Nexus session may expire; refresh needs the user to sign in manually.
+ 6. Frontend: grade pills and 44px targets on phones only checked by classes/emulation; no real-device (iOS Safari, VoiceOver) check.
+ 7. Guard is English-only regex; paraphrased attacks rely on the prompt. A server-side strip of phone numbers absent from context is not built.
+ 8. Test row "[deploy check - please ignore]" in analytics_events; ignore.
+ 9. Old table document_chunks was dropped; backups may be in data/backup/.
+10. Ideas not started: per-grade personalization beyond the pill, Spring schedule, admin view of unanswered questions, bell schedule for special days.
+
+======================================================================================================================
+8. ALPHA TESTING
+======================================================================================================================
+Feedback arrives via the Feedback button, thumbs up/down, and /insights ("Questions it struggled with", "Marked not helpful", "Top questions");
+scripts/weekly_digest.py summarizes. Loop: turn each wrong answer into a data fix, a knowledge/*.md fact, a synonym/intent tweak or a prompt rule, add a
+golden/eval_retrieval case, push, verify live. Reproduce first: curl -X POST https://nuev-ai.vercel.app/api/chat -H 'Content-Type: application/json' -d '{"query":"..."}'
+
+If anything above contradicts what you observe, trust the live system and the repo, then tell the user what changed.
