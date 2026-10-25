@@ -151,3 +151,31 @@ Not done / honest limits
 - Regex guard is a first layer: paraphrased attacks ("what were you told before this chat?") rely on the prompt. Mid-stream leak check can let the first few words of a leaked prompt through before it cuts off.
 - eval_answers.py: 30 of 35 answers 429 again; not read. 
 - Guard is English only; an essay request in another language falls to the model.
+
+## 07 - speed and resilience (2026-10-25)
+
+Measured with new bench_speed.py (SSE, by category). Groq quota was still exhausted: almost every real LLM call returned 429, so time-to-first-token and full-answer times for real model answers are NOT measurable (one live call that did succeed: llm_ms 316, ttft 613 ms, total 734 ms; not a sample).
+
+| stage (ms) | local (laptop) | live Render |
+|---|---|---|
+| smalltalk/canned TTFB = total | 9-22 | 100-120 (network) |
+| retrieval to first SSE event (meta), by category | 460-1200 (calendar 513-1205, teacher/course 458-693, docs 512-778, clubs 485-569, links 635-707) | 150-640 |
+| server-side embed (edge function) | - | 344 (dominant retrieval stage; vector 72, calendar 88, rerank ~0) |
+| cache hit (repeat question) | - | 81 |
+| cold start | not measured (service is kept warm by the 10-min ping; a real cold start needs the service asleep) | |
+Slowest known stage: the embed Edge Function call (~340 ms of ~420 ms retrieval); LLM stage unmeasured (429).
+
+Changed
+- answer_store.py + supabase/answer_cache.sql: persistent L2 answer cache. Key = normalized question, TTL via expires_at (10 min date-bound, 6 h otherwise), no ids, personal-looking questions (email, long digit runs, phone) never stored, writes on a background thread, 2 s read timeout, 120 s circuit breaker, falls back to in-memory L1 if the table is missing or Supabase is slow. Migration applied through the Supabase MCP (it was allowed this time); a live write was observed (l2_writes=1 in /health). Not stored: answers without sources, degraded answers, follow-ups, custom-model requests.
+- Warm-up: top 30 questions from the last 30 days of analytics plus starters; loads from L2 instead of regenerating, paces only real LLM calls, stops at the first LLM outage.
+- Degradation: if every Groq model fails (429, 5xx, timeout, connection error, 25 s budget, or the stream dies) the visitor gets the retrieved calendar lines, confirmed facts and source links with an honest note, flagged degraded (never cached); a stream that breaks mid-answer keeps the text and says it was cut off. Embedding function 546/5xx or slow vector search: retrieval continues with the structured lookups (calendar, pinned facts, teachers, clubs, links), or returns a friendly "search unavailable" message if nothing matched. Supabase unreachable: friendly message, no stack trace; raw exception text is no longer sent to the browser. Timeouts: DB 10 s, query embedding 8 s x2, per-LLM-call 3-20 s.
+- test_resilience.py: 40 simulated drills, all pass (Groq 429 on all models, timeout, connection error, HTTP 500, fallback model, mid-stream break, edge function 546/500/503/timeout, vector search slow/failing, Supabase unreachable, L1 served while Supabase down, L2 round trip/TTL/PII/missing table/slow, restart simulation served from L2 with LLM down, warm-up).
+- Memory: local backend RSS 71 MB idle, peak 92 MB under 3 rounds of 20 concurrent streaming requests (60 requests, all HTTP 200, max 3.5 s; mostly degraded answers because of 429). Linux/Render numbers will differ somewhat but there is ample headroom against the ~150 MB target; not measured on Render itself.
+
+Gates: eval_retrieval 254/254; py_compile ok; frontend untouched (tsc/build not run); /health data_ok true. Gate 4: eval_answers.py against the local backend was blocked by 429 (the 15 answers that completed before I stopped it were all degraded fallbacks), so real answer quality was NOT verified; the degraded text format was read and fixed (duplicate bullet dashes, "nothing found" line when only sources existed).
+
+Not done / follow-ups
+- Deploy has not happened (branch only): after merge, Render needs no new env vars; optional WARM_TOP, LLM_BUDGET_S, DB_TIMEOUT_S, ANSWER_L2_DISABLED.
+- Frontend does not yet style the `degraded` flag in the done event (it renders as a normal answer).
+- Re-measure ttft/full-answer by category with `python bench_speed.py https://nuevai-backend.onrender.com --repeat` when Groq quota returns; verify warm-up logs on Render after deploy.
+- An optional cleanup of expired answer_cache rows: `delete from public.answer_cache where expires_at < now();` (not run).

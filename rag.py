@@ -21,6 +21,7 @@ from cache import TTLCache
 from intent import CalendarIntent, parse_intent
 
 CANDIDATES = 32
+VECTOR_BUDGET_S = float(os.getenv("VECTOR_BUDGET_S", "14"))
 FTS_ENABLED = os.getenv("FTS_ENABLED", "1") != "0"
 FTS_CANDIDATES = 12
 VECTOR_THRESHOLD = 0.0      # gte-small cosine scores sit high (unrelated ~0.75), so rank, do not threshold
@@ -199,7 +200,7 @@ class Retriever:
         hit = self.embed_cache.get(key)
         if hit is not None:
             return hit
-        vec = embedder.embed_one(text)
+        vec = embedder.embed_query(text)
         self.embed_cache.set(key, vec)
         return vec
 
@@ -495,14 +496,24 @@ class Retriever:
             print(f"pinned lookup failed: {e}", flush=True)
         self.sb()      # create the client once, before worker threads import it concurrently
         f_vec, f_cal, f_links, f_fts = _pool.submit(vec_task), _pool.submit(cal_task), _pool.submit(self.link_cards, query), _pool.submit(self.fts_search, search_q)
-        rows, events = merge_fts_rows(f_vec.result(), f_fts.result()), []
+        vec_rows, degraded = [], False
         try:
-            link_rows = f_links.result()
+            vec_rows = f_vec.result(timeout=VECTOR_BUDGET_S)
+        except Exception as e:        # embedding function 546/5xx, slow database: carry on with the structured lookups
+            degraded = True
+            print(f"vector search unavailable ({type(e).__name__}: {str(e)[:100]}); continuing without it", flush=True)
+        try:
+            fts_rows = f_fts.result(timeout=3)
+        except Exception:
+            fts_rows = []
+        rows, events = merge_fts_rows(vec_rows, fts_rows), []
+        try:
+            link_rows = f_links.result(timeout=12)
         except Exception as e:
             link_rows = []
             print(f"link lookup failed: {e}", flush=True)
         try:
-            events = f_cal.result()
+            events = f_cal.result(timeout=12)
         except Exception as e:
             print(f"calendar lookup failed: {e}", flush=True)
 
@@ -526,7 +537,7 @@ class Retriever:
             events, intent = [], None      # "advisory 11.1" is not a date question; the two-week digest would only add noise
         pin_ids = {p["chunk_id"] for p in pinned}
         docs = [d for d in docs if d["chunk_id"] not in ent_ids | pin_ids]
-        return {"pinned": pinned, "docs": docs, "events": events, "intent": intent, "timings": timings, "candidates": len(rows), "entities": ents}
+        return {"pinned": pinned, "docs": docs, "events": events, "intent": intent, "timings": timings, "candidates": len(rows), "entities": ents, "degraded": degraded}
 
 
 def fmt_event(r: dict) -> str:

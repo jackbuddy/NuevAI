@@ -20,6 +20,7 @@ from groq import Groq
 import settings
 from analytics import Analytics
 from cache import TTLCache
+from answer_store import AnswerStore
 from rag import Retriever, build_context
 import guard
 
@@ -39,15 +40,18 @@ _supabase_client = None
 def get_supabase():
     global _supabase_client
     if _supabase_client is None:
-        from supabase import create_client
+        from supabase import create_client, ClientOptions
+        # a slow database must not hang a visitor for the library default of 120 s
         _supabase_client = create_client(os.getenv("SUPABASE_URL", "").strip().strip("\"'"),
-                                         os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip().strip("\"'"))
+                                         os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip().strip("\"'"),
+                                         options=ClientOptions(postgrest_client_timeout=float(os.getenv("DB_TIMEOUT_S", "10"))))
     return _supabase_client
 
 
 retriever = Retriever(get_supabase)
 analytics = Analytics(get_supabase)
 answer_cache = TTLCache(max_items=800, ttl=ANSWER_TTL)
+answer_l2 = AnswerStore(get_supabase, enabled=not os.getenv("ANSWER_L2_DISABLED"))   # persistent L2 (table answer_cache)
 api_cache = TTLCache(max_items=128, ttl=600)
 
 _data_state = {"at": 0.0, "rows": None, "error": ""}
@@ -68,7 +72,13 @@ def data_status() -> dict:
 
 class KnowledgeBaseUnavailable(HTTPException):
     def __init__(self):
-        super().__init__(503, "The school knowledge base is unreachable right now (server configuration). Please try again later.")
+        super().__init__(503, "I can't reach the school's information right now. Please try again in a minute; the Resources and Calendar tabs may still work.")
+
+
+class SearchUnavailable(HTTPException):
+    def __init__(self):
+        super().__init__(503, "Search is temporarily slow or unavailable, so I can't look that up right now. Please try again in a minute, "
+                              "or check the Resources tab and the Calendar tab, which still work.")
 
 
 STARTERS = [
@@ -79,8 +89,13 @@ STARTERS = [
 ]
 
 
+WARM_TOP = int(os.getenv("WARM_TOP", "30"))
+
+
 def _warm():
-    """Pre-compute the starter answers (and the most-asked questions) so the first click is instant."""
+    """After a (re)start, make sure the starters and the most-asked questions (top 30 from analytics) are cached.
+    Questions already in the persistent cache are loaded, not regenerated, so a restart costs few LLM tokens. Stops at the
+    first rate-limit answer instead of burning quota."""
     if os.getenv("WARMUP_DISABLED"):          # local eval runs: do not spend LLM tokens on warm-up answers
         return
     try:
@@ -90,16 +105,24 @@ def _warm():
             return
         popular = []
         try:
-            popular = [q for q, n in analytics.summary(14).get("top_questions", []) if n >= 2][:8]   # what people really ask
+            popular = [q for q, n in analytics.summary(30).get("top_questions", []) if n >= 2][:WARM_TOP]   # what people really ask
         except Exception:
             pass
-        for q in STARTERS + [p for p in popular if p not in [s.lower() for s in STARTERS]]:
+        todo = list(dict.fromkeys(STARTERS + [p for p in popular if p.lower() not in [s.lower() for s in STARTERS]]))[:WARM_TOP]
+        done = fresh = 0
+        for q in todo:
             try:
-                answer_once(q)
-                time.sleep(3)           # stay under the LLM token-per-minute limit
+                r = answer_once(q)
+                done += 1
+                if not r.get("cached"):
+                    fresh += 1
+                    time.sleep(4)           # only pace real LLM calls (token-per-minute limit)
+                if r.get("degraded"):
+                    print("Warm-up stopped: the LLM is unavailable (rate limit?). Remaining questions load on demand.", flush=True)
+                    break
             except Exception as e:
                 print(f"warm failed for {q!r}: {e}", flush=True)
-        print("Warm-up complete.", flush=True)
+        print(f"Warm-up complete: {done}/{len(todo)} ready ({fresh} generated, {done - fresh} from cache).", flush=True)
     except Exception as e:
         print(f"warm-up failed: {e}", flush=True)
 
@@ -119,7 +142,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False,
 def health():
     d = data_status()
     return {"status": "ok", "model_loaded": True, "embedding": "supabase-edge:gte-small", "table": settings.CHUNKS_TABLE,
-            "data_ok": bool(d["rows"]), "data_rows": d["rows"], "answer_cache": answer_cache.stats()}
+            "data_ok": bool(d["rows"]), "data_rows": d["rows"], "answer_cache": {**answer_cache.stats(), **answer_l2.stats}}
 
 
 def _key_kind(key: str) -> str:
@@ -326,6 +349,8 @@ def _prepare(req: QueryRequest):
         if not data_status()["rows"]:
             print("KNOWLEDGE BASE UNREADABLE: 0 rows visible - check SUPABASE_SERVICE_ROLE_KEY (must be the service/secret key)", flush=True)
             raise KnowledgeBaseUnavailable()
+        if result.get("degraded"):          # search was down and nothing structured matched: do not claim "not found"
+            raise SearchUnavailable()
         context = "No relevant documentation was found for this question."
     system = (f"{SYSTEM_PERSONA}\n\nToday is {now.strftime('%A, %B %-d, %Y')} (Pacific time).\n\n"
               f"CONTEXT:\n{context}")
@@ -335,7 +360,33 @@ def _prepare(req: QueryRequest):
     return msgs, sources, result, now
 
 
+def degraded_answer(sources: list[dict], result: dict | None, reason: str = "llm") -> str:
+    """What to show when the model cannot write the answer: the facts we already retrieved, as plain text and links.
+    Uses only retrieved data (calendar lines, confirmed facts, titles, links), never anything generated."""
+    lines = ["I'm having trouble writing a full answer right now (the AI service is busy), but here is what I found in the school's information. "
+             "Please try asking again in a minute."]
+    result = result or {}
+    events = result.get("events") or []
+    if events:
+        from rag import fmt_event
+        lines.append("\n**On the school calendar**")
+        lines += [f"- {fmt_event(e).lstrip('- ').strip()}" for e in events[:6]]
+    facts = [p for p in (result.get("pinned") or []) if (p.get("metadata") or {}).get("source") == "school_facts"]
+    for p in facts[:2]:
+        lines.append("\n" + p["content"].split("\n\n", 1)[-1][:500].strip())
+    docs = [x for x in sources if x.get("title") and (not events or x.get("type") != "calendar")]
+    if docs:
+        lines.append("\n**Related pages and documents**")
+        for x in docs[:5]:
+            title = (x.get("title") or "School document").strip()[:100]
+            lines.append(f"- [{title}]({x['url']})" if x.get("url") else f"- {title}")
+    if not events and not docs and not facts:
+        lines.append("\nI could not find anything relevant to show. You can also browse the Resources and Calendar tabs.")
+    return "\n".join(lines)
+
+
 FALLBACK_MODELS = [m.strip() for m in os.getenv("LLM_FALLBACKS", "openai/gpt-oss-20b,qwen/qwen3.8-27b").split(",") if m.strip()]
+LLM_BUDGET_S = float(os.getenv("LLM_BUDGET_S", "25"))     # total time the model chain may take before we degrade
 RETRYABLE_STATUS = {400, 404, 408, 413, 422, 429, 500, 502, 503, 504, 529}
 
 
@@ -354,9 +405,15 @@ def _create(msgs, model: str, stream: bool, _round: int = 0):
     then gives the visitor a friendly message."""
     from groq import APIConnectionError, APIStatusError
     last, all_rate_limited, waits = None, True, []
+    deadline = time.time() + LLM_BUDGET_S
     for m in [model] + [x for x in FALLBACK_MODELS if x != model]:
+        left = deadline - time.time()
+        if left < 2 and last is not None:
+            print("LLM time budget used up; giving up", flush=True)
+            all_rate_limited = False
+            break
         try:
-            return groq_client.chat.completions.create(messages=msgs, stream=stream, **_llm_kwargs(m)), m
+            return groq_client.with_options(timeout=max(3.0, min(left, 20.0))).chat.completions.create(messages=msgs, stream=stream, **_llm_kwargs(m)), m
         except APIStatusError as e:
             last = e
             if e.status_code not in RETRYABLE_STATUS:
@@ -397,6 +454,28 @@ def _cache_key(req: QueryRequest, now: datetime):
     return (_norm(req.query), now.strftime("%Y-%m-%d"), req.model or LLM_MODEL)
 
 
+def _cache_get(req: QueryRequest, key):
+    """L1 (memory) then L2 (Supabase). Returns the payload or None."""
+    if not key:
+        return None
+    if hit := answer_cache.get(key):
+        return hit
+    if req.model:
+        return None
+    if hit := answer_l2.get(req.query):
+        ttl = DATE_ANSWER_TTL if hit.pop("date_bound", False) else 3600
+        answer_cache.set(key, hit, ttl=ttl)
+        return hit
+    return None
+
+
+def _cache_put(req: QueryRequest, key, payload: dict, intent):
+    ttl = DATE_ANSWER_TTL if intent else ANSWER_TTL
+    answer_cache.set(key, payload, ttl=ttl)
+    if not req.model:
+        answer_l2.put(req.query, payload, ttl, date_bound=bool(intent))
+
+
 def answer_once(query: str) -> dict:
     """Blocking, uncached-or-cached answer used by /api/chat and the warm-up."""
     req = QueryRequest(query=query)
@@ -410,15 +489,20 @@ def _answer(req: QueryRequest, request: Request | None) -> dict:
         _track(req, request, {"query": req.query[:300], "cached": True, "smalltalk": True, "total_ms": 0, "ttft_ms": 0, "sources": 0})
         return {"answer": canned, "model_used": "none", "sources": [], "suggestions": [], "cached": True, "timings": {"total_ms": 0}}
     key = _cache_key(req, now)
-    if key and (hit := answer_cache.get(key)):
+    if key and (hit := _cache_get(req, key)):
         total = round((time.time() - t0) * 1000)
         _track(req, request, {"query": req.query[:300], "cached": True, "total_ms": total, "ttft_ms": total, "sources": len(hit["sources"])})
         return {**hit, "cached": True, "timings": {"total_ms": total}}
     msgs, sources, result, now = _prepare(req)
     model = req.model or LLM_MODEL
     t_llm = time.time()
-    completion, model = _create(msgs, model, stream=False)
-    answer = completion.choices[0].message.content or ""
+    try:
+        completion, model = _create(msgs, model, stream=False)
+        answer = completion.choices[0].message.content or ""
+    except HTTPException as e:
+        if e.status_code not in (429, 503):
+            raise
+        return _degraded_response(req, request, sources, result, t0, e)
     if guard.leak_check(answer):
         print("OUTPUT LEAK BLOCKED", flush=True)
         answer = guard.LEAK_REPLY
@@ -426,11 +510,20 @@ def _answer(req: QueryRequest, request: Request | None) -> dict:
     payload = {"answer": answer, "model_used": model, "sources": sources, "suggestions": suggestions_for(result, req.query)}
     if key and sources:       # never cache an answer that had nothing behind it
         intent = result["intent"]
-        answer_cache.set(key, payload, ttl=DATE_ANSWER_TTL if intent else ANSWER_TTL)
+        _cache_put(req, key, payload, intent)
     _track(req, request, {"query": req.query[:300], "cached": False, "sources": len(sources), "no_context": not sources,
                           "fallback": bool(re.search(r"(isn't|is not|not) (in|available)|not on the school calendar", answer, re.I)),
                           "ttft_ms": timings["total_ms"], **timings})
     return {**payload, "cached": False, "timings": timings}
+
+
+def _degraded_response(req, request, sources, result, t0, exc) -> dict:
+    """LLM unavailable: answer with the retrieved facts and links. Never cached; flagged so the UI/analytics can tell."""
+    total = round((time.time() - t0) * 1000)
+    _track(req, request, {"query": req.query[:300], "cached": False, "degraded": True, "llm_status": exc.status_code,
+                          "sources": len(sources), "total_ms": total, "ttft_ms": total})
+    return {"answer": degraded_answer(sources, result), "model_used": "none", "sources": sources, "suggestions": [],
+            "cached": False, "degraded": True, "timings": {**result.get("timings", {}), "total_ms": total}}
 
 
 @app.post("/api/chat")
@@ -443,7 +536,8 @@ def chat_endpoint(req: QueryRequest, request: Request):
     except Exception as e:
         if req.anon_id:
             analytics.record("chat_error", req.anon_id, req.session_id, {"error": str(e)[:200], "query": req.query[:200]})
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"chat error: {type(e).__name__}: {str(e)[:200]}", flush=True)
+        raise HTTPException(status_code=500, detail="Something went wrong on my side. Please try again in a moment.")
 
 
 _hits: dict[str, list[float]] = {}
@@ -488,7 +582,7 @@ def chat_stream(req: QueryRequest, request: Request):
                 _track(req, request, {"query": req.query[:300], "cached": True, "smalltalk": True, "total_ms": 0, "ttft_ms": 0, "sources": 0})
                 return
             key = _cache_key(req, now)
-            hit = answer_cache.get(key) if key else None
+            hit = _cache_get(req, key)
             if hit:
                 yield _sse("meta", {"sources": hit["sources"], "cached": True})
                 text = hit["answer"]
@@ -502,34 +596,54 @@ def chat_stream(req: QueryRequest, request: Request):
             yield _sse("meta", {"sources": sources, "cached": False, "intent": bool(result["intent"])})
             model = req.model or LLM_MODEL
             t_llm, ttft, parts = time.time(), None, []
-            stream, model = _create(msgs, model, stream=True)
-            for chunk in stream:
-                delta = chunk.choices[0].delta.content if chunk.choices else None
-                if delta:
-                    if guard.leak_check("".join(parts) + delta):
-                        print("OUTPUT LEAK BLOCKED (stream)", flush=True)
-                        yield _sse("delta", {"t": "\n\n" + guard.LEAK_REPLY})
-                        parts = [guard.LEAK_REPLY]
-                        break
-                    if ttft is None:
-                        ttft = round((time.time() - t0) * 1000)
-                    parts.append(delta)
-                    yield _sse("delta", {"t": delta})
+            try:
+                stream, model = _create(msgs, model, stream=True)
+            except HTTPException as e:
+                if e.status_code not in (429, 503):
+                    raise
+                d = _degraded_response(req, request, sources, result, t0, e)
+                yield _sse("delta", {"t": d["answer"]})
+                yield _sse("done", {"cached": False, "degraded": True, "timings": d["timings"], "suggestions": []})
+                return
+            broke = False
+            try:
+                for chunk in stream:
+                    delta = chunk.choices[0].delta.content if chunk.choices else None
+                    if delta:
+                        if guard.leak_check("".join(parts) + delta):
+                            print("OUTPUT LEAK BLOCKED (stream)", flush=True)
+                            yield _sse("delta", {"t": "\n\n" + guard.LEAK_REPLY})
+                            parts = [guard.LEAK_REPLY]
+                            break
+                        if ttft is None:
+                            ttft = round((time.time() - t0) * 1000)
+                        parts.append(delta)
+                        yield _sse("delta", {"t": delta})
+            except Exception as e:           # connection dropped or timed out mid-answer
+                print(f"LLM stream broke ({type(e).__name__})", flush=True)
+                broke = True
+                if parts:
+                    yield _sse("delta", {"t": "\n\n(The answer was cut off because the AI service stopped responding. Please ask again for the full answer.)"})
+                else:
+                    d = _degraded_response(req, request, sources, result, t0, HTTPException(503))
+                    yield _sse("delta", {"t": d["answer"]})
+                    yield _sse("done", {"cached": False, "degraded": True, "timings": d["timings"], "suggestions": []})
+                    return
             answer = "".join(parts)
             timings = {**result["timings"], "ttft_ms": ttft, "llm_ms": round((time.time() - t_llm) * 1000),
                        "total_ms": round((time.time() - t0) * 1000)}
             suggestions = suggestions_for(result, req.query)
             yield _sse("done", {"cached": False, "timings": timings, "suggestions": suggestions})
-            if key and answer and sources:
-                answer_cache.set(key, {"answer": answer, "model_used": model, "sources": sources, "suggestions": suggestions},
-                                 ttl=DATE_ANSWER_TTL if result["intent"] else ANSWER_TTL)
+            if key and answer and sources and not broke:
+                _cache_put(req, key, {"answer": answer, "model_used": model, "sources": sources, "suggestions": suggestions}, result["intent"])
             _track(req, request, {"query": req.query[:300], "cached": False, "sources": len(sources), "no_context": not sources,
                                   "fallback": bool(re.search(r"(isn't|is not|not) (in|available)|not on the school calendar", answer, re.I)),
                                   **timings})
         except Exception as e:
             if req.anon_id:
                 analytics.record("chat_error", req.anon_id, req.session_id, {"error": str(e)[:200], "query": req.query[:200]})
-            yield _sse("error", {"message": e.detail if isinstance(e, HTTPException) else str(e)[:300]})
+            print(f"stream error: {type(e).__name__}: {str(e)[:200]}", flush=True)
+            yield _sse("error", {"message": e.detail if isinstance(e, HTTPException) else "Something went wrong on my side. Please try again in a moment."})
 
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"})
