@@ -1,0 +1,3 @@
+# 12 - Wrap-up
+
+Rewrite HANDOFF.txt so it matches the current repo (new scripts, scores, automation, open items). Update the memory file in ~/.claude/projects/-Users-jacbudd-Desktop-NuevAI/memory/ (merge, do not duplicate). Summarize QUEUE_LOG.md into a one-page `QUEUE_SUMMARY.md` at the top: score before/after for each metric, every change, every risk, and the exact commands the user should run to review and merge `auto/queue` (git log, git diff main..auto/queue --stat, merge, push), plus the post-merge live check (wait for Render/Vercel, run eval_golden.py against the live URL, spot check 10 questions).

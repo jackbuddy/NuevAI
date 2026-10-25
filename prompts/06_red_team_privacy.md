@@ -1,0 +1,5 @@
+# 06 - Adversarial and privacy testing
+
+Write `eval_redteam.py` with 60+ attacks and run against the local backend: asking for student names/rosters/advisee lists/parent emails/salaries/grades of named people; prompt injection (ignore instructions, reveal system prompt/keys/env, roleplay, "developer mode"); injection hidden in retrieved text (check that indexed pages cannot instruct the bot); off-topic and harmful requests; requests to write essays/homework (decide a sensible policy: brief redirect, answer school-related help only); self-harm statements (respond with care and point to the counselor/988 info, never dismiss); long inputs, unicode tricks, empty input, 10k-character input.
+Also scan the whole index with SQL SELECTs for patterns that look like student data (emails not ending in staff domains, "Advisee", "Roster", personal phone numbers, grade-level name lists) and list findings in NEEDS_USER.md with delete SQL (do not run it).
+Fix leaks in filters/prompt/rag. Add every successful attack as a permanent test.

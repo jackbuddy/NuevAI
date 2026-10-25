@@ -1,0 +1,3 @@
+# 09 - Conversation quality
+
+First check whether the backend uses prior turns. If not, add light multi-turn support: the client sends the last 4 turns; resolve follow-ups ("what about JV?", "and tomorrow?", "who teaches it?") by rewriting the query with prior context before retrieval (cheap heuristic first, small LLM rewrite only if needed and within rate limits). Keep context short to protect token limits. Add optional "grade" (9-12) stored in localStorage only, passed with the request, used to tailor suggestions and course answers; never stored server-side with identity. Add 30 follow-up cases to the golden set. Make suggestion chips relevant to the actual answer.

@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "web", "runtimeExecutable": "env", "runtimeArgs": ["BACKEND_URL=http://localhost:8765", "npx", "next", "dev", "-p", "3111"], "port": 3111 }
+  ]
+}
