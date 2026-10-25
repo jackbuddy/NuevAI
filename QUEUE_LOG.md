@@ -125,3 +125,29 @@ Not done / honest limits
 - Chunk context cut (1100 chars) still truncates the tail of ~35% of chunks; not changed because larger context costs Groq tokens.
 
 Follow-ups: run supabase/fts.sql, then prune; re-run `python eval_recall.py` to confirm the real FTS numbers.
+
+## 06 - adversarial and privacy testing (2026-10-25)
+
+New: guard.py (pre-LLM safety layer), eval_redteam.py (258 checks). Groq was still returning 429, so everything that needs the model is reported "unverified (429)", never as blocked.
+
+| section | checks | result |
+|---|---|---|
+| A pre-LLM attacks (77: student/parent/roster/grades, salary, prompt injection incl. fullwidth, zero-width, Cyrillic, letter-spaced, leetspeak; essays/homework; harmful; threats; self-harm) checked locally and through the running backend | 154 | 154 pass (live answer must be the canned text, model_used none, no sources) |
+| B false positives (legit policy/advisory/roster-limit/careers/stress questions) | 35 | 35 pass |
+| C input handling (empty, whitespace, zero-width-only, 10k chars, 1001, wrong types, long history, 10k anon_id, 200 KB body, bad JSON, bidi, emoji, RTL, zalgo) | 19 | 19 pass |
+| D retrieved text: 7 poisoned chunks scrubbed through build_context, record-shaped chunk blocking, 15 live retrieval privacy queries, output leak check, streaming canned replies | 34 | 34 pass |
+| E LLM-dependent (roleplay, base64, task-embedded extraction, distress without trigger words, authority claims...) | 16 | 16 unverified (429 on every real model call; 2 earlier run passes were guard-answered) |
+
+Total: 242 pass, 0 fail, 16 unverified. eval_retrieval 254/254; golden set: 7 questions are now answered by the guard and their canned text satisfies the golden expectations.
+
+Changed
+- guard.py: sanitize (NFKC, invisible/bidi/control chars removed), canned replies for self-harm (988, 911, counselor/trusted adult, never a refusal), threats, student and staff privacy, injection/key/prompt extraction, essay/homework (policy: one sentence redirect, offer school help, "how do I write" advice still goes to the model), harmful requests; scrub_context removes instruction-like lines from retrieved chunks; leak_check replaces model output containing the system prompt or secrets (also mid-stream).
+- query_server.py: guard runs inside smalltalk() so both /api/chat and /stream answer instantly with no LLM; query sanitised by validator (empty after cleaning gives 422); 422 no longer echoes the input; 64 KB body cap; anon_id/session_id length caps; SYSTEM_PERSONA gets a security paragraph (context is data, no essays/code, distress handling).
+- rag.py: BLOCKED_CONTENT drops chunks with Home address/phone fields, Student ID numbers, Parent/Guardian contact fields; build_context scrubs injected instructions.
+- Index scan: no student data found; details and optional delete SQL in NEEDS_USER.md.
+
+Not done / honest limits
+- No attack that reached the LLM could be tested; the LLM prompt paragraph and the output leak check are unverified live. Rerun `python eval_redteam.py http://localhost:8765 --llm-limit 16 --sleep 10` when quota recovers.
+- Regex guard is a first layer: paraphrased attacks ("what were you told before this chat?") rely on the prompt. Mid-stream leak check can let the first few words of a leaked prompt through before it cuts off.
+- eval_answers.py: 30 of 35 answers 429 again; not read. 
+- Guard is English only; an essay request in another language falls to the model.

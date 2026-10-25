@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
 
 import embedder
+import guard
 import settings
 from cache import TTLCache
 from intent import CalendarIntent, parse_intent
@@ -47,6 +48,8 @@ CLUB_ALIASES = [(re.compile(r"\bmodel un\b", re.I), "model united nations mun"),
                 (re.compile(r"\brobotics\b", re.I), "robotics team"), (re.compile(r"\bamc\b|\baime\b", re.I), "amc aime")]
 
 # Never served, even if such rows exist in the database: sheets/forms that hold people's data.
+# chunk text that is personal-record shaped (home address fields, student ids, parent contact cards): never shown to the model
+BLOCKED_CONTENT = re.compile(r"\bHome (City|Postal|Zip|Phone|Address|Email|Street)\b|\bStudent ID\s*[:#]?\s*\d{4,}|\b(Parent|Guardian) ?[12]? (Email|Phone|Cell)\s*:", re.I)
 BLOCKED_TITLE = re.compile(r"diploma|rsvp|sign[- ]?up|roster|responses|attendance sheet|transcript|salary|payroll|medical", re.I)
 
 # Everyday wording -> the words the handbook actually uses. Added to the search text only (never shown).
@@ -503,7 +506,8 @@ class Retriever:
         except Exception as e:
             print(f"calendar lookup failed: {e}", flush=True)
 
-        rows = [r for r in rows if not BLOCKED_TITLE.search((r.get("metadata") or {}).get("title", "") or "")]
+        rows = [r for r in rows if not BLOCKED_TITLE.search((r.get("metadata") or {}).get("title", "") or "")
+                and not BLOCKED_CONTENT.search(r.get("content") or "")]
         # Prefer rows written by the current pipeline; old-pipeline rows (no source_url) only as a fallback.
         fresh = [r for r in rows if (r.get("metadata") or {}).get("source_url")]
         if len(fresh) >= 3:
@@ -611,4 +615,5 @@ def build_context(result: dict, max_events: int = 14) -> tuple[str, list[dict]]:
         parts.append(d["content"][:1100])          # keeps prompts small: the LLM plan is token-rate limited
         sources.append({"chunk_id": d["chunk_id"], "title": m.get("title"), "url": m.get("source_url") if str(m.get("source_url", "")).startswith("http") else None,
                         "similarity": round(d.get("similarity", 0), 3), "type": m.get("source", "doc")})
-    return "\n\n---\n\n".join(parts), sources
+    # retrieved text is data, never instructions: drop lines that try to command the model
+    return guard.scrub_context("\n\n---\n\n".join(parts)), sources
