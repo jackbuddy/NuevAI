@@ -59,6 +59,28 @@ CASES = [
     ("Who teaches Chemistry?", r"Jeremy Jacquot", "confirmed spelling"),
     ("Where is the upper school located?", r"131 E 28th", "campus fact"),
     ("What is the phone number for the front desk?", r"650-235-7100", "campus fact"),
+    # added by golden round 1: direct lookups and pinned facts
+    ("What time is Block 2?", r"10:15-11:30", "bell facts pinned even though the question parses as a date question"),
+    ("When does the school day end?", r"1:55-3:10", "bell facts pinned"),
+    ("What time is lunch?", r"11:30 AM and ends at 12:00", "bell facts pinned (not just the lunch synonyms)"),
+    ("What's the phone number for the Hillsborough campus?", r"650-350-4600", "campus facts pinned"),
+    ("Who teaches art of repair", r"Hilary Fenton", "course lookup without the leading 'the'"),
+    ("who teaches psychology", r"Amy Hunt", "course lookup by a single distinctive word"),
+    ("Who teaches Chinese 5?", r"Ting Zhang", "course lookup: prefix of a longer course name"),
+    ("Who teaches philsophy of consioucness", r"Lee Holtzman", "course lookup tolerates typos and abbreviations"),
+    ("Who teaches Linguistics?", r"Theodosopoulos", "course lookup: abbreviated catalog name"),
+    ("Which room is advisory 11.1?", r"Advisory 11\.1: Alexa Hart and Jen Paull, room 1102", "advisory number lookup"),
+    ("Who are the advisors of advisory 11.5?", r"Sarah Ruddy and Terry Lee, room 316", "advisory number lookup"),
+    ("When does Model UN meet?", r"Tuesday, Lunch in room 1103", "club alias lookup"),
+    ("Who advises the AMC/AIME club and when does it meet?", r"(?i)room 318", "club acronym lookup"),
+    ("Who is the advisor?", r"Patrick Berger", "club lookup from the previous question", [{"role": "user", "content": "When does Model UN meet?"}]),
+    ("What kind of day is November 6, 2026?", r"November 6, 2026 - B' day", "'kind of day' is not a keyword search"),
+    ("What about the next day?", r"October 6, 2026 - B day", "'the next day' follow-up resolves the date", [{"role": "user", "content": "Is October 5 an A day or B day?"}]),
+    ("When is the Spring Sports Athlete/Parent meeting?", r"US Spring Sports Athlete/Parent Meeting", "named athletics event is not a team overview"),
+    ("When is Thanksgiving and when is the November break?", r"Thursday, November 26, 2026, all day: Thanksgiving", "named holiday inside a no-school question"),
+    ("On the calendar it shows a fika, what is it?", r"US Parent Fika", "any-keyword fallback when the strict keyword match is empty"),
+    ("wat time is blok 3", r"12:35-1:50", "typo 'blok' still pins the bell facts"),
+    ("What languages can I study?", r"(?i)chinese", "language synonym expansion"),
 ]
 
 
@@ -68,9 +90,11 @@ def main() -> int:
     # fixed date: the calendar checks refer to dates in the 2026-27 school year
     today = date.fromisoformat(os.getenv("EVAL_TODAY", "2026-10-22"))
     passed = 0
-    for q, rx, note in CASES:
+    for case in CASES:
+        q, rx, note = case[:3]
+        history = case[3] if len(case) > 3 else None
         t = time.time()
-        res = r.retrieve(q, today=today)
+        res = r.retrieve(q, history, today=today)
         ctx, _ = build_context(res)
         ok = bool(re.search(rx, ctx))
         passed += ok

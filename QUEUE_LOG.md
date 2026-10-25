@@ -26,3 +26,33 @@ Notes and follow-ups
 - Some expectations are intentionally soft where the data is thin (cell phone policy: the indexed phone FAQ is another school's sample; league info; coach).
 - Privacy: no emails, rosters, salaries or student contact details appeared in any answer.
 - Several dynamic questions will need review when the date moves past the 2026-27 events they reference.
+
+## 02 - drive the golden score up (2026-10-25)
+
+Diagnosis (layer -> fix). The data was present for nearly every failure; the problems were retrieval and prompt, not missing facts, so no knowledge/*.md or pipeline change was needed.
+- Bell times, campus phones/addresses, "which blocks meet on A/B days": retrieval ranking. "What time is Block 2?" parsed as a date question, so the 2-week/today digest rows and unrelated `school_day` chunks crowded out the curated bell facts. Fix: `Retriever.pinned_facts` always shows the bell-schedule or campus facts (labelled KEY FACTS, never truncated) when the question matches; `school_day` rows are dropped from vector results when the structured lookup ran; "blok"-style typos handled.
+- Advisory 9.5 / 11.1 / 11.5: ranking. New `advisory_lines` extracts the exact "Advisory X.Y: advisors, room" line; the two-week digest is suppressed for these questions.
+- Model UN / AMC-AIME / follow-up "Who is the advisor?" (wrong answer Chris Scott): ranking. New `club_chunks` direct lookup (name, acronym in parentheses, aliases such as "Model UN"), also tried against the previous user turn for short follow-ups.
+- Art of Repair, Psychology, Chinese 5, Philosophy of Consciousness (and a typo variant), Linguistics: entity lookup required the exact course key as a phrase. Added a loose token matcher (prefix/abbreviation/typo tolerant) used only when the question has a who/teach/room/block cue.
+- Nov 6 not identified as B': intent bug. The word "kind" in "what kind of day" became a calendar keyword and matched nothing. Added kind/type/sort to STOP and "kind of day" to the day-type patterns. Follow-up "What about the next day?" now resolves from the previous question's date. Keyword calendar lookups also had an aliasing bug (postgrest builders mutate in place, so the "any keyword" fallback never worked); fixed, with a single-date fallback to that day's schedule.
+- Thanksgiving, Spring Sports Athlete/Parent Meeting: intent. Named holidays inside no-school questions are now fetched; "meeting/parent/banquet..." no longer turns an athletics question into a team overview.
+- Privacy and "What advisory is he in?", Block-time hedging: prompt. SYSTEM_PERSONA now states the bell times, says KEY FACTS/teaching/club/advisory entries are authoritative, asks for the advisory room, and tells the model to decline student/roster/contact/salary requests in one sentence.
+- "What languages can I study?": added a SYNONYMS entry (language -> Chinese/Spanish/French/Japanese/Latin...).
+- Grader fixes (not loosening to hide failures): the "not in the catalog" expectation also accepts "does not list/include/contain/mention/have" (the model's correct wording for AlphaGen/quidditch/flag football). Added `--only-failed <golden json>` to eval_golden.py.
+- Local-eval aid: `WARMUP_DISABLED=1` skips the startup warm-up so it does not spend LLM tokens.
+
+Scores
+- Baseline (prompt 01, rescored): 239/274 = 87.2%.
+- Round 1 (rerun of the 50 questions that failed in the first run, current grader): 46/50 pass; the other 224 were not re-asked, so the implied full score is about 270/274 = 98.5%, an estimate.
+- Round 2 (fixes for the 4 left over, plus later fixes): only partly measurable, see below. Spot check of 14 questions: 6 passed (Dec 3 Block 4, "blok 3", Spring Sports meeting, Jordan Smith, salaries, Thanksgiving+break), 8 errored with HTTP 429 and are unscored (advisory 9.5/11.5, "advisory is he in", alphagen, fika, advisory 9.1 students, parent email list, "next day").
+- Retrieval-level regression check over all 259 non-dynamic golden questions (does the retrieved context contain the expected facts?): old code 223, new code 247, 0 questions regressed, 24 fixed. The remaining 12 misses are privacy/refusal and "not in the data" questions whose expectations are about the answer wording, not the context.
+- eval_retrieval.py: 39 -> 60 cases, all pass (new cases for every fix above; follow-up cases use an optional history field).
+
+Not completed / honest limits
+- A second full golden run did NOT finish: Groq free tier is 200,000 tokens/day per model (rolling) and 8,000/min; my runs (plus earlier ones) exhausted all three models, after which answers failed with 429. No answers could be read from eval_answers.py for the same reason (gate 4 partly met: /health data_ok true and about 60 answers read across the runs, all sensible; no private data seen). The 8 unscored questions above should be rerun with `python eval_golden.py --only-failed data/eval/golden_20261025_021631.json`, after the quota recovers.
+- Prompt-only fixes (privacy wording, advisory room) are unverified for the 8 errored questions.
+- These evals spend the same Groq quota as the live site; see NEEDS_USER.md.
+
+Follow-ups
+- Cut tokens per answer (contexts are about 3k tokens) so a full golden run fits the free quota, or use a separate Groq key for evals.
+- Remaining soft spots: staff-by-last-name only; Spring 2027 offerings not filled in; follow-up resolution relies on one previous user turn.

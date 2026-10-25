@@ -93,6 +93,7 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=0, help="run only the first N selected questions")
     ap.add_argument("--sleep", type=float, default=4.0, help="seconds between questions")
     ap.add_argument("--threshold", type=float, default=0.70, help="minimum pass rate (0-1) for exit code 0")
+    ap.add_argument("--only-failed", default="", help="path to an earlier golden_*.json; run only its failing questions")
     ap.add_argument("--verbose", action="store_true", help="print every answer, not only failures")
     a = ap.parse_args()
 
@@ -100,6 +101,9 @@ def main() -> int:
     if a.category:
         want = set(a.category.split(","))
         items = [i for i in items if i["category"] in want]
+    if a.only_failed:
+        bad = {r["q"] for r in json.load(open(a.only_failed))["results"] if not r["ok"]}
+        items = [i for i in items if i["q"] in bad]
     if a.limit:
         items = items[: a.limit]
     print(f"golden set: {len(items)} questions against {a.base}\n")

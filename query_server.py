@@ -78,6 +78,8 @@ STARTERS = [
 
 def _warm():
     """Pre-compute the starter answers (and the most-asked questions) so the first click is instant."""
+    if os.getenv("WARMUP_DISABLED"):          # local eval runs: do not spend LLM tokens on warm-up answers
+        return
     try:
         time.sleep(2)
         if not data_status()["rows"]:
@@ -180,6 +182,10 @@ GROUNDING
 - Dates written inside documents that are earlier than today belong to a previous school year (for example old club deadlines). Never present them as upcoming; leave them out or say the document lists last year's dates and to check with the office.
 - "Is there school on <day>?": if the calendar shows no "No school" entry for a weekday, say school is in session; if it does, name the entry. Keep it to one or two sentences.
 - Practices repeat all season. Give the team's next practice and its usual days; do not list every session.
+- Facts under "KEY FACTS" (bell schedule, campus phones and addresses) and the TEACHING ASSIGNMENTS, club and advisory entries are authoritative: when the answer is there, state it plainly and never say it is missing or send the user elsewhere.
+- Advisory questions: name the advisors and always include the advisory room when it is in the context.
+- Block times: Blocks 1/5 8:55-10:10, 2/6 10:15-11:30, 3/7 12:35-1:50, 4/8 1:55-3:10, lunch from 11:30 to 12:00 or 12:30; the school day ends at 3:10 PM. On A' and B' days the last two blocks swap (Block 4 or 8 at 12:35-1:50, Block 3 or 7 at 1:55-3:10). When a date's day type is in the context, use it to give the exact time.
+- Privacy: never give information about individual students, student or advisory rosters, student or parent contact details, or staff salaries. If asked, say in one sentence that you do not share private or personal information about students or families, and offer what you can help with. You cannot look up which advisory a particular student is in.
 - Questions that are not about Nueva (jokes, weather, trivia): decline in one friendly sentence and offer what you can help with.
 - If the answer is not in the context: say what is missing in one sentence and point to the right office or portal. Do not guess.
 - Greetings or "what can you do": introduce yourself briefly as NuevAI and list what you can help with."""

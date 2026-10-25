@@ -32,7 +32,7 @@ STOP = set("""a an the is are was were be been do does did can could will would 
 how why of for on in at to from with about into over under this that these those it its my our your their me us we you
 i there here any some all more most next last new today tonight tomorrow yesterday week weekend month year day days
 time times date dates schedule scheduled upcoming calendar event events please tell show give list find get
-have has had having am pm what's whats that's there's happening going anything something events"""
+have has had having am pm what's whats that's there's happening going anything something events kind type sort"""
     .split())
 
 
@@ -51,9 +51,13 @@ class CalendarIntent:
     next_only: bool = False
     label: str = ""
     dayinfo: bool = False           # asking about A/B day type or which blocks meet
+    holidays: list[str] = field(default_factory=list)   # named holidays in the question (thanksgiving, labor day...)
 
     def short_range(self) -> bool:
         return (self.end - self.start).days <= 3
+
+
+HOLIDAY_RX = re.compile(r"\b(thanksgiving|christmas|labor day|memorial day|martin luther king|mlk|veterans day|indigenous|columbus|presidents.? day|juneteenth|new year|halloween|diwali|lunar new year|easter|good friday|winter break|spring break|independence day|winter solstice)\b", re.I)
 
 
 def _next_weekday(today: date, idx: int, strictly_after: bool = False) -> date:
@@ -148,9 +152,17 @@ def parse_intent(question: str, today: date, previous_user_msg: str = "") -> Cal
     category = "no_school" if re.search(NO_SCHOOL_WORDS, q) else "arts" if re.search(ARTS_WORDS, q) and not sport else None
     if not sport and not category and re.search(r"\b(sports?|teams?|athletics?|athletes?)\b", q):
         category = "athletics"
+    if category == "athletics" and re.search(r"\b(meetings?|banquet|orientation|tryouts?|physicals?|parent)\b", q):
+        category = None      # "Spring Sports Athlete/Parent Meeting" is a named event, not a team-list question
     rng = parse_range(q, today)
+    if not rng and previous_user_msg and re.search(r"\b(the )?(next|following) day\b|\bday after( that)?\b|\b(the )?(previous|day before)\b", q):
+        prev_rng = parse_range(previous_user_msg.lower(), today)
+        if prev_rng:
+            step = -1 if re.search(r"\b(previous|day before)\b", q) else 1
+            d = prev_rng[1 if step > 0 else 0] + timedelta(days=step)
+            rng = (d, d, d.strftime("%B %-d"))
     has_cal_word = bool(re.search(CAL_WORDS, q))
-    dayinfo = bool(re.search(r"\b[AB]['\u2019]?[ -]?day\b", question) or re.search(r"\b(a|b) day (or|and) (a|b) day\b|\bwhich blocks?\b|\bwhat blocks?\b|\bday type\b|\bblock schedule\b|\bwhat day (is|are) (it|we|today|tomorrow)\b|\bblocks?\s*\d\b|\bblock\b|\bbell schedule\b|\bwhen does (school|class|classes) (start|end)\b|\bwhat time (does|do) (school|classes|lunch)\b", q))
+    dayinfo = bool(re.search(r"\b[AB]['\u2019]?[ -]?day\b", question) or re.search(r"\b(a|b) day (or|and) (a|b) day\b|\bwhich blocks?\b|\bwhat blocks?\b|\bday type\b|\b(kind|type|sort) of day\b|\bblock schedule\b|\bwhat day (is|are) (it|we|today|tomorrow)\b|\bblocks?\s*\d\b|\bbl[oa]c?ks?\b|\bblock\b|\bbell schedule\b|\bwhen does (school|class|classes) (start|end)\b|\bwhat time (does|do) (school|classes|lunch)\b", q))
 
     # short follow-ups ("what about tomorrow?") inherit the topic of the previous question
     if previous_user_msg and not sport and not category and len(q.split()) <= 8 and rng:
@@ -197,4 +209,4 @@ def parse_intent(question: str, today: date, previous_user_msg: str = "") -> Cal
     next_only = bool(re.search(r"\b(next|upcoming|soonest|first)\b", q)) and not rng
     if not (sport or kind or category or keywords or rng or dayinfo):
         return None
-    return CalendarIntent(start, end, sport, kind, category, gender, division, home_away, keywords, date_given, next_only, label, dayinfo)
+    return CalendarIntent(start, end, sport, kind, category, gender, division, home_away, keywords, date_given, next_only, label, dayinfo, [x.lower() for x in HOLIDAY_RX.findall(q)])

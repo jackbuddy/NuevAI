@@ -6,6 +6,7 @@ For each question, in parallel:
 Then a small cross-encoder reranks the vector candidates, and everything is
 shaped into a compact, correctly ordered context block for the model.
 """
+import difflib
 import math
 import os
 import re
@@ -35,6 +36,13 @@ LINK_INTENTS = [
     ("payment", re.compile(r"\b(donat\w*|giv(e|ing)|gift|pay|payment|tuition|store|buy|merch\w*|spirit ?wear)\b", re.I)),
 ]
 
+BELL_Q = re.compile(r"\bbl(o|a)c?ks?\b|\bblocks?\b|\bbell\b|\blunch\b|\bperiods?\b|\bschool day\b|\b(when|what time) (does|do|is) (school|class\w*|the day|the school day) (start|end|begin|over|out|finish)|\bclasses (per|a|each) day\b|\bhow (long|many)\b.*\b(class|classes|block|blocks|lessons?)\b|\bprime\b|\b[ab]['\u2019] ?day\b|\bstart of school\b|\bend of (the )?(school )?day\b|\bschool (start|end)s?\b", re.I)
+CAMPUS_Q = re.compile(r"\bphone\b|\bcall\b|\baddress\b|\bwhere (is|are)\b|\blocated\b|\blocation\b|\bfront desk\b|\bmain office\b|\bcampus(es)?\b|\bdirections\b|\bcontact\b|\bhillsborough\b|\bsan mateo\b", re.I)
+ADVISORY_NO = re.compile(r"\b(9|10|11|12)\.\d{1,2}\b")
+CLUB_GENERIC = set("club clubs team nueva group society association the and of for at in to a an".split())
+CLUB_ALIASES = [(re.compile(r"\bmodel un\b", re.I), "model united nations mun"), (re.compile(r"\bmun\b", re.I), "model united nations mun"),
+                (re.compile(r"\brobotics\b", re.I), "robotics team"), (re.compile(r"\bamc\b|\baime\b", re.I), "amc aime")]
+
 # Never served, even if such rows exist in the database: sheets/forms that hold people's data.
 BLOCKED_TITLE = re.compile(r"diploma|rsvp|sign[- ]?up|roster|responses|attendance sheet|transcript|salary|payroll|medical", re.I)
 
@@ -61,6 +69,7 @@ SYNONYMS = {
     r"\bphone number\b|\bcall\b|\bmain office\b|\bfront desk\b|\baddress\b|\blocated\b|\blocation\b|\bdirections\b|\bwhere is (the )?(school|campus|nueva)\b": "campus locations and main phone numbers address front desk main office",
     r"\badvis(ory|or|ors|er|ers)\b": "advisory advisors advising team room",
     r"\bclubs?\b|\baffinity\b|\bstudent organi[sz]ations?\b": "clubs and affinity groups list",
+    r"\blanguages?\b|\bforeign language\b": "world languages Chinese Spanish French Japanese Latin Korean language courses",
     r"\bmakeup\b|\bmake[- ]up\b|\bretake\b": "make-up retake assessment policy",
 }
 
@@ -81,6 +90,30 @@ TOKEN = re.compile(r"[a-z0-9]+(?:[.'-][a-z0-9]+)*")
 
 def tokens(text: str) -> list[str]:
     return [t for t in TOKEN.findall(text.lower()) if t not in STOP and len(t) > 1]
+
+
+COURSE_NOISE = set("teach teaches teacher teachers taught class classes course courses room rooms block blocks instructor offered section sections period periods fall spring semester year mr mrs ms dr".split())
+
+
+def _tmatch(a: str, b: str) -> bool:
+    """Loose token match: equal, shared 4+ letter prefix (abbreviations like 'phil'/'philosophy', 'consc'/'consciousness'), or a typo."""
+    if a == b:
+        return True
+    if a.isdigit() or b.isdigit():
+        return False
+    cp = len(os.path.commonprefix([a, b]))
+    if cp >= 4 and cp >= min(len(a), len(b)) - 1:
+        return True
+    return len(a) >= 7 and len(b) >= 7 and difflib.SequenceMatcher(None, a, b).ratio() >= 0.85
+
+
+def _course_loose_match(qcontent: set[str], course_key: str) -> bool:
+    ct = [t for t in course_key.split() if t not in STOP]
+    if not ct:
+        return False
+    if all(any(_tmatch(q, c) for c in ct) for q in qcontent):
+        return len(qcontent) >= 2 or any(len(q) >= 6 for q in qcontent)
+    return False
 
 
 class Retriever:
@@ -143,38 +176,55 @@ class Retriever:
 
     def calendar_events(self, intent: CalendarIntent) -> list[dict]:
         key = (intent.start, intent.end, intent.sport, intent.kind, intent.category, intent.gender,
-               intent.division, intent.home_away, tuple(intent.keywords))
+               intent.division, intent.home_away, tuple(intent.keywords), tuple(intent.holidays))
         cached = self.calendar_cache.get(key)
         if cached is not None:
             return cached
         digest = intent.short_range() and not (intent.sport or intent.kind or intent.keywords or intent.category)
-        q = self.sb().table(settings.CHUNKS_TABLE).select("chunk_id,content,metadata") \
-            .in_("metadata->>source", ["calendar_day", "school_day"] if digest else ["calendar", "calendar_sheet"]) \
-            .gte("metadata->>event_date" if digest else "metadata->>end_date", intent.start.isoformat()) \
-            .lte("metadata->>event_date", intent.end.isoformat())
-        if not digest:
+        def base():      # postgrest builders mutate in place, so the "strict" and "any keyword" queries each need their own
+            return self.sb().table(settings.CHUNKS_TABLE).select("chunk_id,content,metadata") \
+                .in_("metadata->>source", ["calendar_day", "school_day"] if digest else ["calendar", "calendar_sheet"]) \
+                .gte("metadata->>event_date" if digest else "metadata->>end_date", intent.start.isoformat()) \
+                .lte("metadata->>event_date", intent.end.isoformat())
+        def filtered():
+            qb = base()
             if intent.sport:
-                q = q.ilike("metadata->>summary", f"%{intent.sport}%")
+                qb = qb.ilike("metadata->>summary", f"%{intent.sport}%")
             if intent.kind:
-                q = q.eq("metadata->>kind", intent.kind)
+                qb = qb.eq("metadata->>kind", intent.kind)
             if intent.category:
-                q = q.eq("metadata->>category", intent.category)
+                qb = qb.eq("metadata->>category", intent.category)
             if intent.gender:
-                q = q.ilike("metadata->>summary", f"%{intent.gender[:-1]}%")      # boys -> boy(s'), girls -> girl(s')
+                qb = qb.ilike("metadata->>summary", f"%{intent.gender[:-1]}%")      # boys -> boy(s'), girls -> girl(s')
             if intent.division:
-                q = q.ilike("metadata->>summary", f"{intent.division} %")
+                qb = qb.ilike("metadata->>summary", f"{intent.division} %")
             if intent.home_away:
-                q = q.eq("metadata->>home_away", intent.home_away)
+                qb = qb.eq("metadata->>home_away", intent.home_away)
+            return qb
+        q = base() if digest else filtered()
+        if not digest:
             if intent.keywords:
-                strict = q
+                strict = filtered()
                 for k in intent.keywords:
                     strict = strict.ilike("metadata->>summary", f"%{k}%")
                 rows = strict.limit(300).execute().data or []
                 if not rows:     # fall back to "any keyword" when the strict match finds nothing
-                    rows = q.or_(",".join(f"metadata->>summary.ilike.%{k}%" for k in intent.keywords)).limit(300).execute().data or []
+                    rows = filtered().or_(",".join(f"metadata->>summary.ilike.%{k}%" for k in intent.keywords)).limit(300).execute().data or []
+                if not rows and intent.short_range():       # named-keyword miss on a single date: show that day's schedule instead
+                    digest_rows = self.sb().table(settings.CHUNKS_TABLE).select("chunk_id,content,metadata") \
+                        .in_("metadata->>source", ["calendar_day", "school_day"]).gte("metadata->>event_date", intent.start.isoformat()) \
+                        .lte("metadata->>event_date", intent.end.isoformat()).limit(50).execute().data or []
+                    rows = digest_rows
                 q = None
         if q is not None:
             rows = q.limit(300).execute().data or []
+        if intent.holidays and not digest and intent.category == "no_school":
+            # a named holiday (Thanksgiving) is often its own event rather than part of the "no school" category
+            have = {r["chunk_id"] for r in rows}
+            extra = self.sb().table(settings.CHUNKS_TABLE).select("chunk_id,content,metadata").eq("metadata->>source", "calendar") \
+                .gte("metadata->>end_date", intent.start.isoformat()).lte("metadata->>event_date", intent.end.isoformat()) \
+                .or_(",".join(f"metadata->>summary.ilike.%{h}%" for h in intent.holidays)).limit(50).execute().data or []
+            rows += [r for r in extra if r["chunk_id"] not in have and "basketball" not in (r["metadata"] or {}).get("summary", "").lower()]
         rows.sort(key=lambda r: ((r["metadata"] or {}).get("event_date", ""), (r["metadata"] or {}).get("start_time") or ""))
         self.calendar_cache.set(key, rows)
         return rows
@@ -220,6 +270,8 @@ class Retriever:
         tokens_q = set(qn.split())
         cue = bool(TEACH_CUE.search(query))
         hits = []
+        loose = bool(re.search(r"\b(who|teach\w*|taught|instructor|prof\w*|room|which block|what block|when is|offered|sections?)\b", query, re.I))
+        qcontent = {t for t in qn.split() if t not in STOP and t not in COURSE_NOISE}
         for r in self._entities():
             m = r.get("metadata") or {}
             if m.get("kind") == "teacher":
@@ -233,11 +285,75 @@ class Retriever:
                 ck = m.get("course_key", "")
                 if len(ck) >= 5 and f" {ck} " in f" {qn} ":
                     hits.append((1, r))
+                elif loose and qcontent and _course_loose_match(qcontent, ck):
+                    hits.append((2, r))
         def sem_rank(r):
             sem = (r.get("metadata") or {}).get("semester", "")
             return 0 if (("Fall" in sem) == (today.month >= 8)) else 1
         hits.sort(key=lambda x: (x[0], sem_rank(x[1]), -len((x[1].get("metadata") or {}).get("course_key", ""))))
         return [r for _, r in hits][:6]
+
+    # ---- pinned facts, advisory numbers, clubs -----------------------------
+    def _by_source(self, source: str, kinds: list[str] | None = None) -> list[dict]:
+        key = ("src", source)
+        hit = self.calendar_cache.get(key)
+        if hit is None:
+            q = self.sb().table(settings.CHUNKS_TABLE).select("chunk_id,content,metadata").eq("metadata->>source", source)
+            hit = q.limit(1000).execute().data or []
+            self.calendar_cache.set(key, hit, ttl=1800)
+        return [r for r in hit if not kinds or (r.get("metadata") or {}).get("kind") in kinds]
+
+    def pinned_facts(self, query: str) -> list[dict]:
+        """Curated school facts (bell schedule, campus phones) are short and decisive. When the question is about
+        them they are always shown, instead of competing with 5,000 other chunks in a similarity search."""
+        out = []
+        facts = self._by_source("school_facts")
+        if BELL_Q.search(query):
+            out += [r for r in facts if "bell_schedule" in str((r.get("metadata") or {}).get("source_url", ""))]
+        if CAMPUS_Q.search(query):
+            out += [r for r in facts if "campus" in str((r.get("metadata") or {}).get("source_url", ""))]
+        return out
+
+    def advisory_lines(self, query: str) -> list[dict]:
+        """'Which room is advisory 11.1' -> the exact advisor line(s) for that advisory number."""
+        nums = {m.group(0) for m in ADVISORY_NO.finditer(query)}
+        if not nums or not re.search(r"advis|room|who|where|teacher", query, re.I):
+            return []
+        lines = []
+        for r in self._by_source("school_advisory", ["advisors"]):
+            for ln in r["content"].split("\n"):
+                m = re.match(r"\s*-\s*Advisory (\d+\.\d+):", ln)
+                if m and m.group(1) in nums:
+                    lines.append(ln.strip(" -"))
+        if not lines:
+            return []
+        return [{"chunk_id": "advisory-lines", "content": "Title: Advisory assignments\n\nAdvisors and rooms for the advisories asked about (2026-27):\n"
+                 + "\n".join(f"- {l}" for l in lines), "metadata": {"source": "school_advisory", "title": "Advisory assignments"}}]
+
+    def club_chunks(self, query: str) -> list[dict]:
+        """Direct lookup of a named club ('Model UN', 'AMC/AIME', 'Robotics') so its leader, advisor, meeting time and room
+        reach the model even when similarity search buries the club record."""
+        qx = query
+        for rx, extra in CLUB_ALIASES:
+            if rx.search(query):
+                qx += " " + extra
+        qt = {t for t in norm_words(qx).split() if t not in CLUB_GENERIC}
+        if not qt:
+            return []
+        hits = []
+        for r in self._by_source("school_clubs", ["club"]):
+            name = (r.get("metadata") or {}).get("club", "")
+            # acronym in parentheses, e.g. "Nueva Model United Nations (MUN)"; "AMC/AIME"
+            acr = re.findall(r"\(([A-Za-z0-9/&]+)\)", name)
+            acr_t = {a.lower() for x in acr for a in re.split(r"[/&]", x)}
+            nt = [t for t in norm_words(re.sub(r"\([^)]*\)", " ", name)).split() if t not in CLUB_GENERIC]
+            if not nt:
+                continue
+            matched = sum(1 for t in nt if t in qt or any(len(t) >= 6 and len(q) >= 6 and q[:6] == t[:6] for q in qt))
+            if bool(qt & acr_t) or matched == len(nt) and (len(nt) >= 2 or len(nt[0]) >= 5):
+                hits.append((matched, r))
+        hits.sort(key=lambda x: -x[0])
+        return [r for _, r in hits[:2]]
 
     # ---- orchestration ----------------------------------------------------
     def retrieve(self, query: str, history: list[dict] | None = None, top_k: int = 6, today: date | None = None) -> dict:
@@ -272,6 +388,15 @@ class Retriever:
         except Exception as e:
             ents = []
             print(f"entity lookup failed: {e}", flush=True)
+        pinned = []
+        try:
+            pinned = self.pinned_facts(query) + self.advisory_lines(query)
+            clubs = self.club_chunks(query)
+            if not clubs and prev_user and len(query.split()) <= 6:
+                clubs = self.club_chunks(prev_user)
+            pinned += clubs
+        except Exception as e:
+            print(f"pinned lookup failed: {e}", flush=True)
         f_vec, f_cal, f_links = _pool.submit(vec_task), _pool.submit(cal_task), _pool.submit(self.link_cards, query)
         rows, events = f_vec.result(), []
         try:
@@ -290,7 +415,7 @@ class Retriever:
         if len(fresh) >= 3:
             rows = fresh
         # calendar chunks come from the structured lookup, not from similarity
-        rows = [r for r in rows if (r.get("metadata") or {}).get("source") not in ("calendar", "calendar_day")] if events else rows
+        rows = [r for r in rows if (r.get("metadata") or {}).get("source") not in ("calendar", "calendar_day", "school_day")] if events else rows
 
         t = time.time()
         ranked = self.rerank(search_q, rows)
@@ -299,8 +424,11 @@ class Retriever:
         docs = (link_rows + [d for d in ranked if d["chunk_id"] not in {l["chunk_id"] for l in link_rows}])[:top_k + len(link_rows)]
         timings["retrieve_ms"] = round((time.time() - t0) * 1000)
         ent_ids = {e["chunk_id"] for e in ents}
-        docs = [d for d in docs if d["chunk_id"] not in ent_ids]
-        return {"docs": docs, "events": events, "intent": intent, "timings": timings, "candidates": len(rows), "entities": ents}
+        if intent and intent.label == "the next two weeks" and any(p["chunk_id"] == "advisory-lines" for p in pinned):
+            events, intent = [], None      # "advisory 11.1" is not a date question; the two-week digest would only add noise
+        pin_ids = {p["chunk_id"] for p in pinned}
+        docs = [d for d in docs if d["chunk_id"] not in ent_ids | pin_ids]
+        return {"pinned": pinned, "docs": docs, "events": events, "intent": intent, "timings": timings, "candidates": len(rows), "entities": ents}
 
 
 def fmt_event(r: dict) -> str:
@@ -378,6 +506,12 @@ def build_context(result: dict, max_events: int = 14) -> tuple[str, list[dict]]:
                      + "\n\n".join(e["content"].split("\n\n", 1)[-1] for e in ents))
         for e in ents[:3]:
             sources.append({"chunk_id": e["chunk_id"], "title": (e.get("metadata") or {}).get("title"), "type": "schedule"})
+    for p in result.get("pinned") or []:
+        pm = p.get("metadata") or {}
+        if pm.get("source") == "school_facts" and not any(x.startswith("KEY FACTS") for x in parts):
+            parts.append("KEY FACTS (confirmed by the school; authoritative):")
+        parts.append(p["content"].split("\n\n", 1)[-1][:1800])
+        sources.append({"chunk_id": p["chunk_id"], "title": pm.get("title"), "type": pm.get("source", "doc")})
     for d in result["docs"]:
         m = d.get("metadata") or {}
         parts.append(d["content"][:1100])          # keeps prompts small: the LLM plan is token-rate limited

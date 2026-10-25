@@ -1375,7 +1375,7 @@
   "category": "clubs",
   "q": "what is the alphagen club",
   "expect": [
-   "(?i)(is(n.t| not) (listed|in|included)|no [\\w ]{0,30}(listed|found|information|record|mention|result)|not (currently )?(listed|included)|don.t have|do not have|couldn.t find|could not find|can.t find|cannot find|no (information|record|mention|data|result)|not (listed|find|see|available|sure|aware)|isn.t (listed|in)|unable|not able|unfortunately|no club|doesn.t appear|does not appear|didn.t find)"
+   "(?i)(is(n.t| not) (listed|in|included)|no [\\w ]{0,30}(listed|found|information|record|mention|result)|not (currently )?(listed|included)|don.t have|do not have|couldn.t find|could not find|can.t find|cannot find|no (information|record|mention|data|result)|not (listed|find|see|available|sure|aware)|(does(n.t| not)|do(n.t| not)) (list|include|contain|mention|have)|isn.t (listed|in)|unable|not able|unfortunately|no club|doesn.t appear|does not appear|didn.t find)"
   ],
   "forbid": [
    "(?i)alphagen[^.]{0,40}\\b(meets|leader|advis)"
@@ -1387,7 +1387,7 @@
   "category": "clubs",
   "q": "Is there a quidditch club?",
   "expect": [
-   "(?i)(is(n.t| not) (listed|in|included)|no [\\w ]{0,30}(listed|found|information|record|mention|result)|not (currently )?(listed|included)|don.t have|do not have|couldn.t find|could not find|can.t find|cannot find|no (information|record|mention|data|result)|not (listed|find|see|available|sure|aware)|isn.t (listed|in)|unable|not able|unfortunately|no club|doesn.t appear|does not appear|didn.t find)"
+   "(?i)(is(n.t| not) (listed|in|included)|no [\\w ]{0,30}(listed|found|information|record|mention|result)|not (currently )?(listed|included)|don.t have|do not have|couldn.t find|could not find|can.t find|cannot find|no (information|record|mention|data|result)|not (listed|find|see|available|sure|aware)|(does(n.t| not)|do(n.t| not)) (list|include|contain|mention|have)|isn.t (listed|in)|unable|not able|unfortunately|no club|doesn.t appear|does not appear|didn.t find)"
   ],
   "forbid": [],
   "src": "synthetic",
@@ -1571,7 +1571,7 @@
   "category": "sports",
   "q": "did nueva flag football win yesterday",
   "expect": [
-   "(?i)(is(n.t| not) (listed|in|included)|no [\\w ]{0,30}(listed|found|information|record|mention|result)|not (currently )?(listed|included)|don.t have|do not have|couldn.t find|could not find|can.t find|cannot find|no (information|record|mention|data|result)|not (listed|find|see|available|sure|aware)|isn.t (listed|in)|unable|not able|unfortunately|no club|doesn.t appear|does not appear|didn.t find)"
+   "(?i)(is(n.t| not) (listed|in|included)|no [\\w ]{0,30}(listed|found|information|record|mention|result)|not (currently )?(listed|included)|don.t have|do not have|couldn.t find|could not find|can.t find|cannot find|no (information|record|mention|data|result)|not (listed|find|see|available|sure|aware)|(does(n.t| not)|do(n.t| not)) (list|include|contain|mention|have)|isn.t (listed|in)|unable|not able|unfortunately|no club|doesn.t appear|does not appear|didn.t find)"
   ],
   "forbid": [
    "(?i)\\b(won|lost)\\b.{0,20}\\d+\\s*[-to]+\\s*\\d+"
