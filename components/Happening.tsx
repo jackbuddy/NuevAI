@@ -11,6 +11,18 @@ interface Lunch { items?: string[]; available?: boolean; month_available?: boole
 const addDays = (d: string, n: number) => { const x = parseISO(d); x.setDate(x.getDate() + n); return iso(x); };
 const dayLabel = (d: string, today: string) =>
   d === today ? 'Today' : d === addDays(today, 1) ? 'Tomorrow' : parseISO(d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+// weekends show the next school day's menu instead of an empty card
+const lunchDay = (today: string) => { const w = parseISO(today).getDay(); return w === 6 ? addDays(today, 2) : w === 0 ? addDays(today, 1) : today; };
+// "Asian Inspired: Orange Chicken, Steamed Rice and Veggies" -> "Orange Chicken"; the vegetarian twin of a dish is dropped
+const dishNames = (items: string[]) => {
+  const out: string[] = [];
+  for (const it of items) {
+    if (/^(plant inspired|earthly selections)/i.test(it)) continue;
+    const name = (it.includes(':') ? it.slice(it.indexOf(':') + 1) : it).split(/,| and /)[0].trim();
+    if (name && !out.includes(name)) out.push(name);
+  }
+  return out;
+};
 const byTime = (a: CalEvent, b: CalEvent) => a.event_date.localeCompare(b.event_date) || (a.start_time ?? '').localeCompare(b.start_time ?? '');
 
 /** What is going on that people might not already know about: the next games, programming and today's lunch. */
@@ -31,7 +43,7 @@ export function Happening({ campus, onCampus, onOpenCalendar, onAsk }: {
     if (!campus) { setLunch(undefined); return; }
     const ac = new AbortController();
     setLunch(undefined);
-    fetch(`/api/lunch?campus=${campus}&date=${today}`, { signal: ac.signal }).then((r) => (r.ok ? r.json() : null)).then((j) => setLunch(j && !j.error ? j : null)).catch(() => {});
+    fetch(`/api/lunch?campus=${campus}&date=${lunchDay(today)}`, { signal: ac.signal }).then((r) => (r.ok ? r.json() : null)).then((j) => setLunch(j && !j.error ? j : null)).catch(() => {});
     return () => ac.abort();
   }, [campus, today]);
 
@@ -71,7 +83,8 @@ export function Happening({ campus, onCampus, onOpenCalendar, onAsk }: {
     if (lunch === undefined) return <div className="space-y-1.5" aria-busy><div className="shimmer h-3 w-3/4 rounded-full" /><div className="shimmer h-3 w-1/2 rounded-full" /></div>;
     if (lunch === null) return <p className="ink-2 text-xs">Menu unavailable right now.</p>;
     if (lunch.available && lunch.items?.length) {
-      return <p className="wrap-any text-sm font-semibold leading-snug">{lunch.items.slice(0, 4).join(' · ')}</p>;
+      const names = dishNames(lunch.items);
+      return <p className="wrap-any text-sm font-semibold leading-snug">{(names.length ? names : lunch.items).slice(0, 4).join(' · ')}</p>;
     }
     return <p className="ink-2 text-xs">{lunch.closed_reason || (lunch.month_available === false ? `The ${lunch.month_label ?? 'new'} menu isn’t posted yet.` : 'No menu listed for today.')}</p>;
   })();
@@ -105,7 +118,7 @@ export function Happening({ campus, onCampus, onOpenCalendar, onAsk }: {
     <div key="lunch" className={`${card} cursor-default hover:translate-y-0 hover:shadow-soft`}>
       <button type="button" onClick={() => { track('happening_click', { card: 'lunch' }); onAsk('What’s for lunch today?'); }} className="flex items-center gap-2 text-left">
         <span className={chip('bg-amber-100 text-amber-800')}><UtensilsCrossed className="h-4 w-4" aria-hidden /></span>
-        <span className={`${label} text-amber-800`}>Lunch{campusName ? ` · ${campusName}` : ''}</span>
+        <span className={`${label} text-amber-800`}>Lunch{campusName ? ` · ${campusName}` : ''}{lunchDay(today) !== today ? ` · ${dayLabel(lunchDay(today), today)}` : ''}</span>
       </button>
       {lunchBody}
     </div>,
