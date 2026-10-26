@@ -18,6 +18,9 @@ What is checked (each line of output is a group of checks):
   ical.*        the private iCal feed vs the index: counts, dates, timezone, all-day handling, duplicates, digests
   fresh.*       freshness metadata present and correct, prior-year documents flagged, same document in two years,
                 contradicting facts between sources
+  lunch.*       the cafe's monthly lunch rows (chunk_id "lunch-<campus>-<date>"): metadata and freshness present, valid campus, no duplicate
+                dates, every weekday of each posted month present per campus, record text consistent with its items, index vs the parsed PDF;
+                lunch served on a no-classes day is listed as information only
   email.*       rows written by the email ingest (chunk_id "email-..."): metadata sanity (source_type, dates, hashes, no raw sender address)
                 and no non-staff email address or phone number in the text. They are kept out of every other group (they are not part of
                 the pipeline's plan, so they are never orphans or "missing freshness")
@@ -1256,6 +1259,90 @@ def audit_email(A: Audit, S: Sources):
         A.check(g, why is None, f"{r['chunk_id']}: looks like student-level data ({why}); remove it with scripts/email_remove.py")
 
 
+def audit_lunch(A: Audit, S: Sources):
+    """The cafe's lunch rows (chunk_id "lunch-<campus>-<date>", written by pipeline/lunch.py): internal consistency of the indexed records.
+    They are kept out of the pipeline-vs-index groups (a past month simply ages out when the owner prunes)."""
+    from pipeline import lunch as L
+    g = "lunch.rows"
+    if S.db is None:
+        return A.skip(g, f"database not read ({S.db_err or 'offline'})")
+    rows = [r for r in S.db if freshness.is_lunch_row(r["chunk_id"], (r.get("metadata") or {}).get("source"))]
+    if not rows:
+        return A.skip(g, "no lunch rows indexed yet")
+    A.info(g, f"{len(rows)} lunch rows: " + ", ".join(f"{c} {m} ({n})" for (c, m), n in sorted(collections.Counter(
+        ((r['metadata'] or {}).get('campus'), (r['metadata'] or {}).get('month')) for r in rows).items(), key=str)))
+    need = ("source", "campus", "event_date", "month", "month_label", "source_url", "pdf_name", "indexed_at", "source_date", "school_year")
+    seen = collections.Counter()
+    by_month = collections.defaultdict(dict)
+    for r in rows:
+        m, cid = r["metadata"] or {}, r["chunk_id"]
+        absent = [k for k in need if m.get(k) in (None, "")] + [k for k in ("items", "closed") if k not in m]
+        A.check(g, not absent, f"{cid}: missing metadata {absent}")
+        A.check(g, m.get("campus") in L.CAMPUSES, f"{cid}: campus {m.get('campus')!r} is not san_mateo or hillsborough")
+        d = str(m.get("event_date", ""))
+        ok_date = bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", d))
+        A.check(g, ok_date and cid == f"lunch-{m.get('campus')}-{d.replace('-', '')}", f"{cid}: chunk_id does not match its campus and date ({m.get('campus')}, {d})")
+        if ok_date:
+            dd = date.fromisoformat(d)
+            A.check(g, dd.weekday() < 5 and m.get("weekday") == dd.strftime("%A"), f"{cid}: {d} is not a school weekday or its weekday label {m.get('weekday')!r} is wrong")
+            A.check(g, m.get("month") == d[:7] and m.get("month_label") == L.month_label(d[:7]), f"{cid}: month {m.get('month')!r}/{m.get('month_label')!r} does not match {d}")
+            by_month[(m.get("campus"), m.get("month"))][d] = r
+        seen[(m.get("campus"), d)] += 1
+        items = m.get("items") or []
+        text = r["content"]
+        if m.get("closed"):
+            A.check(g, not items and "No lunch menu is listed" in text, f"{cid}: closed day with dishes or without the 'no menu' wording")
+        else:
+            A.check(g, bool(items) and all(x in text for x in items) and L.NOTE in text, f"{cid}: its items are not all in its text, or the cafe note is missing")
+        A.check(g, str(m.get("source_url", "")).startswith("http"), f"{cid}: source_url is not a link")
+        A.check(g, bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(m.get("source_date", "")))) and m.get("stale") is False and not m.get("superseded"),
+                f"{cid}: freshness metadata wrong (source_date {m.get('source_date')!r}, stale {m.get('stale')!r})")
+    for (campus, d), n in seen.items():
+        A.check(g, n == 1, f"{campus} {d}: {n} duplicate rows for one day")
+    g = "lunch.coverage"
+    for (campus, month), recs in sorted(by_month.items(), key=str):
+        y, mo = map(int, month.split("-"))
+        d, missing = date(y, mo, 1), []
+        while d.month == mo:
+            if d.weekday() < 5 and d.isoformat() not in recs:
+                missing.append(d.isoformat())
+            d += timedelta(days=1)
+        A.check(g, not missing, f"{campus} {month}: weekdays with no record: {missing}")
+    g = "lunch.vs_parse"
+    n_cmp = 0
+    for (campus, month), recs in sorted(by_month.items(), key=str):
+        p = L.PARSED_DIR / f"{campus}_{month}.json"
+        if not p.exists():
+            continue
+        parsed = json.loads(p.read_text(encoding="utf-8"))
+        n_cmp += 1
+        want = {x["date"]: x for x in parsed["days"]}
+        A.check(g, set(want) == set(recs), f"{campus} {month}: dates that differ between the parsed PDF and the index: {sorted(set(want) ^ set(recs))[:4]}")
+        for dkey, x in want.items():
+            r = recs.get(dkey)
+            if r:
+                A.check(g, bool((r["metadata"] or {}).get("closed")) == bool(x["closed"]) and list((r["metadata"] or {}).get("items") or []) == L.item_strings(x["items"]),
+                        f"{campus} {dkey}: indexed record differs from the parsed PDF")
+    if not n_cmp:
+        A.skip(g, "no parsed menu files (data/pipeline/lunch/parsed) to compare with")
+    # information only: a menu served on a day the school calendar says has no classes (two sources written by different people)
+    g = "lunch.vs_calendar"
+    nocls = {}
+    for r in S.db:
+        m = r["metadata"] or {}
+        if m.get("source") == "school_day" and m.get("kind") == "no_classes":
+            nocls.setdefault(m.get("event_date"), set()).add("san_mateo")
+        if m.get("source") == "calendar_day":
+            for ln in r["content"].splitlines():
+                if re.search(r"\bno (?:ls|ms)\b.*classes|\bno (?:school|classes)\b", ln, re.I) and not re.search(r"\bno us\b", ln, re.I):
+                    nocls.setdefault(m.get("event_date"), set()).add("hillsborough")
+    for (campus, month), recs in sorted(by_month.items(), key=str):
+        for dkey, r in recs.items():
+            if not (r["metadata"] or {}).get("closed") and campus in nocls.get(dkey, ()):
+                A.info(g, f"{campus} {dkey}: the cafe menu lists lunch but the school calendar shows no classes that day (check with the cafe)")
+    A.passed(g)
+
+
 # --------------------------------------------------------------------------- main
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -1272,7 +1359,7 @@ def main() -> int:
     if S.db is None and not args.offline:
         print(f"note: database not read ({S.db_err}); database groups are skipped\n")
     for name, fn in (("days", audit_days), ("bell", audit_bell), ("courses", audit_courses), ("clubs", audit_clubs),
-                     ("teams", audit_teams), ("ical", audit_ical), ("fresh", audit_fresh), ("index", audit_orphans), ("email", audit_email)):
+                     ("teams", audit_teams), ("ical", audit_ical), ("fresh", audit_fresh), ("index", audit_orphans), ("email", audit_email), ("lunch", audit_lunch)):
         try:
             fn(A, S)
         except Exception as e:

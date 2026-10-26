@@ -101,6 +101,22 @@ CASES = [
     ("What does Laura Mendez-Ortiz teach?", r"listed only on the course offerings sheet", "unconfirmed offerings-only assignment is labelled"),
     ("When does daylight saving time end?", r"Sunday, November 1, 2026, all day: Daylight Saving Time Ends", "all-day event with a timed DTEND keeps its date"),
     ("What is the 2025-26 year at a glance calendar?", r"(?s)\A(?!.*2025.2026 Year-at-a-Glance).*2026.2027 Year-at-a-Glance", "current-year calendar document wins over last year's copy"),
+    # lunch menu (pipeline/lunch.py, October 2026 cafe PDFs; fixed "today" is Thursday 2026-10-22). Tuple: (question, regex, note, history, saved campus).
+    # They need the October rows in the index and are skipped (not failed) once that month has been pruned.
+    ("What's for lunch today?", r"(?s)San Mateo \(Upper School\):.*Tuscan Free Range Chicken and House Marinara with Rigatoni.*Hillsborough \(Lower and Middle School\):.*Free Range Chicken Teriyaki", "lunch: no campus known -> both, labelled", None, None),
+    ("What's for lunch today at Hillsborough?", r"(?s)\A(?!.*Tuscan Free Range Chicken).*Asian Inspired: Free Range Chicken Teriyaki", "lunch: campus in the text", None, None),
+    ("What's for lunch tomorrow?", r"(?s)\A(?!.*Hillsborough \().*Baked Potato with Cheddar.*Ground Beef Sloppy Osborns", "lunch: saved campus (San Mateo) only", None, "san_mateo"),
+    ("MS lunch tomorrow", r"(?s)\A(?!.*Baked Potato).*Hillsborough.*No lunch service listed: No LS & MS Classes", "lunch: text (MS) beats the saved campus; conference day has no lunch", None, "san_mateo"),
+    ("What's for lunch on Saturday?", r"Both campuses: No lunch service \(weekend\)\.", "lunch: weekend", None, None),
+    ("Is there lunch on Oct 12?", r"(?s)San Mateo.*No lunch service listed: No (?:School|classes)[:( ]+Indigenous People.s Day", "lunch: holiday, reason from the school calendar data", None, "san_mateo"),
+    ("What's for lunch on Nov 3?", r"November menu isn't posted yet", "lunch: next month not posted", None, "hillsborough"),
+    ("Are there vegetarian options for lunch on Oct 14?", r"(?s)does not mark individual dishes as vegetarian.*Earthly Selections: Soyrizo and Potato Tacos", "lunch: dietary question, dishes are not officially tagged", None, "hillsborough"),
+    ("What about Hillsborough?", r"(?s)Hillsborough.*Platillos Latino: Marinated Chicken Tinga Tacos", "lunch: follow-up switches the campus", [{"role": "user", "content": "What's for lunch on Oct 14?"}], None),
+    ("lunch menu next week at San Mateo", r"(?s)Grass Fed Marinated Flank Steak.*Wednesday, October 28, 2026:.*No lunch service listed: No classes \(Parent Teacher Conferences\)", "lunch: next week", None, None),
+    ("When is pizza on the menu?", r"(?s)Hillsborough.*Friday, October 30, 2026.*Pork Pepperoni Pizza", "lunch: dish search lists the matching day", None, None),
+    ("upper school lunch on Oct 5", r"(?s)Soup: Tomato Basil.*Meatless Monday: Cheese Raviolis", "lunch: upper school = San Mateo", None, None),
+    ("What time is lunch?", r"11:30 AM and ends at 12:00", "not a menu question: lunch bell time", None, None),
+    ("Which clubs meet at lunch?", r"(?i)club", "not a menu question: club meeting times", None, None),
 ]
 
 
@@ -118,7 +134,7 @@ def golden_cases() -> list:
         if not usable(g) or k in seen:
             continue
         seen.add(k)
-        out.append((g["q"], g["expect"], f"golden/{g['category']}", g.get("history")))
+        out.append((g["q"], g["expect"], f"golden/{g['category']}", g.get("history"), g.get("campus")))
     return out
 
 
@@ -134,14 +150,23 @@ def main() -> int:
     CASES.extend(golden_cases())
     r = Retriever(get_supabase)
     r.embed("warm up")
+    try:       # lunch cases need the October 2026 menus in the index
+        n_lunch = get_supabase().table("document_chunks_v2").select("chunk_id", count="exact").eq("metadata->>source", "lunch").eq("metadata->>month", "2026-10").limit(1).execute().count or 0
+    except Exception:
+        n_lunch = 0
+    if not n_lunch:
+        skipped = [c for c in CASES if str(c[2]).startswith(("lunch:", "golden/lunch"))]
+        CASES[:] = [c for c in CASES if c not in skipped]
+        print(f"SKIP {len(skipped)} lunch case(s): the October 2026 menu is not in the index (a past month is pruned; update these cases for the current month)\n")
     # fixed date: the calendar checks refer to dates in the 2026-27 school year
     today = date.fromisoformat(os.getenv("EVAL_TODAY", "2026-10-22"))
     passed = 0
     for case in CASES:
         q, rx, note = case[:3]
         history = case[3] if len(case) > 3 else None
+        campus = case[4] if len(case) > 4 else None
         t = time.time()
-        res = r.retrieve(q, history, today=today)
+        res = r.retrieve(q, history, today=today, campus=campus)
         ctx, _ = build_context(res)
         ok = has_facts(ctx, rx)
         passed += ok

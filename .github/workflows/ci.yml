@@ -42,6 +42,7 @@ jobs:
           python test_pipeline_fixes.py
           python test_resilience.py
           python test_email_ingest.py
+          python test_lunch.py
 
   frontend:
     runs-on: ubuntu-latest

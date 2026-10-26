@@ -23,7 +23,9 @@ from cache import TTLCache
 from answer_store import AnswerStore
 from rag import Retriever, build_context
 from followup import grade_relevant, valid_grade
+from intent import is_lunch_question
 import guard
+import lunch_lookup
 
 load_dotenv()
 
@@ -194,8 +196,16 @@ class QueryRequest(BaseModel):
     history: list[Turn] = Field(default_factory=list, max_length=8)
     # optional 9-12 preference kept only in the browser; used for this request and never logged, cached or stored
     grade: int | None = Field(default=None, ge=9, le=12)
+    # optional saved campus ("san_mateo" | "hillsborough"), kept only in the browser; used for this request's lunch lookup and never logged,
+    # cached, stored or sent to analytics. Anything else is ignored (None), not an error.
+    campus: str | None = None
     anon_id: str = Field(default="", max_length=64)
     session_id: str = Field(default="", max_length=64)
+
+    @field_validator("campus", mode="before")
+    @classmethod
+    def _clean_campus(cls, v):
+        return lunch_lookup.valid_campus(v)
 
     @field_validator("query")
     @classmethod
@@ -234,6 +244,7 @@ STYLE (house style, follow exactly)
 - Bold only the one or two key facts (a time, room or deadline) and only in longer answers; never bold labels or whole lines.
 - Links are markdown links [short label](exact-url) and only when the context has the URL: when the user asks how or where to book, register, sign up, pay, log in, fill out a form or open a document, include it. Copy URLs exactly, character for character; never write a bare URL, and never invent, shorten or guess one.
 - Never mention the context, sources, documents, file names, chunk ids, or "provided information" (the one exception is a school email, see GROUNDING). Say "I don't have that" instead of "the context does not say".
+- Lunch and cafe menu questions: the first line answers directly (for example "Hillsborough lunch today (Thu, Oct 22):"), then a simple "-" list of the dishes exactly as the context lists them, one per line, with the cafe's section name kept ("Earthly Selections: ..."). Name the campus; if the context shows both campuses, label each. This overrides the length limit above. Weekends, holidays, and months that are not posted get one plain sentence. Never add dishes, ingredients, allergens or vegetarian/vegan/gluten-free labels that the context does not state. The last line is always exactly: The menu can change; check with the cafe for ingredients or allergens.
 - Phone numbers, emails and URLs: only copy ones that appear in the context, exactly. Never write a placeholder or made-up number such as "(415) 555-1234"; if none is listed, name the office without a number. Never say "in the current context" or "in the context".
 - When unsure or the answer is missing: "I don't have that" plus the best next step in the same sentence (the relevant office, its phone number, or a link from the context). Do not guess.
 
@@ -311,6 +322,15 @@ def suggestions_for(result: dict, query: str, grade: int | None = None, history=
     """Two or three follow-ups that fit what was just answered (never one the student already asked)."""
     intent, docs, events = result.get("intent"), result.get("docs", []), result.get("events", [])
     q_eff = (result.get("resolved") or query).strip()
+    if result.get("lunch"):
+        li = result["lunch"]["intent"]
+        out = [{"label": "Tomorrow's lunch", "query": "What's for lunch tomorrow?"}] if li.label != "tomorrow" else [{"label": "Lunch today", "query": "What's for lunch today?"}]
+        if li.campus_from == "none":
+            out += [{"label": "San Mateo lunch", "query": "What's for lunch at San Mateo?"}, {"label": "Hillsborough lunch", "query": "What's for lunch at Hillsborough?"}]
+        else:
+            out += [{"label": "Next week's lunches", "query": "What's the lunch menu next week?"}]
+        asked = [query] + [t.content for t in (history or []) if t.role == "user"]
+        return [c for c in out if not _asked(c["query"], asked)][:3]
     asked = [query] + [t.content for t in (history or []) if t.role == "user"]
     grade = valid_grade(grade)
     out = []
@@ -377,7 +397,7 @@ def _prepare(req: QueryRequest):
     """Retrieval + prompt assembly. Returns everything the LLM step and the logs need."""
     now = datetime.now(PACIFIC)
     try:
-        result = retriever.retrieve(req.query, [t.model_dump() for t in req.history], top_k=min(max(req.top_k, 3), 5), today=now.date(), grade=req.grade)
+        result = retriever.retrieve(req.query, [t.model_dump() for t in req.history], top_k=min(max(req.top_k, 3), 5), today=now.date(), grade=req.grade, campus=req.campus)
     except Exception as e:
         if not data_status()["rows"]:
             print(f"KNOWLEDGE BASE UNREACHABLE ({str(e)[:80]}) - check SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY", flush=True)
@@ -412,6 +432,9 @@ def degraded_answer(sources: list[dict], result: dict | None, reason: str = "llm
     lines = ["I'm having trouble writing a full answer right now (the AI service is busy), but here is what I found in the school's information. "
              "Please try asking again in a minute."]
     result = result or {}
+    if result.get("lunch"):
+        from rag import lunch_plain_answer          # exact records, no model needed: this answer is complete as it is
+        return lunch_plain_answer(result["lunch"])
     events = result.get("events") or []
     if events:
         from rag import fmt_event
@@ -429,6 +452,13 @@ def degraded_answer(sources: list[dict], result: dict | None, reason: str = "llm
     if not events and not docs and not facts:
         lines.append("\nI could not find anything relevant to show. You can also browse the Resources and Calendar tabs.")
     return "\n".join(lines)
+
+
+def with_lunch_note(answer: str, result: dict | None) -> str:
+    """Lunch answers always end with the cafe note, whatever the model wrote."""
+    if result and result.get("lunch") and lunch_lookup.NOTE not in answer:
+        return answer.rstrip() + "\n\n" + lunch_lookup.NOTE
+    return answer
 
 
 FALLBACK_MODELS = [m.strip() for m in os.getenv("LLM_FALLBACKS", "openai/gpt-oss-20b,qwen/qwen3.8-27b").split(",") if m.strip()]
@@ -499,6 +529,8 @@ def _cache_key(req: QueryRequest, now: datetime):
         return None                    # follow-ups depend on the conversation; never cached
     if grade_relevant(req.query, req.grade):
         return None                    # tailored to the grade: must not be served to (or learned from) anyone else
+    if is_lunch_question(req.query):
+        return None                    # lunch depends on the campus (saved setting) and on today's date: never shared through L1 or L2
     return (_norm(req.query), now.strftime("%Y-%m-%d"), req.model or LLM_MODEL)
 
 
@@ -554,6 +586,7 @@ def _answer(req: QueryRequest, request: Request | None) -> dict:
     if guard.leak_check(answer):
         print("OUTPUT LEAK BLOCKED", flush=True)
         answer = guard.LEAK_REPLY
+    answer = with_lunch_note(answer, result)
     timings = {**result["timings"], "llm_ms": round((time.time() - t_llm) * 1000), "total_ms": round((time.time() - t0) * 1000)}
     payload = {"answer": answer, "model_used": model, "sources": sources, "suggestions": suggestions_for(result, req.query, req.grade, req.history)}
     if key and sources:       # never cache an answer that had nothing behind it
@@ -678,6 +711,10 @@ def chat_stream(req: QueryRequest, request: Request):
                     yield _sse("done", {"cached": False, "degraded": True, "timings": d["timings"], "suggestions": []})
                     return
             answer = "".join(parts)
+            if result.get("lunch") and not broke and lunch_lookup.NOTE not in answer:
+                tail = "\n\n" + lunch_lookup.NOTE
+                yield _sse("delta", {"t": tail})              # the cafe note is always the last line, even if the model left it out
+                answer += tail
             timings = {**result["timings"], "ttft_ms": ttft, "llm_ms": round((time.time() - t_llm) * 1000),
                        "total_ms": round((time.time() - t0) * 1000)}
             suggestions = suggestions_for(result, req.query, req.grade, req.history)
@@ -732,6 +769,59 @@ def important_links():
     links = [{k: (r["metadata"] or {}).get(k) for k in ("label", "url", "link_category", "found_on")} for r in rows]
     out = {"links": [l for l in links if l.get("url")]}
     api_cache.set("links", out, ttl=3600)
+    return out
+
+
+# ------------------------------------------------------------------ cafe lunch menu (no LLM; exact records written by pipeline/lunch.py)
+_lunch_hits: dict[str, list[float]] = {}
+LUNCH_PER_IP_PER_MIN = int(os.getenv("RATE_LUNCH_PER_IP_PER_MIN", "60"))
+LUNCH_GLOBAL_PER_MIN = int(os.getenv("RATE_LUNCH_GLOBAL_PER_MIN", "600"))
+
+
+def _lunch_rate_limit(request: Request):
+    """Sliding 60 s window per client address (first X-Forwarded-For hop when behind the Next.js proxy) and overall. Nothing is stored beyond
+    the timestamps, which are dropped after a minute."""
+    now = time.time()
+    fwd = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    who = fwd or (request.client.host if request.client else "unknown")
+    with _hits_lock:
+        for key, limit in ((who, LUNCH_PER_IP_PER_MIN), ("*", LUNCH_GLOBAL_PER_MIN)):
+            window = [t for t in _lunch_hits.get(key, []) if now - t < 60]
+            if len(window) >= limit:
+                _lunch_hits[key] = window
+                raise HTTPException(429, "Too many lunch requests - please wait a few seconds and try again.")
+            window.append(now)
+            _lunch_hits[key] = window
+        if len(_lunch_hits) > 5000:
+            for k in [k for k, v in _lunch_hits.items() if not v or now - v[-1] > 60]:
+                del _lunch_hits[k]
+
+
+@app.get("/lunch")
+def lunch_day(request: Request, campus: str = Query(...), day: str | None = Query(None, alias="date")):
+    """GET /lunch?date=YYYY-MM-DD&campus=san_mateo|hillsborough -> {date, campus, items, note, available, month_available, month_label, source_url, closed_reason}.
+    `date` defaults to today in America/Los_Angeles."""
+    _lunch_rate_limit(request)
+    if lunch_lookup.valid_campus(campus) is None:
+        raise HTTPException(400, "campus must be san_mateo or hillsborough")
+    if day is None:
+        d = datetime.now(PACIFIC).date()
+    else:
+        try:
+            d = datetime.strptime(day, "%Y-%m-%d").date() if re.fullmatch(r"\d{4}-\d{2}-\d{2}", day) else None
+        except ValueError:
+            d = None
+        if d is None or not (2020 <= d.year <= 2100):
+            raise HTTPException(400, "date must be YYYY-MM-DD")
+    key = ("lunch", campus, d.isoformat())
+    if (hit := api_cache.get(key)) is not None:
+        return hit
+    try:
+        out = lunch_lookup.day_info(get_supabase(), campus, d)
+    except Exception as e:
+        print(f"lunch lookup failed: {type(e).__name__}: {str(e)[:120]}", flush=True)
+        raise HTTPException(503, "The lunch menu is unavailable right now. Please try again in a moment.")
+    api_cache.set(key, out, ttl=300)
     return out
 
 

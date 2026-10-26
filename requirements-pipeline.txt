@@ -7,3 +7,4 @@ httpx
 python-docx
 pypdf
 openpyxl
+pdfplumber

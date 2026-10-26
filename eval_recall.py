@@ -66,7 +66,7 @@ def main() -> int:
     for c in cases:
         hist = c.get("history")
         t = time.time()
-        res = r.retrieve(c["q"], hist, today=today)
+        res = r.retrieve(c["q"], hist, today=today, campus=c.get("campus"))
         lat.append((time.time() - t) * 1000)
         its = [normalize(x) for x in items_of(res)]
         ctx = normalize(build_context(res)[0])

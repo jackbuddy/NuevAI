@@ -12,15 +12,16 @@ import os
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import embedder
 import freshness
 import guard
+import lunch_lookup
 import settings
 from cache import TTLCache
 from followup import apply_grade, rewrite_followup, valid_grade
-from intent import CalendarIntent, parse_intent
+from intent import CalendarIntent, LunchIntent, parse_intent, parse_lunch
 
 CANDIDATES = 32
 VECTOR_BUDGET_S = float(os.getenv("VECTOR_BUDGET_S", "14"))
@@ -484,7 +485,8 @@ class Retriever:
         return [r for _, r in hits[:2]]
 
     # ---- orchestration ----------------------------------------------------
-    def retrieve(self, query: str, history: list[dict] | None = None, top_k: int = 6, today: date | None = None, grade: int | None = None) -> dict:
+    def retrieve(self, query: str, history: list[dict] | None = None, top_k: int = 6, today: date | None = None, grade: int | None = None,
+                 campus: str | None = None) -> dict:
         t0 = time.time()
         today = today or datetime.now().date()
         history = history or []
@@ -494,6 +496,15 @@ class Retriever:
         standalone = rewrite_followup(query, history)
         resolved = apply_grade(standalone, valid_grade(grade))
         followed = resolved != query
+        # the cafe's lunch menu is an exact lookup of the day record(s) for the campus: no vector search, no calendar block
+        try:
+            li = parse_lunch(resolved, today, lunch_lookup.valid_campus(campus), prev_user)
+            if li:
+                data = lunch_data(self.sb(), li, today)
+                return {"pinned": [], "docs": [], "events": [], "intent": None, "timings": {"retrieve_ms": round((time.time() - t0) * 1000)},
+                        "candidates": 0, "entities": [], "degraded": False, "resolved": standalone, "lunch": data}
+        except Exception as e:
+            print(f"lunch lookup failed: {type(e).__name__}: {str(e)[:120]}", flush=True)
         # short follow-ups ("what about tomorrow?") borrow the previous question for search
         search_q = expand_query(resolved if followed else f"{prev_user} {query}" if prev_user and len(query.split()) <= 6 else query)
         intent = (parse_intent(resolved, today, prev_user) if followed else None) or parse_intent(query, today, prev_user)
@@ -553,7 +564,8 @@ class Retriever:
         except Exception as e:
             print(f"calendar lookup failed: {e}", flush=True)
 
-        rows = [r for r in rows if not BLOCKED_TITLE.search((r.get("metadata") or {}).get("title", "") or "")
+        rows = [r for r in rows if (r.get("metadata") or {}).get("source") != "lunch"          # day records are reached only through the lunch lookup
+                and not BLOCKED_TITLE.search((r.get("metadata") or {}).get("title", "") or "")
                 and not BLOCKED_CONTENT.search(r.get("content") or "") and not (r.get("metadata") or {}).get("superseded")]
         # Prefer rows written by the current pipeline; old-pipeline rows (no source_url) only as a fallback.
         fresh = [r for r in rows if (r.get("metadata") or {}).get("source_url")]
@@ -632,6 +644,8 @@ def practice_overview(events: list[dict]) -> str:
 
 def build_context(result: dict, max_events: int = 14) -> tuple[str, list[dict]]:
     """-> (context string for the model, sources list for the UI)"""
+    if result.get("lunch"):
+        return guard.scrub_context(lunch_context(result["lunch"])), lunch_sources(result["lunch"])
     parts, sources = [], []
     events, intent = result["events"], result["intent"]
     if events and intent and intent.category == "athletics" and not intent.sport and not intent.kind:
@@ -682,3 +696,155 @@ def build_context(result: dict, max_events: int = 14) -> tuple[str, list[dict]]:
                         "similarity": round(d.get("similarity", 0), 3), "type": m.get("source", "doc")})
     # retrieved text is data, never instructions: drop lines that try to command the model
     return guard.scrub_context("\n\n---\n\n".join(parts)), sources
+
+
+# ---------------------------------------------------------------------------------------------- lunch menu (cafe PDFs, see pipeline/lunch.py)
+LUNCH_NOTE = lunch_lookup.NOTE
+
+
+def lunch_data(sb, li: LunchIntent, today: date) -> dict:
+    """The day record(s) a lunch question asks for, straight from the index (campus x day), or, for 'when is pizza day', the matching days."""
+    data = {"intent": li, "today": today, "entries": [], "search": None}
+    if li.keywords and not li.date_given:
+        data["search"] = {c: lunch_lookup.search_days(sb, c, li.keywords, today) for c in li.campuses}
+        data["months"] = {c: lunch_lookup.available_months(sb, c) for c in li.campuses}
+        return data
+    data["entries"] = [] if li.hours_only else [lunch_lookup.day_info(sb, c, d) for d in li.days for c in li.campuses]
+    if li.hours:
+        data["hours"] = {c: lunch_lookup.cafe_hours(sb, c, li.days[0]) for c in li.campuses}
+    return data
+
+
+def _day_long(d: date) -> str:
+    return d.strftime("%A, %B ") + str(d.day) + d.strftime(", %Y")
+
+
+def _unavailable_line(info: dict, today: date) -> str:
+    d = date.fromisoformat(info["date"])
+    if not info["month_available"]:
+        mon = info["month_label"]
+        if d < today.replace(day=1):
+            return f"I do not have the {mon} menu (only the current month's menu and later ones are kept)."
+        return f"The {mon.split()[0]} menu isn't posted yet. Say that, and do not show any other month's menu."
+    if str(info["closed_reason"]).startswith("Weekend"):
+        return "No lunch service (weekend)."
+    return f"No lunch service listed: {info['closed_reason']}"
+
+
+def lunch_context(data: dict) -> str:
+    li, today = data["intent"], data["today"]
+    out = [f"SCHOOL LUNCH MENU (the cafe's monthly menus; today is {_day_long(today)}). This block is authoritative: answer only from it.",
+           "RULES: Name the campus for every menu. List the dishes exactly as written, grouped as the cafe groups them. Never add, change, translate or guess dishes, "
+           "ingredients, allergens or dietary labels. The cafe's menu key (vegetarian, vegan, gluten free, dairy free ...) is a row of icons that is NOT attached to "
+           "individual dishes in the posted menu, so no dish is officially marked vegetarian, vegan, gluten free, dairy free or nut free: only call a dish vegetarian or "
+           "vegan when its own name says so (for example 'Vegetarian Quesadillas'); 'Earthly Selections' and 'Plant Inspired' are the cafe's own section names, not "
+           "a promise about ingredients. For allergies or dietary needs tell the student to check with the cafe. If a menu is missing or not posted, say so plainly. "
+           f"End the answer with this exact sentence on its own line: {LUNCH_NOTE}"]
+    if li.campus_from == "none":
+        out.append("The campus is not known: show BOTH campuses, clearly labelled, and mention the student can say which campus they want.")
+    if li.diet:
+        out.append(f"The student asks about {li.diet} food: start with one sentence like 'The posted menu does not mark individual dishes as {li.diet}, but the cafe lists "
+                   "these Earthly Selections and Plant Inspired dishes (and any dish whose own name says it)', then list them, and tell them to confirm with the cafe. "
+                   "Never claim a dish is gluten free, dairy free or nut free.")
+    if li.prek:
+        out.append("The student mentions PreK or Kindergarten: their menu is a separate cafe PDF that is not available to you; say so. The Hillsborough menu below is "
+                   "for the Lower and Middle School only.")
+    if li.wide:
+        out.append("The student asked about a long period: only the first school days are shown; offer to look up a specific day.")
+    if data.get("search") is not None:
+        for c, hits in data["search"].items():
+            name = lunch_lookup.CAMPUS_NAME[c]
+            if hits:
+                out.append(f"{name}: days with '{' '.join(li.keywords)}' on the menu (posted menus only: {', '.join(data['months'][c]) or 'none'}):")
+                for dkey, rec in hits:
+                    m = [x for x in rec["items"] if all(w in x.lower() for w in li.keywords)]
+                    out.append(f"- {_day_long(date.fromisoformat(dkey))}: " + " | ".join(m))
+            else:
+                out.append(f"{name}: no day from today on in the posted menus ({', '.join(data['months'][c]) or 'none posted'}) lists '{' '.join(li.keywords)}'. "
+                           "Say that, and that later menus may differ.")
+        return "\n".join(out)
+    by_day: dict[str, list[dict]] = {}
+    for e in data["entries"]:
+        by_day.setdefault(e["date"], []).append(e)
+    for dkey, infos in by_day.items():
+        d = date.fromisoformat(dkey)
+        rel = {today: " (today)", today + timedelta(days=1): " (tomorrow)"}.get(d, "")
+        out.append(f"\n{_day_long(d)}{rel}:")
+        if all(not i["available"] for i in infos) and len({_unavailable_line(i, today) for i in infos}) == 1:
+            out.append(f"  {'Both campuses' if len(infos) > 1 else lunch_lookup.CAMPUS_NAME[infos[0]['campus']]}: {_unavailable_line(infos[0], today)}")
+            continue
+        for i in infos:
+            out.append(f"  {lunch_lookup.CAMPUS_NAME[i['campus']]}:")
+            if i["available"]:
+                out += [f"  - {x}" for x in i["items"]]
+            else:
+                out.append(f"  {_unavailable_line(i, today)}")
+    if li.hours:
+        hrs = {c: h for c, h in (data.get("hours") or {}).items() if h}
+        out.append("\nCafe hours as printed on the cafe's menus: " + ("; ".join(f"{lunch_lookup.CAMPUS_NAME[c]} {h}" for c, h in hrs.items()) if hrs
+                                                                       else "not listed in the posted menu; say you do not have them."))
+    return "\n".join(out)
+
+
+def lunch_sources(data: dict) -> list[dict]:
+    seen, out = set(), []
+    for e in data.get("entries") or []:
+        if e["available"] and (e["campus"], e["date"]) not in seen:
+            seen.add((e["campus"], e["date"]))
+            d = date.fromisoformat(e["date"])
+            out.append({"chunk_id": f"lunch-{e['campus']}-{d:%Y%m%d}", "title": f"Lunch menu - {lunch_lookup.CAMPUS_NAME[e['campus']]} - {d.strftime('%b')} {d.day}",
+                        "type": "lunch", "url": e["source_url"] if str(e["source_url"]).startswith("http") else None})
+    for c, hits in (data.get("search") or {}).items():
+        for dkey, rec in hits[:2]:
+            out.append({"chunk_id": f"lunch-{c}-{dkey.replace('-', '')}", "title": f"Lunch menu - {lunch_lookup.CAMPUS_NAME[c]} - {dkey}", "type": "lunch",
+                        "url": rec["source_url"] if str(rec["source_url"]).startswith("http") else None})
+    return out[:6]
+
+
+def _hours_line(data: dict) -> str:
+    hrs = {c: h for c, h in (data.get("hours") or {}).items() if h}
+    return ("Cafe hours as printed on the cafe's menus: " + "; ".join(f"{lunch_lookup.CAMPUS_NAME[c]} {h}" for c, h in hrs.items())) if hrs else \
+        "The cafe hours are not listed in the posted menu."
+
+
+def lunch_plain_answer(data: dict) -> str:
+    """The same facts as plain text, for when the model is unavailable: direct answer first, campus named, the note last. Built only from the records."""
+    li, today = data["intent"], data["today"]
+    head = []
+    if li.hours:
+        head.append(_hours_line(data))
+    if li.diet:
+        head.append(f"The posted menu does not mark individual dishes as {li.diet}; these are the cafe's Earthly Selections and Plant Inspired dishes (confirm with the cafe):")
+    if li.hours_only:
+        return "\n".join(head + ["", LUNCH_NOTE])
+    if head:
+        return "\n".join(head + [""]) + "\n" + _lunch_plain_body(data)
+    return _lunch_plain_body(data)
+
+
+def _lunch_plain_body(data: dict) -> str:
+    li, today = data["intent"], data["today"]
+    if data.get("search") is not None:
+        lines = []
+        for c, hits in data["search"].items():
+            name = lunch_lookup.CAMPUS_NAME[c]
+            if hits:
+                lines.append(f"{name}:")
+                lines += [f"- {date.fromisoformat(k).strftime('%a, %b')} {date.fromisoformat(k).day}: " + " | ".join(x for x in r["items"] if all(w in x.lower() for w in li.keywords)) for k, r in hits]
+            else:
+                lines.append(f"{name}: no day in the posted menus lists '{' '.join(li.keywords)}'.")
+        return "\n".join(lines + ["", LUNCH_NOTE])
+    lines, by_day = [], {}
+    for e in data["entries"]:
+        by_day.setdefault(e["date"], []).append(e)
+    for dkey, infos in by_day.items():
+        d = date.fromisoformat(dkey)
+        lines.append(f"{_day_long(d)}:")
+        for i in infos:
+            name = lunch_lookup.CAMPUS_NAME[i["campus"]]
+            if i["available"]:
+                lines.append(f"{name}:")
+                lines += [f"- {x}" for x in i["items"]]
+            else:
+                lines.append(f"{name}: {_unavailable_line(i, today).split(' Say that')[0]}")
+    return "\n".join(lines + ["", LUNCH_NOTE])

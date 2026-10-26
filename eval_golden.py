@@ -61,6 +61,8 @@ def check(answer: str, item: dict) -> tuple[bool, list[str]]:
 def ask(base: str, item: dict, retries: int = 3) -> dict:
     body = {"query": item["q"], "history": item.get("history", []), "anon_id": "golden-" + uuid.uuid4().hex[:10],
             "session_id": "golden"}
+    if item.get("campus"):
+        body["campus"] = item["campus"]               # the saved campus setting (lunch questions)
     t = time.time()
     last = ""
     for attempt in range(retries + 1):

@@ -3436,5 +3436,230 @@
    }
   ],
   "note": "prompt 09 multi-turn"
+ },
+ {
+  "category": "lunch",
+  "q": "What's for lunch at Hillsborough on October 14?",
+  "expect": [
+   "Marinated Chicken Tinga",
+   "Soyrizo and Potato Tacos",
+   "Ham and Provolone Cheese on Ciabatta",
+   "(?i)check with the cafe for ingredients or allergens"
+  ],
+  "forbid": [
+   "Cincinnati",
+   "Pork Posole"
+  ],
+  "src": "synthetic",
+  "note": "Hillsborough Oct 14: Platillos Latino / Earthly / Plant / Sandwich Favorite"
+ },
+ {
+  "category": "lunch",
+  "q": "What is the San Mateo lunch on October 5?",
+  "expect": [
+   "Tomato Basil",
+   "Cheese Raviolis",
+   "California Bagelwich",
+   "Rainbow Beet Salad",
+   "(?i)check with the cafe for ingredients or allergens"
+  ],
+  "forbid": [
+   "Hillsborough"
+  ],
+  "src": "synthetic",
+  "note": "San Mateo has a soup line and a Superfood Tossed salad"
+ },
+ {
+  "category": "lunch",
+  "q": "What is for lunch at San Mateo on October 9?",
+  "expect": [
+   "(?i)(no lunch|not listed|no school|no classes|not served|isn't|is not)"
+  ],
+  "forbid": [
+   "Beef Barley",
+   "Meatless Black Bean"
+  ],
+  "src": "synthetic",
+  "note": "Oct 9 San Mateo cell shows a Professional Development picture, no menu"
+ },
+ {
+  "category": "lunch",
+  "q": "What's for lunch on Saturday October 24?",
+  "expect": [
+   "(?i)(no lunch|weekend|not served|no service)"
+  ],
+  "forbid": [
+   "Tuscan",
+   "Teriyaki"
+  ],
+  "src": "synthetic",
+  "note": "weekend: no service, nothing invented"
+ },
+ {
+  "category": "lunch",
+  "q": "What's the Hillsborough lunch on November 3?",
+  "expect": [
+   "(?i)(isn't|is not|not yet|not) (been )?(posted|available|published)|november menu"
+  ],
+  "forbid": [
+   "Tomato Basil",
+   "Marinated Chicken",
+   "Platillos"
+  ],
+  "src": "synthetic",
+  "note": "November menu not posted: never show October's menu for a November date"
+ },
+ {
+  "category": "lunch",
+  "q": "What's for lunch on October 21?",
+  "expect": [
+   "Platillos Latino",
+   "Grass Fed Beef Fajitas",
+   "Beef Quesadillas",
+   "(?i)san mateo",
+   "(?i)hillsborough",
+   "(?i)check with the cafe for ingredients or allergens"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "note": "no campus known: both campuses, labelled"
+ },
+ {
+  "category": "lunch",
+  "q": "What's for lunch on October 21?",
+  "expect": [
+   "Beef Quesadillas",
+   "(?i)check with the cafe for ingredients or allergens"
+  ],
+  "forbid": [
+   "Fajitas"
+  ],
+  "src": "synthetic",
+  "campus": "hillsborough",
+  "note": "saved campus used"
+ },
+ {
+  "category": "lunch",
+  "q": "What's for lunch at San Mateo on October 21?",
+  "expect": [
+   "Grass Fed Beef Fajitas",
+   "(?i)check with the cafe for ingredients or allergens"
+  ],
+  "forbid": [
+   "Beef Quesadillas"
+  ],
+  "src": "synthetic",
+  "campus": "hillsborough",
+  "note": "campus named in the text beats the saved campus"
+ },
+ {
+  "category": "lunch",
+  "q": "Are there vegetarian options for lunch at Hillsborough on October 20?",
+  "expect": [
+   "BBQ Portobello Mushroom Sliders",
+   "(?i)(earthly selections|plant inspired)",
+   "(?i)(check with the cafe|ask the cafe|confirm with the cafe)"
+  ],
+  "forbid": [
+   "(?i)certified (vegan|vegetarian)",
+   "(?i)gluten.free"
+  ],
+  "src": "synthetic",
+  "note": "dishes are not officially tagged: name the cafe's sections and send them to the cafe, never claim gluten free"
+ },
+ {
+  "category": "lunch",
+  "q": "What about San Mateo?",
+  "expect": [
+   "Orange Chicken",
+   "Miso",
+   "(?i)check with the cafe for ingredients or allergens"
+  ],
+  "forbid": [
+   "Chicken Tenders"
+  ],
+  "src": "synthetic",
+  "history": [
+   {
+    "role": "user",
+    "content": "What's for lunch at Hillsborough on October 27?"
+   },
+   {
+    "role": "assistant",
+    "content": "Hillsborough lunch on Tue, Oct 27: Street Food: House Cut Chicken Tenders, Sweet Potato Fries and Medley of Sauteed Veggies."
+   }
+  ],
+  "note": "follow-up keeps the day, switches the campus"
+ },
+ {
+  "category": "lunch",
+  "q": "What soup is on the San Mateo menu on October 22?",
+  "expect": [
+   "Beef Barley"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "note": "San Mateo soup of the day"
+ },
+ {
+  "category": "lunch",
+  "q": "What is the Hillsborough sandwich favorite on October 28?",
+  "expect": [
+   "Bagels with Cream Cheese"
+  ],
+  "forbid": [
+   "Philly"
+  ],
+  "src": "synthetic",
+  "note": "Hillsborough Oct 28 sandwich"
+ },
+ {
+  "category": "lunch",
+  "q": "Is there lunch at Hillsborough on October 23?",
+  "expect": [
+   "(?i)(no lunch|no school|not listed|no classes|conferences|not served)"
+  ],
+  "forbid": [
+   "Classic Meatball",
+   "Tofu Sticks"
+  ],
+  "src": "synthetic",
+  "note": "Oct 23 Hillsborough cell shows a No School picture"
+ },
+ {
+  "category": "lunch",
+  "q": "Is there lunch at San Mateo on October 28?",
+  "expect": [
+   "(?i)(no lunch|no school|no classes|not listed|conferences|not served)"
+  ],
+  "forbid": [
+   "Quesadilla",
+   "Pesto Pasto"
+  ],
+  "src": "synthetic",
+  "note": "San Mateo Oct 28-30 are covered by a No School picture"
+ },
+ {
+  "category": "lunch",
+  "q": "What are the cafe hours?",
+  "expect": [
+   "11:00",
+   "(?i)(1:00|1 pm)"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "note": "cafe hours as printed on the menu"
+ },
+ {
+  "category": "lunch",
+  "q": "When is pizza on the menu at Hillsborough?",
+  "expect": [
+   "(?i)pizza"
+  ],
+  "forbid": [],
+  "src": "synthetic",
+  "campus": "hillsborough",
+  "dynamic": true,
+  "note": "dish search from today on: only Oct 30 lists pizza, so the answer changes after that day"
  }
 ]

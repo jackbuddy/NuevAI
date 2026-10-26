@@ -1,6 +1,6 @@
 name: Refresh calendar
 
-# Daily unattended refresh: iCal calendar feed + live team-schedule sheets -> chunk -> embed -> Supabase.
+# Daily unattended refresh: iCal calendar feed + the cafe's monthly lunch menus + live team-schedule sheets -> chunk -> embed -> Supabase.
 # Expired events are removed automatically. The public site is crawled once and
 # Nexus (behind school SSO/2FA) is refreshed by hand, both locally:
 #   python run_pipeline.py --refresh-nexus
@@ -37,7 +37,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           NUEVAI_CALENDAR_URL: ${{ secrets.NUEVAI_CALENDAR_URL }}
         run: |
-          LIVE_KINDS=team_schedule python run_pipeline.py --stages calendar,live,chunk,index
+          LIVE_KINDS=team_schedule python run_pipeline.py --stages calendar,lunch,live,chunk,index
       - name: Guard - index must not shrink by more than 10%
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
