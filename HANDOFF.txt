@@ -184,3 +184,18 @@ scripts/weekly_digest.py summarizes. Loop: turn each wrong answer into a data fi
 golden/eval_retrieval case, push, verify live. Reproduce first: curl -X POST https://nuev-ai.vercel.app/api/chat -H 'Content-Type: application/json' -d '{"query":"..."}'
 
 If anything above contradicts what you observe, trust the live system and the repo, then tell the user what changed.
+
+
+======================================================================================================================
+9. EMAIL INGEST (branch feature/email-ingest, 25 Oct 2026; NOT merged, NOT deployed, workflow not yet run on GitHub)
+======================================================================================================================
+Owner forwards school emails to a dedicated Gmail inbox; .github/workflows/email-ingest.yml (every 30 min + workflow_dispatch) runs
+scripts/email_ingest.py -> pipeline/email_ingest.py: IMAP SSL, UNSEEN only, sender allowlist + Gmail dkim/spf pass, clean (forward block ->
+original subject/date, strip quotes/signatures/footers/tracking), privacy (student-data -> needs_review, non-staff emails/phones redacted,
+guard.scrub_context), chunk (email-<content hash>-<n>, source=email, sent date, sender_domain only) -> document_chunks_v2, log row in
+email_ingest_log (applied in Supabase; no bodies/addresses), then \Seen. Secrets EMAIL_INGEST_USER / EMAIL_INGEST_APP_PASSWORD / EMAIL_ALLOWED_SENDERS
+(GitHub repo secrets, set by the owner; never printed). Review: scripts/email_list.py; remove: scripts/email_remove.py (dry run unless --yes).
+Prune safety: pipeline/index.py, index_guard.py (rows not counted), audit_data.py (own email.* group) skip email-* rows; delete_ids and
+mark_superseded refuse them. rag.py: recency boost (<=0.10, 30-day half-life), "[School email, sent <date>]" label, never stale.
+SYSTEM_PERSONA has a school-email rule. Tests: test_email_ingest.py (in ci.yml). Open: attachments/PDFs ignored; answer cache (L2, 6 h) can keep
+serving an old answer after a new email; real Gmail header format only verified against synthetic messages (see NEEDS_USER.md for the end-to-end test).

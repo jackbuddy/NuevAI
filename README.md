@@ -42,6 +42,38 @@ Automations (all free: GitHub Actions + the existing Supabase/Render/Groq free p
 | `keep-warm.yml` | every 10 min | pings `/health` so Render's free plan stays awake | - |
 | `scripts/weekly_digest.py` | by hand, weekly | prints a markdown digest (visitors, top questions, failures, feedback; grader traffic excluded, emails/numbers masked); read-only, sends nothing | `python scripts/weekly_digest.py --days 7` (needs `.env`) and paste the output into a chat |
 
+### Forwarded school emails (`email-ingest.yml`)
+The owner forwards a school email (info update, schedule change) to a dedicated Gmail inbox; every 30 minutes a GitHub Action reads the unread
+mail over IMAP (`imap.gmail.com`, app password) and indexes it, so the chatbot can cite it ("per the school email of Oct 28 ..."). Free: GitHub
+Actions minutes only, no domain, no paid service. Secrets (repo secrets, never printed): `EMAIL_INGEST_USER`, `EMAIL_INGEST_APP_PASSWORD`,
+`EMAIL_ALLOWED_SENDERS` (comma-separated); without them the script prints "not configured" and exits 0.
+
+- **Gatekeeping:** the forwarder's From address must be on the allowlist AND Gmail's `Authentication-Results` must show `dkim=pass` or `spf=pass`
+  for that address's domain; otherwise the message is logged (`rejected_sender` / `rejected_auth`) and never indexed. Mail from the inbox's own address is ignored.
+- **Cleaning and privacy:** the original sender name (staff only), subject and date are taken from the forwarded block (the forwarder's own note,
+  quoted replies, signatures, footers and tracking links are dropped); non-staff email addresses and phone numbers are redacted (`@nuevaschool.org`
+  addresses and the two main school lines stay); anything that looks like student-level data (rosters, grade/GPA tables, student IDs, parent contact
+  blocks, discipline or medical content) is NOT indexed and logged `needs_review`; instruction-like lines are scrubbed. Attachments are ignored (counted in the log).
+- **Indexing:** chunks `email-<content hash>-<n>` in `document_chunks_v2` with `source_type=email`, the sent date and the sender's domain only. A
+  re-forward of the same text is a `duplicate`; changed text for the same message replaces its chunks. Nothing expires or is deleted by the pipeline
+  (`run_pipeline.py --prune`, the superseded flagging, `index_guard.py` and the audit all skip `email-*` rows); retrieval gives newer emails a modest
+  boost, labels them `[School email, sent Oct 28, 2026]`, and the prompt tells the model to prefer the newest source and say where it came from.
+- **Add or remove an allowed sender:** GitHub > Settings > Secrets and variables > Actions > update `EMAIL_ALLOWED_SENDERS` (comma-separated addresses).
+  Locally put the same three variables in `.env`.
+- **Review:** `python scripts/email_list.py` (last 30 log rows: status, subject, date; `--status needs_review`, `--chunks` to list indexed emails).
+  The table is `email_ingest_log` (no bodies, no full addresses). `python scripts/audit_data.py` has an `email.*` group that checks metadata and privacy.
+- **Remove an email:** `python scripts/email_remove.py "<subject text>"` shows what it would delete (dry run is the default); add `--yes` to delete
+  it. It only ever touches `email-*` rows.
+- **Rerun:** Actions > Email ingest > Run workflow. Locally: `python scripts/email_ingest.py --dry-run` (reads the mailbox, writes nothing, marks nothing read) or
+  `python scripts/email_ingest.py --eml saved.eml` (offline preview of a saved message; add `--show-subjects` to print the chunk text).
+  Scheduled workflows run only from the default branch, and GitHub pauses them after 60 days without repository activity.
+
+**End-to-end test (once, after merging to main):** (1) from an allowed address forward any real school email to the inbox (Gmail "Forward", inline, not as an
+attachment is best; avoid student lists); (2) Actions > Email ingest > Run workflow (or wait up to 30 min), the log should end with `summary: indexed=1`;
+(3) `python scripts/email_list.py` shows the subject with status `indexed` (a `needs_review` / `rejected_*` status explains itself in the reason column);
+(4) ask the site a question about the email's facts (answers can lag up to 6 h through the answer cache for repeated questions, so use a new wording) and expect
+"per the school email of <date>"; (5) `python scripts/email_remove.py "<subject>"` to preview the removal.
+
 Baseline: `eval_baseline.json` records which number is measured (239/274 = 87.2%, prompt 01) and which was only an estimate
 (~98%, prompt 02, not used). After a full nightly run with few errors, record the real score with
 `python scripts/check_baseline.py --report <report.json> --write-baseline` and commit the file. A red nightly run means a

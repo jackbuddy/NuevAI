@@ -4,7 +4,7 @@
     python scripts/index_guard.py before            # records the count to data/index_count_before.txt
     python scripts/index_guard.py after [--max-drop 0.10]   # exit 1 if rows dropped by more than 10%
 
-Read-only (one exact-count SELECT). Needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY; never prints them.
+Read-only (one exact-count SELECT; rows of forwarded emails, chunk_id 'email-%', are not counted). Needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY; never prints them.
 """
 import argparse
 import os
@@ -25,7 +25,9 @@ def count_rows() -> int:
     from supabase import create_client
     import settings
     sb = create_client(os.environ["SUPABASE_URL"].strip().strip("\"'"), os.environ["SUPABASE_SERVICE_ROLE_KEY"].strip().strip("\"'"))
-    return sb.table(settings.CHUNKS_TABLE).select("chunk_id", count="exact").limit(1).execute().count or 0
+    # Forwarded emails (chunk_id "email-...", added by scripts/email_ingest.py every 30 minutes) are not part of this pipeline's output: counting
+    # them would let new emails mask a real loss of calendar/document rows, so the guard watches only the pipeline's own rows.
+    return sb.table(settings.CHUNKS_TABLE).select("chunk_id", count="exact").not_.like("chunk_id", "email-%").limit(1).execute().count or 0
 
 
 def main() -> int:

@@ -189,3 +189,102 @@ LEAK_REPLY = "I can't share that. " + OFFER
 
 def leak_check(answer: str) -> bool:
     return bool(_LEAK.search(answer or ""))
+
+
+# ---------------------------------------------------------------- private data in documents (shared by rag.py and the email ingest)
+# Record-shaped text that must never be indexed or shown: home address/phone fields, student ID numbers, parent/guardian contact fields.
+RECORD_CONTENT = re.compile(r"\bHome (City|Postal|Zip|Phone|Address|Email|Street)\b|\bStudent ID\s*[:#]?\s*\d{4,}|\b(Parent|Guardian) ?[12]? (Email|Phone|Cell)\s*:", re.I)
+
+STAFF_DOMAIN = "nuevaschool.org"
+# the school's two published main lines (knowledge/ confirmed facts); every other phone number in a message is treated as private
+SCHOOL_PHONES = {"6502357100", "6503504600"}
+_EMAIL = re.compile(r"(?<![\w.+-])[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)")
+_EMAIL_OBFUSCATED = re.compile(r"\b[\w.+-]+\s*[\[(]\s*at\s*[\])]\s*[\w-]+(?:\s*[\[(]\s*dot\s*[\])]\s*[\w-]+)+", re.I)
+_PHONE = re.compile(r"(?<![\w.])(?:\+\d{1,3}[\s.-]?\(?\d{1,4}\)?(?:[\s.-]?\d{2,4}){2,4}|(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4})(?![\w-]|\.\d)")
+
+
+def is_staff_email(address: str) -> bool:
+    d = address.rsplit("@", 1)[-1].lower().strip(".")
+    return d == STAFF_DOMAIN or d.endswith("." + STAFF_DOMAIN)
+
+
+def _school_phone(raw: str) -> bool:
+    digits = re.sub(r"\D", "", raw)
+    return (digits[1:] if len(digits) == 11 and digits[0] == "1" else digits) in SCHOOL_PHONES
+
+
+def find_contacts(text: str) -> list[str]:
+    """Email addresses (other than staff @nuevaschool.org ones) and phone numbers (other than the school's main lines) in text."""
+    out = [m.group(0) for m in _EMAIL.finditer(text) if not is_staff_email(m.group(0))]
+    out += [m.group(0) for m in _EMAIL_OBFUSCATED.finditer(text)]
+    out += [m.group(0) for m in _PHONE.finditer(text) if not _school_phone(m.group(0))]
+    return out
+
+
+def redact_contacts(text: str) -> tuple[str, int]:
+    """Replace private email addresses and phone numbers with placeholders -> (text, how many were replaced)."""
+    n = 0
+
+    def email(m):
+        nonlocal n
+        if is_staff_email(m.group(0)):
+            return m.group(0)
+        n += 1
+        return "[email removed]"
+
+    def phone(m):
+        nonlocal n
+        if _school_phone(m.group(0)):
+            return m.group(0)
+        n += 1
+        return "[phone removed]"
+
+    text = _EMAIL.sub(email, text)
+    text, k = _EMAIL_OBFUSCATED.subn("[email removed]", text)
+    n += k
+    return _PHONE.sub(phone, text), n
+
+
+_N = r"[A-Z][a-z]+(?:[-'][A-Z][a-z]+)?"
+_NOT_NAMES = set("""january february march april may june july august september october november december jan feb mar apr jun jul aug sep sept oct nov dec
+monday tuesday wednesday thursday friday saturday sunday mon tue tues wed thu thur thurs fri sat sun block room grade day week period class course
+upper middle school team varsity junior boys girls home away game practice session form unit chapter page part step level section advisory lunch
+spring fall winter summer semester term quarter bus gym lab room rooms hall theater theatre library""".split())
+_DATA = r"(?:\d{1,3}(?:\.\d+)?%?|[A-F][+-]?|\d{4,}|[\w.+-]+@[\w.-]+)"
+_STUDENT_ROW = re.compile(rf"^\s*(?:\d+[.)]\s*|[-*•]\s*)?((?:{_N}(?:\s+[A-Z]\.)?\s+{_N})|(?:{_N},\s*{_N}))\s*(?:(?:[,|:\t–-]\s*|\s{{2,}})(?:\S+\s*[,|:\t]\s*)*{_DATA}|\s+\d{{4,}})\s*$")
+_TABLE_HEAD = re.compile(r"^(?=.*\b(student|name)\b)(?=.*\b(gpa|grades?|id|scores?|parent|guardian|dob|birth|homeroom|advis\w+|email)\b).*[|\t,].*$", re.I)
+_STUDENT_ID = re.compile(r"\b(student|stu\.?)\s*(id|#|no\.?|number)\s*[:#]?\s*\d{3,}", re.I)
+_PARENT_BLOCK = re.compile(r"\b(parent|guardian|mother|father|mom|dad)s?(?:'s)?(?:\s*/\s*guardian)?\s*[12]?\s*(?:e-?mail|phone|cell|mobile|contact|number|address)\s*[:\-]|\bemergency contact\s*[:\-]|"
+                           r"\bparent (?:contact|e-?mail|phone) (?:list|info(?:rmation)?|directory)\b", re.I)
+_DISCIPLINE_MEDICAL = re.compile(
+    r"\b(disciplinary (?:record|action|file|hearing|case|history)|(?:was|were|been|is|being|will be) (?:suspended|expelled|placed on probation)|"
+    r"suspension of|expulsion|honor (?:code|council) (?:violation|case|hearing)|academic probation|"
+    r"medical (?:record|condition|leave|file|history|information|diagnosis)|diagnos(?:is|ed|es)|\bIEP\b|504 plan|learning (?:plan|accommodations?)|"
+    r"medications?|prescriptions?|\bseizures?\b|counseling (?:record|notes?|file))\b", re.I)
+_ROSTERISH = re.compile(r"\b(roster|rosters|class list|advisory list|advisee list|attendance sheet|honor roll|grade ?book|report cards?|transcripts?|gpa)\b", re.I)
+
+
+def student_data_reason(text: str) -> str | None:
+    """Why a message looks like student-level data (rosters, grade/GPA tables, IDs, parent contact blocks, discipline or medical
+    information), else None. Deliberately conservative: a false positive only sends a message to a person for review."""
+    if RECORD_CONTENT.search(text):
+        return "record fields (home address/phone, student ID, parent/guardian contact)"
+    if _STUDENT_ID.search(text):
+        return "student ID numbers"
+    if _PARENT_BLOCK.search(text):
+        return "parent/guardian contact block"
+    if _DISCIPLINE_MEDICAL.search(text):
+        return "disciplinary or medical content"
+    lines = text.splitlines()
+    rows = [l for l in lines if (m := _STUDENT_ROW.match(l)) and not (set(re.findall(r"[A-Za-z]+", m.group(1).lower())) & _NOT_NAMES)]
+    if len(rows) >= 3:
+        return f"{len(rows)} lines of student-looking names with grades, IDs or emails"
+    for i, l in enumerate(lines):
+        if _TABLE_HEAD.match(l) and sum(1 for x in lines[i + 1:i + 6] if re.search(r"[|\t]", x) or x.count(",") >= 2) >= 2:
+            return "table of student names with grades/ids/contacts"
+    if _ROSTERISH.search(text):
+        names = [l for l in lines if re.fullmatch(rf"\s*(?:\d+[.)]\s*|[-*•]\s*)?(?:{_N}(?:\s+[A-Z]\.)?\s+{_N}|{_N},\s*{_N})\s*", l)
+                 and not (set(re.findall(r"[A-Za-z]+", l.lower())) & _NOT_NAMES)]
+        if len(names) >= 3:
+            return "roster or list of student names"
+    return None

@@ -16,7 +16,7 @@ import re
 from datetime import date, datetime, timedelta
 
 CURRENT_BY_CONSTRUCTION = {"school_day", "school_courses", "school_clubs", "school_advisory", "school_facts",
-                           "calendar", "calendar_day", "calendar_sheet", "link_registry"}
+                           "calendar", "calendar_day", "calendar_sheet", "link_registry", "email"}
 
 YEAR_RANGE = re.compile(r"(?<!\d)(20\d{2})\s*[-–—/]\s*(?:20)?(\d{2})(?![\d:])")
 SHORT_RANGE = re.compile(r"(?<![\d:.$/])(2[3-9])\s*[-–]\s*(2[4-9])(?![\d:%])")
@@ -127,3 +127,39 @@ def parse_day(value) -> str | None:
         return datetime.fromisoformat(str(value).replace("Z", "+00:00")).date().isoformat()
     except ValueError:
         return None
+
+
+# ---------------------------------------------------------------- forwarded school emails (pipeline/email_ingest.py)
+EMAIL_ID_PREFIX = "email-"
+
+
+def is_email_row(chunk_id: str = "", source: str | None = None, metadata: dict | None = None) -> bool:
+    """True for a chunk written by the email ingest. Those rows are NOT part of run_pipeline's plan, so every prune, orphan, superseded
+    or row-count routine must leave them alone."""
+    m = metadata or {}
+    return str(chunk_id or "").startswith(EMAIL_ID_PREFIX) or source == "email" or m.get("source") == "email" or m.get("source_type") == "email"
+
+
+def email_meta(source_date: str, now: datetime | None = None) -> dict:
+    """Freshness fields of an email chunk. An email is never stale and never expires: it is dated, newer emails win at retrieval and older
+    ones stay available as context. school_year comes from the date it was sent."""
+    now = now or datetime.now().astimezone()
+    sent = date.fromisoformat(source_date)
+    return {"indexed_at": now.replace(microsecond=0).isoformat(), "source_date": source_date,
+            "school_year": label(current_start(sent)), "stale": False}
+
+
+def email_age_days(source_date, today: date | None = None) -> int | None:
+    d = parse_day(source_date)
+    if not d:
+        return None
+    return max(0, ((today or date.today()) - date.fromisoformat(d)).days)
+
+
+def day_label(source_date) -> str:
+    """'2026-10-28' -> 'Oct 28, 2026' (how emails are named in the prompt and the chunk header)."""
+    d = parse_day(source_date)
+    if not d:
+        return ""
+    x = date.fromisoformat(d)
+    return f"{x.strftime('%b')} {x.day}, {x.year}"

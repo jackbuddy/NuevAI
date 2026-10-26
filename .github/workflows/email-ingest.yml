@@ -1,0 +1,37 @@
+name: Email ingest
+
+# Every 30 minutes: read the dedicated Gmail inbox over IMAP, and index forwarded school emails from allowed senders
+# (see README > Operations). Secrets reach the job only as environment variables and are never echoed.
+# "No new mail" is a success; only real errors (login failure, a message that could not be processed) fail the run.
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: email-ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-pipeline.txt
+      - run: pip install -r requirements-pipeline.txt
+      - name: Ingest forwarded emails
+        env:
+          EMAIL_INGEST_USER: ${{ secrets.EMAIL_INGEST_USER }}
+          EMAIL_INGEST_APP_PASSWORD: ${{ secrets.EMAIL_INGEST_APP_PASSWORD }}
+          EMAIL_ALLOWED_SENDERS: ${{ secrets.EMAIL_ALLOWED_SENDERS }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/email_ingest.py --once
