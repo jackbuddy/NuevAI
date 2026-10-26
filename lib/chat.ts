@@ -38,6 +38,16 @@ export function saveGrade(g: number | null) {
   try { if (g) localStorage.setItem(GRADE_KEY, String(g)); else localStorage.removeItem(GRADE_KEY); } catch {}
 }
 
+export type Role = 'student' | 'parent' | 'staff';
+const ROLE_KEY = 'nuevai.role';
+/** Optional "I'm a…" preference. Browser-only, like the grade: it only changes which starter questions are offered. */
+export function loadRole(): Role | null {
+  try { const r = localStorage.getItem(ROLE_KEY); return r === 'student' || r === 'parent' || r === 'staff' ? r : null; } catch { return null; }
+}
+export function saveRole(r: Role | null) {
+  try { if (r) localStorage.setItem(ROLE_KEY, r); else localStorage.removeItem(ROLE_KEY); } catch {}
+}
+
 export async function streamChat(query: string, history: { role: string; content: string }[], h: StreamHandlers, signal?: AbortSignal, grade?: number | null) {
   const res = await fetch('/api/chat/stream', {
     method: 'POST',

@@ -87,7 +87,6 @@ export function Shell() {
           <button onClick={() => go('chat', 'logo')} className="tap-box -ml-1 gap-2 justify-self-start rounded-full px-1" aria-label="NuevAI home">
             <Logo size={26} />
             <span className="hidden text-[15px] font-bold tracking-tight sm:block">NuevAI</span>
-            <span className="hidden rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-700 sm:block">Alpha</span>
           </button>
 
           <nav role="tablist" aria-label="Sections" onKeyDown={onTabKey} className="surface-2 relative grid grid-cols-3 rounded-full p-1">

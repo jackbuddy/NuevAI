@@ -65,7 +65,7 @@ export function FeedbackButton({ tab }: { tab: string }) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 id="fb-title" className="text-lg font-bold tracking-tight">Help improve NuevAI</h3>
-                <p className="ink-2 mt-0.5 text-[13px]">NuevAI is in alpha. Tell us what was wrong, missing or great.</p>
+                <p className="ink-2 mt-0.5 text-[13px]">Tell us what was wrong, missing or great.</p>
               </div>
               <button type="button" onClick={close} aria-label="Close" className="ink-2 tap-box -mr-2 -mt-2 h-10 w-10 shrink-0 rounded-full hover:bg-[var(--surface-2)]"><X className="h-4 w-4" aria-hidden /></button>
             </div>

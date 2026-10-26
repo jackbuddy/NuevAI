@@ -5,7 +5,7 @@ import { ArrowDown, ArrowUp, BookOpen, CalendarDays, Check, ChevronDown, Copy, G
 import { Markdown } from './Markdown';
 import { Logo } from './Logo';
 import { track } from '@/lib/analytics';
-import { Message, loadGrade, saveGrade, streamChat, uid } from '@/lib/chat';
+import { Message, Role, loadGrade, loadRole, saveGrade, saveRole, streamChat, uid } from '@/lib/chat';
 import { CalEvent, nowLA } from '@/lib/calendar';
 
 const STARTERS = [
@@ -16,6 +16,25 @@ const STARTERS = [
   { icon: MapPin, label: 'How do I book a campus tour?' },
   { icon: BookOpen, label: 'What clubs can I join?' },
 ];
+// the "I'm a…" choice only changes which starter questions are shown; it is never sent to the server
+const STARTERS_BY_ROLE: Record<Role, typeof STARTERS> = {
+  student: STARTERS,
+  parent: [
+    { icon: MapPin, label: 'How do I book a campus tour?' },
+    { icon: CalendarDays, label: 'When are parent-teacher conferences?' },
+    { icon: CalendarDays, label: 'When is the next school break?' },
+    { icon: ShieldCheck, label: 'What is the attendance policy?' },
+    { icon: Trophy, label: 'What sports are playing this season?' },
+  ],
+  staff: [
+    { icon: CalendarDays, label: 'What is the bell schedule?' },
+    { icon: CalendarDays, label: 'What kind of day is it tomorrow?' },
+    { icon: CalendarDays, label: 'When are the next professional development days?' },
+    { icon: BookOpen, label: 'What clubs meet at lunch?' },
+    { icon: ShieldCheck, label: 'What is the cell phone policy?' },
+  ],
+};
+const ROLES: { id: Role; label: string }[] = [{ id: 'student', label: 'Student' }, { id: 'parent', label: 'Parent' }, { id: 'staff', label: 'Faculty & staff' }];
 const STORE_KEY = 'nuevai.chat.v2';
 
 export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendingAsk: string | null; onAskConsumed: () => void; onOpenCalendar: () => void }) {
@@ -36,6 +55,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
   const [announce, setAnnounce] = useState('');     // screen-reader status, not the streaming text itself
   const composing = useRef(false);
   const [grade, setGrade] = useState<number | null>(null);   // optional preference, browser-only
+  const [role, setRole] = useState<Role | null>(null);
   const gradeRef = useRef<number | null>(null);
   gradeRef.current = grade;
   const [hydrated, setHydrated] = useState(false);   // do not save until the saved chat has been read back
@@ -48,6 +68,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
       if (raw) setMessages((JSON.parse(raw) as Message[]).filter((m) => m.role === 'user' || m.content).map((m) => ({ ...m, streaming: false })));
     } catch {}
     setGrade(loadGrade());
+    setRole(loadRole());
     setHydrated(true);
     const { date: d, hour: h } = nowLA();
     setGreeting(h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening');
@@ -137,19 +158,33 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
   const retry = (m: Message) => { if (m.query) { setMessages((p) => p.filter((x) => x.id !== m.id).slice(0, -1)); setTimeout(() => send(m.query!, 'retry'), 0); } };
   const clear = () => { abortRef.current?.abort(); setMessages([]); track('chat_cleared'); };
   const chooseGrade = (g: number | null) => { setGrade(g); saveGrade(g); };
+  const chooseRole = (r: Role | null) => {
+    setRole(r); saveRole(r);
+    if (r === 'staff') chooseGrade(null);   // grade only applies to students and their parents
+  };
   const empty = messages.length === 0;
   const games = (today ?? []).filter((e) => e.kind !== 'practice');
   const practices = (today ?? []).length - games.length;
 
 
+  const pill = (on: boolean) => `tap-box h-8 rounded-full px-3 text-[12px] font-semibold transition max-sm:h-11 ${on ? 'bg-brand-900 text-white' : 'surface-2 text-brand-800 hover:bg-white hover:shadow-soft'}`;
   const gradePicker = (
-    <div role="group" aria-label="Your grade (optional)" className="flex flex-wrap items-center gap-1.5">
-      <span className="ink-2 mr-1 text-[12px] font-medium">My grade</span>
-      {[9, 10, 11, 12].map((g) => (
-        <button key={g} type="button" aria-pressed={grade === g} onClick={() => chooseGrade(grade === g ? null : g)}
-                className={`tap-box h-8 min-w-8 rounded-full px-2.5 text-[12px] font-semibold transition max-sm:h-11 max-sm:min-w-11 ${grade === g ? 'bg-brand-900 text-white' : 'surface-2 text-brand-800 hover:bg-white hover:shadow-soft'}`}>{g}</button>
-      ))}
-      <span className="ink-2 text-[11px]">{grade ? 'Saved on this device only' : 'Optional, tailors course answers'}</span>
+    <div className="flex flex-col items-center gap-2">
+      <div role="group" aria-label="I am a (optional)" className="flex flex-wrap items-center justify-center gap-1.5">
+        <span className="ink-2 mr-1 text-[12px] font-medium">I’m a</span>
+        {ROLES.map((r) => (
+          <button key={r.id} type="button" aria-pressed={role === r.id} onClick={() => chooseRole(role === r.id ? null : r.id)} className={pill(role === r.id)}>{r.label}</button>
+        ))}
+      </div>
+      {(role === 'student' || role === 'parent') && (
+        <div role="group" aria-label={role === 'parent' ? 'Your student’s grade (optional)' : 'Your grade (optional)'} className="flex flex-wrap items-center justify-center gap-1.5">
+          <span className="ink-2 mr-1 text-[12px] font-medium">{role === 'parent' ? 'Student’s grade' : 'Grade'}</span>
+          {[9, 10, 11, 12].map((g) => (
+            <button key={g} type="button" aria-pressed={grade === g} onClick={() => chooseGrade(grade === g ? null : g)} className={`${pill(grade === g)} min-w-8 max-sm:min-w-11`}>{g}</button>
+          ))}
+        </div>
+      )}
+      <span className="ink-2 text-[11px]">{role || grade ? 'Saved on this device only' : 'Optional, tailors suggestions and course answers'}</span>
     </div>
   );
 
@@ -196,10 +231,10 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
             </div>
 
             <div className="animate-rise mt-8" style={{ animationDelay: '70ms' }}>{composer}</div>
-            <div className="animate-rise mt-3 pl-1" style={{ animationDelay: '100ms' }}>{gradePicker}</div>
+            <div className="animate-rise mt-4" style={{ animationDelay: '100ms' }}>{gradePicker}</div>
 
-            <div className="animate-rise mt-5 flex flex-wrap gap-2" style={{ animationDelay: '140ms' }}>
-              {STARTERS.map((s) => (
+            <div className="animate-rise mt-5 flex flex-wrap justify-center gap-2" style={{ animationDelay: '140ms' }}>
+              {STARTERS_BY_ROLE[role ?? 'student'].map((s) => (
                 <button key={s.label} onClick={() => { track('starter_click', { label: s.label }); send(s.label, 'starter'); }}
                         className="surface-2 tap-h inline-flex items-center gap-2 rounded-full border border-transparent px-4 py-2 text-[13px] font-medium text-brand-800 transition hover:border-[var(--line)] hover:bg-white hover:shadow-soft">
                   <s.icon className="h-3.5 w-3.5 text-brand-500" />{s.label}
@@ -252,7 +287,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
             )}
             <div className="mx-auto w-full max-w-3xl">
               {composer}
-              <div className="mt-2 flex justify-center">{gradePicker}</div>
+              <div className="mt-2">{gradePicker}</div>
               <p className="ink-2 mt-2 text-center text-[11px] leading-snug">NuevAI can make mistakes — verify important dates. Anonymous analytics only; no account or personal data.</p>
             </div>
           </div>

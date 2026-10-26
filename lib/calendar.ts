@@ -14,13 +14,13 @@ export interface CalEvent {
   home_away: string | null;
 }
 
-export const CATEGORIES: { id: string; label: string; dot: string; chip: string }[] = [
-  { id: 'athletics', label: 'Athletics', dot: 'bg-brand-800', chip: 'bg-brand-800/10 text-brand-800' },
-  { id: 'academics', label: 'Academics', dot: 'bg-brand-500', chip: 'bg-brand-500/10 text-brand-600' },
-  { id: 'arts', label: 'Arts', dot: 'bg-brand-300', chip: 'bg-brand-300/25 text-brand-700' },
-  { id: 'community', label: 'Community', dot: 'bg-slate-400', chip: 'bg-slate-400/15 text-slate-600' },
-  { id: 'no_school', label: 'No school', dot: 'bg-amber-500', chip: 'bg-amber-500/15 text-amber-800' },
-  { id: 'other', label: 'Other', dot: 'bg-slate-300', chip: 'bg-slate-300/25 text-slate-600' },
+export const CATEGORIES: { id: string; label: string; dot: string; chip: string; edge: string }[] = [
+  { id: 'athletics', label: 'Athletics', dot: 'bg-teal-600', chip: 'bg-teal-600/10 text-teal-800', edge: 'border-l-teal-600' },
+  { id: 'academics', label: 'Academics', dot: 'bg-brand-500', chip: 'bg-brand-500/10 text-brand-700', edge: 'border-l-brand-500' },
+  { id: 'arts', label: 'Arts', dot: 'bg-violet-500', chip: 'bg-violet-500/10 text-violet-700', edge: 'border-l-violet-500' },
+  { id: 'community', label: 'Community', dot: 'bg-sky-500', chip: 'bg-sky-500/10 text-sky-800', edge: 'border-l-sky-500' },
+  { id: 'no_school', label: 'No school', dot: 'bg-amber-500', chip: 'bg-amber-500/15 text-amber-800', edge: 'border-l-amber-500' },
+  { id: 'other', label: 'Other', dot: 'bg-slate-300', chip: 'bg-slate-300/25 text-slate-600', edge: 'border-l-slate-300' },
 ];
 export const catMeta = (id: string) => CATEGORIES.find((c) => c.id === id) ?? CATEGORIES[CATEGORIES.length - 1];
 

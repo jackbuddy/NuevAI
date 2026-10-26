@@ -79,7 +79,7 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
   const agendaDays = [...byDay.entries()].filter(([k]) => parseISO(k).getMonth() === cursor.getMonth() && (k.slice(0, 7) !== todayIso.slice(0, 7) || k >= todayIso));
 
   return (
-    <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
+    <div className="scroll-thin min-h-0 flex-1 overflow-y-auto bg-gradient-to-b from-brand-50 via-white to-white">
       <div className="mx-auto w-full max-w-5xl px-4 pb-10 pt-6 md:px-6">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -112,7 +112,7 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
               const on = cats.has(c.id);
               return (
                 <button key={c.id} onClick={() => toggleCat(c.id)} aria-pressed={on}
-                        className={`tap-h flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${on ? 'border-transparent bg-brand-900 text-white' : 'surface ink-2 hover:bg-[var(--surface-2)]'}`}>
+                        className={`tap-h flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${on ? `border-transparent ${c.chip} ring-1 ring-current` : 'surface ink-2 hover:bg-[var(--surface-2)]'}`}>
                   <span aria-hidden className={`h-2 w-2 rounded-full ${c.dot}`} />{c.label}
                 </button>
               );
@@ -136,7 +136,7 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
         {state !== 'error' && view === 'month' && (
           <div className="grid gap-5 lg:grid-cols-[1fr_20rem]">
             <div className="surface shadow-soft overflow-hidden rounded-3xl">
-              <div aria-hidden className="grid grid-cols-7 border-b hairline text-center text-[11px] font-semibold uppercase tracking-wider ink-2">
+              <div aria-hidden className="grid grid-cols-7 border-b hairline bg-brand-50 text-center text-[11px] font-semibold uppercase tracking-wider text-brand-600">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => <div key={d} className="py-2">{d}</div>)}
               </div>
               <div role="group" aria-label={`${monthLabel}, ${filtered.length} events`} aria-busy={state === 'loading'} className={`grid grid-cols-7 transition-opacity ${state === 'loading' ? 'opacity-50' : ''}`}>
@@ -145,8 +145,8 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
                   return (
                     <button key={k} onClick={() => pick(k, list.length)} aria-pressed={isSel} aria-current={isToday ? 'date' : undefined}
                             aria-label={`${d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}${isToday ? ', today' : ''}, ${list.length ? `${list.length} event${list.length === 1 ? '' : 's'}` : 'no events'}`}
-                            className={`relative min-h-[4.25rem] min-w-0 border-b border-r hairline p-1.5 text-left transition hover:bg-[var(--surface-2)] focus-visible:z-10 md:min-h-[6rem] ${!inMonth ? 'opacity-70' : ''} ${isSel ? 'bg-brand-500/10 ring-2 ring-inset ring-brand-500' : ''}`}>
-                      <span aria-hidden className={`grid h-6 w-6 place-items-center rounded-full text-xs font-semibold ${isToday ? 'bg-brand-900 text-white' : ''}`}>{d.getDate()}</span>
+                            className={`relative min-h-[4.25rem] min-w-0 border-b border-r hairline p-1.5 text-left transition hover:bg-[var(--surface-2)] focus-visible:z-10 md:min-h-[6rem] ${!inMonth ? 'opacity-70' : ''} ${d.getDay() % 6 === 0 && !isSel ? 'bg-brand-50/70' : ''} ${isSel ? 'bg-brand-500/10 ring-2 ring-inset ring-brand-500' : ''}`}>
+                      <span aria-hidden className={`grid h-6 w-6 place-items-center rounded-full text-xs font-semibold ${isToday ? 'bg-brand-600 text-white shadow-soft' : ''}`}>{d.getDate()}</span>
                       <div aria-hidden className="mt-1 hidden space-y-0.5 md:block">
                         {list.slice(0, 2).map((e, i) => (
                           <div key={i} className={`truncate rounded px-1 py-0.5 text-[11px] font-medium leading-tight ${catMeta(e.category).chip}`}>{e.summary.trim()}</div>
@@ -162,7 +162,7 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
               </div>
             </div>
 
-            <aside ref={detailRef} aria-label="Selected day" className="surface shadow-soft h-fit scroll-mt-4 rounded-3xl p-4 lg:sticky lg:top-4">
+            <aside ref={detailRef} aria-label="Selected day" className="surface shadow-soft h-fit scroll-mt-4 rounded-3xl border-t-4 border-t-brand-500 p-4 lg:sticky lg:top-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">{selected === todayIso ? 'Today' : 'Selected day'}</p>
               <h3 className="wrap-any mb-3 text-xl font-bold">{parseISO(selected).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</h3>
               {dayEvents.length === 0 ? <Empty practicesHidden={!practices && events.some((e) => onDay(e, selected) && e.kind === 'practice')} /> :
@@ -208,7 +208,7 @@ function Empty({ practicesHidden, filtered }: { practicesHidden?: boolean; filte
 function EventCard({ e, onAsk }: { e: CalEvent; onAsk: (q: string) => void }) {
   const cat = catMeta(e.category);
   return (
-    <div className="surface rounded-2xl p-3.5">
+    <div className={`surface rounded-2xl border-l-4 p-3.5 ${cat.edge}`}>
       <div className="flex items-start gap-2.5">
         <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${cat.dot}`} />
         <div className="min-w-0 flex-1">
