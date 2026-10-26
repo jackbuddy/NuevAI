@@ -18,6 +18,9 @@ What is checked (each line of output is a group of checks):
   ical.*        the private iCal feed vs the index: counts, dates, timezone, all-day handling, duplicates, digests
   fresh.*       freshness metadata present and correct, prior-year documents flagged, same document in two years,
                 contradicting facts between sources
+  email.*       rows written by the email ingest (chunk_id "email-..."): metadata sanity (source_type, dates, hashes, no raw sender address)
+                and no non-staff email address or phone number in the text. They are kept out of every other group (they are not part of
+                the pipeline's plan, so they are never orphans or "missing freshness")
 
 Exit status 1 when any group has a mismatch beyond what scripts/audit_known.json accepts; 2 on a crash. A "conflict" is two
 sources disagreeing with each other (needs a person to decide); a "mismatch" is the index disagreeing with its source (fixable).
@@ -187,6 +190,10 @@ class Sources:
             self.local_chunks = json.loads(config.CHUNKS_FILE.read_text(encoding="utf-8")) if config.CHUNKS_FILE.exists() else []
         except Exception:
             self.local_chunks = []
+        # rows of forwarded emails are audited by audit_email only; the pipeline-vs-index groups must not see them (they are not in its plan)
+        self.email_db = [r for r in (self.db or []) if freshness.is_email_row(r["chunk_id"], None, r.get("metadata"))]
+        if self.db is not None:
+            self.db = [r for r in self.db if not freshness.is_email_row(r["chunk_id"], None, r.get("metadata"))]
 
     def current(self):
         """Rows the current pipeline output still contains. Rows it no longer produces (superseded copies, renamed records) are
@@ -1217,6 +1224,38 @@ def audit_orphans(A: Audit, S: Sources):
     A.passed(g, len(S.db) - len(orph))
 
 
+def audit_email(A: Audit, S: Sources):
+    """Rows written by scripts/email_ingest.py: metadata sanity and privacy of the stored text."""
+    import guard
+    g = "email.rows"
+    if S.db is None:
+        return A.skip(g, f"database not read ({S.db_err or 'offline'})")
+    rows = S.email_db
+    A.info(g, f"{len(rows)} email chunks from {len({(r['metadata'] or {}).get('content_key') for r in rows})} emails")
+    needed = ("source", "source_type", "title", "source_url", "source_date", "indexed_at", "school_year", "message_id_hash", "content_key", "sender_domain")
+    for r in rows:
+        m, cid = r["metadata"] or {}, r["chunk_id"]
+        A.check(g, all(m.get(k) not in (None, "") for k in needed), f"{cid}: missing metadata {[k for k in needed if m.get(k) in (None, '')]}")
+        A.check(g, m.get("source_type") == "email" and m.get("source") == "email", f"{cid}: source/source_type are not 'email'")
+        A.check(g, bool(re.fullmatch(r"email-[0-9a-f]{16}-\d{3}", cid)) and cid.startswith(f"email-{m.get('content_key')}-"), f"{cid}: chunk_id does not match its content_key")
+        d = str(m.get("source_date", ""))
+        A.check(g, bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", d)) and d <= (S.today + timedelta(days=1)).isoformat(), f"{cid}: bad or future source_date {d!r}")
+        A.check(g, m.get("stale") is False, f"{cid}: an email must never be flagged stale")
+        A.check(g, not m.get("superseded"), f"{cid}: email rows are never flagged superseded")
+        A.check(g, bool(re.fullmatch(r"[0-9a-f]{16}", str(m.get("message_id_hash", "")))), f"{cid}: message_id_hash is not a 16-hex hash")
+        A.check(g, "@" not in str(m.get("sender_domain", "")), f"{cid}: sender_domain holds an address, not a domain")
+        meta_text = json.dumps(m)
+        leaks = [x for x in guard.find_contacts(meta_text)]
+        A.check(g, not leaks, f"{cid}: metadata contains a private contact detail ({len(leaks)})")
+        A.check(g, "Source: school email" in r["content"], f"{cid}: content lacks its 'Source: school email, <date>' header")
+    g = "email.privacy"
+    for r in rows:
+        bad = guard.find_contacts(r["content"])
+        A.check(g, not bad, f"{r['chunk_id']}: contains {len(bad)} non-staff email address(es) or phone number(s) (re-ingest or remove it with scripts/email_remove.py)")
+        why = guard.student_data_reason(r["content"])
+        A.check(g, why is None, f"{r['chunk_id']}: looks like student-level data ({why}); remove it with scripts/email_remove.py")
+
+
 # --------------------------------------------------------------------------- main
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -1233,7 +1272,7 @@ def main() -> int:
     if S.db is None and not args.offline:
         print(f"note: database not read ({S.db_err}); database groups are skipped\n")
     for name, fn in (("days", audit_days), ("bell", audit_bell), ("courses", audit_courses), ("clubs", audit_clubs),
-                     ("teams", audit_teams), ("ical", audit_ical), ("fresh", audit_fresh), ("index", audit_orphans)):
+                     ("teams", audit_teams), ("ical", audit_ical), ("fresh", audit_fresh), ("index", audit_orphans), ("email", audit_email)):
         try:
             fn(A, S)
         except Exception as e:

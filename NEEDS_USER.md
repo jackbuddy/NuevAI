@@ -35,3 +35,11 @@
     delete from document_chunks_v2 where metadata->>'superseded' = 'true';
     -- the ~1,140 superseded document copies from prompt 05 are still pending: python run_pipeline.py --stages index --dry-run, then --prune (see the prompt 05 line above)
 - The iCal feed has 8 index rows for events that were moved or edited since the last daily run (e.g. Diwali 11:00-12:30 now 11:20-12:50) or are older than 14 days. The 13:30 UTC refresh deletes them by itself (existing behaviour); nothing to do unless `python scripts/audit_data.py` still shows "awaiting the daily refresh" tomorrow.
+
+2026-10-25 (email ingest, branch feature/email-ingest) - for you:
+- The table email_ingest_log was created in Supabase through the MCP (RLS on, no policies). supabase/email_ingest_log.sql is the same SQL if you ever need to re-run it.
+- Merge feature/email-ingest into main (the schedule and the "Run workflow" button only exist for workflows on the default branch). Render redeploys: that ships the rag/prompt change.
+- Confirm the three repo secrets exist: EMAIL_INGEST_USER, EMAIL_INGEST_APP_PASSWORD, EMAIL_ALLOWED_SENDERS (you added them). IMAP must be enabled in that Gmail account (Settings > Forwarding and POP/IMAP) and the app password needs 2-step verification on it.
+- Forward FROM an address that is on EMAIL_ALLOWED_SENDERS. If a forward shows rejected_auth, the sending domain failed DKIM/SPF at Gmail; check with `python scripts/email_list.py`.
+- Run the end-to-end test in the README "Forwarded school emails" section once after merging (what to forward, how to trigger, what to ask).
+- Not built: PDF/attachment text, clearing the 6 h answer cache when a new email arrives.

@@ -30,6 +30,7 @@ VECTOR_THRESHOLD = 0.0      # gte-small cosine scores sit high (unrelated ~0.75)
 W_VECTOR, W_LEXICAL = 0.3, 0.7
 OUTLINE_BOOST, CAL_PENALTY, HEAD_BOOST, LEN_EXP = 0.2, 0.2, 1.0, 0.4   # rerank knobs (tuned by sweep_rerank.py)
 OLD_COPY_SOURCES = ("nexus", "google_doc", "google_slides", "google_sheet", "manual", "public_site")
+EMAIL_RECENCY_MAX, EMAIL_HALF_LIFE_DAYS = 0.10, 30     # forwarded school emails: a modest boost that halves every 30 days, so the newest email wins ties without drowning calendar/structured data
 STALE_PENALTY, OLDER_VERSION_PENALTY = 0.25, 0.15      # documents written for an earlier school year; older twin of a newer document
 TEACH_CUE = re.compile(r"\b(teach\w*|taught|class(es)?|room|block|course|prof|instructor|mr|mrs|ms|dr)\b|'s\b", re.I)
 
@@ -54,7 +55,7 @@ CLUB_ALIASES = [(re.compile(r"\bmodel un\b", re.I), "model united nations mun"),
 
 # Never served, even if such rows exist in the database: sheets/forms that hold people's data.
 # chunk text that is personal-record shaped (home address fields, student ids, parent contact cards): never shown to the model
-BLOCKED_CONTENT = re.compile(r"\bHome (City|Postal|Zip|Phone|Address|Email|Street)\b|\bStudent ID\s*[:#]?\s*\d{4,}|\b(Parent|Guardian) ?[12]? (Email|Phone|Cell)\s*:", re.I)
+BLOCKED_CONTENT = guard.RECORD_CONTENT      # shared record-shape patterns (guard.py); the email ingest uses them too
 BLOCKED_TITLE = re.compile(r"diploma|rsvp|sign[- ]?up|roster|responses|attendance sheet|transcript|salary|payroll|medical", re.I)
 
 # Everyday wording -> the words the handbook actually uses. Added to the search text only (never shown).
@@ -167,6 +168,12 @@ def _course_loose_match(qcontent: set[str], course_key: str) -> bool:
     return False
 
 
+def email_recency_boost(source_date, today: date | None = None) -> float:
+    """Rerank bonus for a forwarded school email: EMAIL_RECENCY_MAX when sent today, halving every EMAIL_HALF_LIFE_DAYS; 0 if undated."""
+    age = freshness.email_age_days(source_date, today)
+    return 0.0 if age is None else EMAIL_RECENCY_MAX * 0.5 ** (age / EMAIL_HALF_LIFE_DAYS)
+
+
 def dedupe_rows(rows: list[dict]) -> list[dict]:
     """Drop lower-ranked rows whose text repeats a higher-ranked one (the same document indexed under two
     URLs or titles). Compared on the normalised body: same first and last 200 characters and a similar length."""
@@ -229,7 +236,7 @@ class Retriever:
             print(f"fts disabled: {str(e)[:120]}", flush=True)
             return []
 
-    def rerank(self, query: str, rows: list[dict]) -> list[dict]:
+    def rerank(self, query: str, rows: list[dict], today: date | None = None) -> list[dict]:
         """Hybrid score = vector similarity + lexical overlap (idf-weighted, title/section boosted), both min-max
         normalised over the candidates. Cheap, no model, and it fixes exact-wording misses that embeddings blur."""
         if len(rows) < 2:
@@ -264,16 +271,22 @@ class Retriever:
                 r["rerank"] += OUTLINE_BOOST        # contents lists answer "list all ..." questions
             if m.get("source") in ("calendar", "calendar_day", "calendar_sheet"):
                 r["rerank"] -= CAL_PENALTY         # calendar is looked up structurally, not by similarity
-            if freshness.meta_of(r)["stale"]:
+            if freshness.is_email_row(r.get("chunk_id", ""), None, m):
+                r["rerank"] += email_recency_boost(m.get("source_date"), today)     # newest email wins; emails are never "stale"
+            elif freshness.meta_of(r)["stale"]:
                 r["rerank"] -= STALE_PENALTY       # written for an earlier school year: only wins when nothing current matches
         # the same document in two years ("2025-26 Course Catalog" / "2026-27 Course Catalog"): the older copy loses
         newest: dict[str, int] = {}
         for r in rows:
+            if freshness.is_email_row(r.get("chunk_id", ""), None, r.get("metadata")):
+                continue                                 # an email never demotes (or is demoted by) a document of another year
             f = freshness.meta_of(r)
             k = freshness.title_key((r.get("metadata") or {}).get("title", ""))
             if k and f["school_year"]:
                 newest[k] = max(newest.get(k, 0), int(f["school_year"][:4]))
         for r in rows:
+            if freshness.is_email_row(r.get("chunk_id", ""), None, r.get("metadata")):
+                continue
             f = freshness.meta_of(r)
             k = freshness.title_key((r.get("metadata") or {}).get("title", ""))
             if k in newest and f["school_year"] and int(f["school_year"][:4]) < newest[k]:
@@ -555,7 +568,7 @@ class Retriever:
         rows = [r for r in rows if (r.get("metadata") or {}).get("source") not in ("calendar", "calendar_day", "school_day")] if events else rows
 
         t = time.time()
-        ranked = dedupe_rows(self.rerank(search_q, rows))
+        ranked = dedupe_rows(self.rerank(search_q, rows, today))
         timings["rerank_ms"] = round((time.time() - t) * 1000)
         link_rows = link_rows[:3]
         docs = (link_rows + [d for d in ranked if d["chunk_id"] not in {l["chunk_id"] for l in link_rows}])[:top_k + len(link_rows)]
@@ -656,7 +669,10 @@ def build_context(result: dict, max_events: int = 14) -> tuple[str, list[dict]]:
         m = d.get("metadata") or {}
         f = freshness.meta_of(d)
         tag = ""
-        if f["stale"]:
+        if freshness.is_email_row(d.get("chunk_id", ""), None, m):
+            sent = freshness.day_label(m.get("source_date"))
+            tag = f"[School email, sent {sent}] " if sent else "[School email] "          # a recent official update; newest wins over older sources
+        elif f["stale"]:
             why = f["reason"] or (f"written for the {f['school_year']} school year or earlier" if f["school_year"] else "dated before this school year")
             tag = f"[OUTDATED: {why}; use only if nothing current answers, and say it may have changed]\n"
         elif f["source_date"]:
