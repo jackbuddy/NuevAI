@@ -5,7 +5,7 @@ import { ArrowDown, ArrowUp, BookOpen, CalendarDays, Check, ChevronDown, Copy, G
 import { Markdown } from './Markdown';
 import { Logo } from './Logo';
 import { track } from '@/lib/analytics';
-import { Message, Role, loadGrade, loadRole, saveGrade, saveRole, streamChat, uid } from '@/lib/chat';
+import { Message, Role, loadRole, saveGrade, saveRole, streamChat, uid } from '@/lib/chat';
 import { CalEvent, nowLA } from '@/lib/calendar';
 
 const STARTERS = [
@@ -54,10 +54,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
   const [away, setAway] = useState(false);          // reader scrolled up: offer a jump back
   const [announce, setAnnounce] = useState('');     // screen-reader status, not the streaming text itself
   const composing = useRef(false);
-  const [grade, setGrade] = useState<number | null>(null);   // optional preference, browser-only
   const [role, setRole] = useState<Role | null>(null);
-  const gradeRef = useRef<number | null>(null);
-  gradeRef.current = grade;
   const [hydrated, setHydrated] = useState(false);   // do not save until the saved chat has been read back
 
   // restore conversation for this browser tab
@@ -67,7 +64,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
       // an answer that was still empty when the page was refreshed would show a loading skeleton forever: drop it
       if (raw) setMessages((JSON.parse(raw) as Message[]).filter((m) => m.role === 'user' || m.content).map((m) => ({ ...m, streaming: false })));
     } catch {}
-    setGrade(loadGrade());
+    saveGrade(null);   // the grade selector is gone: drop any value saved by an earlier version
     setRole(loadRole());
     setHydrated(true);
     const { date: d, hour: h } = nowLA();
@@ -124,7 +121,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
             onMeta: (m) => patch((x) => ({ ...x, sources: m.sources, cached: m.cached })),
             onDelta: (t) => { if (!first) { first = performance.now() - t0; setWaking(false); } patch((x) => ({ ...x, content: x.content + t })); },
             onDone: (d) => { setAnnounce('Answer ready'); patch((x) => ({ ...x, streaming: false, cached: d.cached, degraded: !!d.degraded, suggestions: d.suggestions ?? [], ms: Math.round(first), totalMs: Math.round(performance.now() - t0) })); },
-          }, ac.signal, gradeRef.current);
+          }, ac.signal);
           break;
         } catch (err: any) {
           // the model provider is briefly at its per-minute limit: wait a few seconds and try once more, quietly
@@ -157,11 +154,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
 
   const retry = (m: Message) => { if (m.query) { setMessages((p) => p.filter((x) => x.id !== m.id).slice(0, -1)); setTimeout(() => send(m.query!, 'retry'), 0); } };
   const clear = () => { abortRef.current?.abort(); setMessages([]); track('chat_cleared'); };
-  const chooseGrade = (g: number | null) => { setGrade(g); saveGrade(g); };
-  const chooseRole = (r: Role | null) => {
-    setRole(r); saveRole(r);
-    if (r === 'staff') chooseGrade(null);   // grade only applies to students and their parents
-  };
+  const chooseRole = (r: Role | null) => { setRole(r); saveRole(r); };
   const empty = messages.length === 0;
   const games = (today ?? []).filter((e) => e.kind !== 'practice');
   const practices = (today ?? []).length - games.length;
@@ -176,15 +169,6 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
           <button key={r.id} type="button" aria-pressed={role === r.id} onClick={() => chooseRole(role === r.id ? null : r.id)} className={pill(role === r.id)}>{r.label}</button>
         ))}
       </div>
-      {(role === 'student' || role === 'parent') && (
-        <div role="group" aria-label={role === 'parent' ? 'Your student’s grade (optional)' : 'Your grade (optional)'} className="flex flex-wrap items-center justify-center gap-1.5">
-          <span className="ink-2 mr-1 text-[12px] font-medium">{role === 'parent' ? 'Student’s grade' : 'Grade'}</span>
-          {[9, 10, 11, 12].map((g) => (
-            <button key={g} type="button" aria-pressed={grade === g} onClick={() => chooseGrade(grade === g ? null : g)} className={`${pill(grade === g)} min-w-8 max-sm:min-w-11`}>{g}</button>
-          ))}
-        </div>
-      )}
-      <span className="ink-2 text-[11px]">{role || grade ? 'Saved on this device only' : 'Optional, tailors suggestions and course answers'}</span>
     </div>
   );
 
