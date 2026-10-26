@@ -48,11 +48,22 @@ export function saveRole(r: Role | null) {
   try { if (r) localStorage.setItem(ROLE_KEY, r); else localStorage.removeItem(ROLE_KEY); } catch {}
 }
 
-export async function streamChat(query: string, history: { role: string; content: string }[], h: StreamHandlers, signal?: AbortSignal, grade?: number | null) {
+export type Campus = 'san_mateo' | 'hillsborough';
+export const CAMPUSES: { id: Campus; label: string }[] = [{ id: 'san_mateo', label: 'San Mateo' }, { id: 'hillsborough', label: 'Hillsborough' }];
+const CAMPUS_KEY = 'nuevai.campus';
+/** Optional campus preference. Browser-only; it is sent only so lunch answers come from the right menu, and never stored with an identity. */
+export function loadCampus(): Campus | null {
+  try { const c = localStorage.getItem(CAMPUS_KEY); return c === 'san_mateo' || c === 'hillsborough' ? c : null; } catch { return null; }
+}
+export function saveCampus(c: Campus | null) {
+  try { if (c) localStorage.setItem(CAMPUS_KEY, c); else localStorage.removeItem(CAMPUS_KEY); } catch {}
+}
+
+export async function streamChat(query: string, history: { role: string; content: string }[], h: StreamHandlers, signal?: AbortSignal, grade?: number | null, campus?: Campus | null) {
   const res = await fetch('/api/chat/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, history: history.slice(-4).map((t) => ({ role: t.role, content: t.content.slice(0, 700) })), ...(grade ? { grade } : {}), ...currentIds() }),
+    body: JSON.stringify({ query, history: history.slice(-4).map((t) => ({ role: t.role, content: t.content.slice(0, 700) })), ...(grade ? { grade } : {}), ...(campus ? { campus } : {}), ...currentIds() }),
     signal,
   });
   if (!res.ok || !res.body) {

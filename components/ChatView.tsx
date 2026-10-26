@@ -1,40 +1,37 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, BookOpen, CalendarDays, Check, ChevronDown, Copy, GraduationCap, Link2, MapPin, RotateCw, ShieldCheck, Info, Square, SquarePen, ThumbsDown, ThumbsUp, Trophy, Zap } from 'lucide-react';
+import { ArrowDown, ArrowUp, CalendarDays, Check, ChevronDown, Copy, Link2, MapPin, RotateCw, Info, Square, SquarePen, ThumbsDown, ThumbsUp, Trophy, UtensilsCrossed, Users, Zap } from 'lucide-react';
 import { Markdown } from './Markdown';
 import { Logo } from './Logo';
 import { track } from '@/lib/analytics';
-import { Message, Role, loadRole, saveGrade, saveRole, streamChat, uid } from '@/lib/chat';
-import { CalEvent, nowLA } from '@/lib/calendar';
+import { Message, Role, Campus, loadCampus, loadRole, saveCampus, saveGrade, saveRole, streamChat, uid } from '@/lib/chat';
+import { nowLA } from '@/lib/calendar';
+import { Preferences } from './Preferences';
+import { Happening } from './Happening';
 
+// short, concrete things people actually ask; the role only swaps one or two of them
 const STARTERS = [
-  { icon: Trophy, label: 'What sports are playing this season?' },
-  { icon: GraduationCap, label: 'What engineering courses are offered?' },
-  { icon: ShieldCheck, label: 'What is the cell phone policy?' },
-  { icon: CalendarDays, label: 'When is the next school break?' },
-  { icon: MapPin, label: 'How do I book a campus tour?' },
-  { icon: BookOpen, label: 'What clubs can I join?' },
+  { icon: Trophy, label: 'What games are today?' },
+  { icon: UtensilsCrossed, label: 'What’s for lunch today?' },
+  { icon: Users, label: 'What clubs meet at lunch?' },
+  { icon: CalendarDays, label: 'Is there school tomorrow?' },
 ];
-// the "I'm a…" choice only changes which starter questions are shown; it is never sent to the server
 const STARTERS_BY_ROLE: Record<Role, typeof STARTERS> = {
   student: STARTERS,
   parent: [
+    { icon: Trophy, label: 'What games are this week?' },
+    { icon: UtensilsCrossed, label: 'What’s for lunch today?' },
     { icon: MapPin, label: 'How do I book a campus tour?' },
-    { icon: CalendarDays, label: 'When are parent-teacher conferences?' },
-    { icon: CalendarDays, label: 'When is the next school break?' },
-    { icon: ShieldCheck, label: 'What is the attendance policy?' },
-    { icon: Trophy, label: 'What sports are playing this season?' },
+    { icon: CalendarDays, label: 'Is there school tomorrow?' },
   ],
   staff: [
-    { icon: CalendarDays, label: 'What is the bell schedule?' },
     { icon: CalendarDays, label: 'What kind of day is it tomorrow?' },
-    { icon: CalendarDays, label: 'When are the next professional development days?' },
-    { icon: BookOpen, label: 'What clubs meet at lunch?' },
-    { icon: ShieldCheck, label: 'What is the cell phone policy?' },
+    { icon: UtensilsCrossed, label: 'What’s for lunch today?' },
+    { icon: CalendarDays, label: 'When are the next PD days?' },
+    { icon: Trophy, label: 'What games are this week?' },
   ],
 };
-const ROLES: { id: Role; label: string }[] = [{ id: 'student', label: 'Student' }, { id: 'parent', label: 'Parent' }, { id: 'staff', label: 'Faculty & staff' }];
 const STORE_KEY = 'nuevai.chat.v2';
 
 export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendingAsk: string | null; onAskConsumed: () => void; onOpenCalendar: () => void }) {
@@ -43,7 +40,6 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
   const [busy, setBusy] = useState(false);
   const [waking, setWaking] = useState(false);
   const [greeting, setGreeting] = useState('Hello');
-  const [today, setToday] = useState<CalEvent[] | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -55,6 +51,9 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
   const [announce, setAnnounce] = useState('');     // screen-reader status, not the streaming text itself
   const composing = useRef(false);
   const [role, setRole] = useState<Role | null>(null);
+  const [campus, setCampus] = useState<Campus | null>(null);
+  const campusRef = useRef<Campus | null>(null);
+  campusRef.current = campus;
   const [hydrated, setHydrated] = useState(false);   // do not save until the saved chat has been read back
 
   // restore conversation for this browser tab
@@ -66,10 +65,10 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
     } catch {}
     saveGrade(null);   // the grade selector is gone: drop any value saved by an earlier version
     setRole(loadRole());
+    setCampus(loadCampus());
     setHydrated(true);
     const { date: d, hour: h } = nowLA();
     setGreeting(h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening');
-    fetch(`/api/calendar?from=${d}&to=${d}&limit=200`).then((r) => r.ok ? r.json() : null).then((j) => j && setToday(j.events)).catch(() => {});
   }, []);
   useEffect(() => { if (!hydrated) return; try { sessionStorage.setItem(STORE_KEY, JSON.stringify(messages.slice(-24))); } catch {} }, [messages, hydrated]);
   const toBottom = useCallback((smooth = false) => {
@@ -121,7 +120,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
             onMeta: (m) => patch((x) => ({ ...x, sources: m.sources, cached: m.cached })),
             onDelta: (t) => { if (!first) { first = performance.now() - t0; setWaking(false); } patch((x) => ({ ...x, content: x.content + t })); },
             onDone: (d) => { setAnnounce('Answer ready'); patch((x) => ({ ...x, streaming: false, cached: d.cached, degraded: !!d.degraded, suggestions: d.suggestions ?? [], ms: Math.round(first), totalMs: Math.round(performance.now() - t0) })); },
-          }, ac.signal);
+          }, ac.signal, null, campusRef.current);
           break;
         } catch (err: any) {
           // the model provider is briefly at its per-minute limit: wait a few seconds and try once more, quietly
@@ -155,22 +154,11 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
   const retry = (m: Message) => { if (m.query) { setMessages((p) => p.filter((x) => x.id !== m.id).slice(0, -1)); setTimeout(() => send(m.query!, 'retry'), 0); } };
   const clear = () => { abortRef.current?.abort(); setMessages([]); track('chat_cleared'); };
   const chooseRole = (r: Role | null) => { setRole(r); saveRole(r); };
+  const chooseCampus = (c: Campus | null) => { setCampus(c); saveCampus(c); };
   const empty = messages.length === 0;
-  const games = (today ?? []).filter((e) => e.kind !== 'practice');
-  const practices = (today ?? []).length - games.length;
 
 
-  const pill = (on: boolean) => `tap-box h-8 rounded-full px-3 text-[12px] font-semibold transition max-sm:h-11 ${on ? 'bg-brand-900 text-white' : 'surface-2 text-brand-800 hover:bg-white hover:shadow-soft'}`;
-  const gradePicker = (
-    <div className="flex flex-col items-center gap-2">
-      <div role="group" aria-label="I am a (optional)" className="flex flex-wrap items-center justify-center gap-1.5">
-        <span className="ink-2 mr-1 text-[12px] font-medium">I’m a</span>
-        {ROLES.map((r) => (
-          <button key={r.id} type="button" aria-pressed={role === r.id} onClick={() => chooseRole(role === r.id ? null : r.id)} className={pill(role === r.id)}>{r.label}</button>
-        ))}
-      </div>
-    </div>
-  );
+  const prefs = <Preferences role={role} campus={campus} onRole={chooseRole} onCampus={chooseCampus} />;
 
   const composer = (
     <form onSubmit={(e) => { e.preventDefault(); send(input); }}
@@ -205,19 +193,19 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
     <div className="relative flex min-h-0 flex-1 flex-col">
       <p className="sr-only-live" role="status" aria-live="polite">{announce}</p>
       {empty ? (
-        <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center px-4 pb-16 pt-10 md:px-6">
+        <div className="scroll-thin hero-glow relative min-h-0 flex-1 overflow-y-auto">
+          <div className="relative mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center px-4 pb-16 pt-10 md:px-6">
             <div className="animate-rise">
               <p className="mb-1 flex items-center gap-2 text-lg font-semibold text-brand-600"><Logo size={22} />{greeting}</p>
               <h1 className="text-balance text-4xl font-bold leading-[1.1] tracking-tight text-brand-900 md:text-[3.25rem]">
-                What would you like to know?
+                What would you like to <span className="bg-gradient-to-r from-brand-600 to-sky-500 bg-clip-text text-transparent">know</span>?
               </h1>
             </div>
 
             <div className="animate-rise mt-8" style={{ animationDelay: '70ms' }}>{composer}</div>
-            <div className="animate-rise mt-4" style={{ animationDelay: '100ms' }}>{gradePicker}</div>
+            <div className="animate-rise relative z-20 mt-3 text-center" style={{ animationDelay: '100ms' }}>{prefs}</div>
 
-            <div className="animate-rise mt-5 flex flex-wrap justify-center gap-2" style={{ animationDelay: '140ms' }}>
+            <div className="animate-rise mt-4 flex flex-wrap justify-center gap-2" style={{ animationDelay: '140ms' }}>
               {STARTERS_BY_ROLE[role ?? 'student'].map((s) => (
                 <button key={s.label} onClick={() => { track('starter_click', { label: s.label }); send(s.label, 'starter'); }}
                         className="surface-2 tap-h inline-flex items-center gap-2 rounded-full border border-transparent px-4 py-2 text-[13px] font-medium text-brand-800 transition hover:border-[var(--line)] hover:bg-white hover:shadow-soft">
@@ -226,18 +214,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
               ))}
             </div>
 
-            {games.length > 0 && (
-              <button onClick={() => { track('today_strip_click'); onOpenCalendar(); }}
-                      className="animate-rise surface group mt-8 flex w-full items-center gap-3 rounded-2xl p-3.5 text-left transition hover:shadow-soft" style={{ animationDelay: '210ms' }}>
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-100 text-brand-700"><Zap className="h-4 w-4" /></span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[11px] font-bold uppercase tracking-wider text-brand-500">Today</span>
-                  <span className="block truncate text-sm font-semibold">{games.slice(0, 3).map((e) => e.summary.trim()).join('  ·  ')}</span>
-                  <span className="ink-2 block text-xs">{games.length} event{games.length === 1 ? '' : 's'}{practices ? ` · ${practices} practices` : ''}</span>
-                </span>
-                <ChevronDown className="ink-2 h-4 w-4 -rotate-90 transition group-hover:translate-x-0.5" />
-              </button>
-            )}
+            <Happening campus={campus} onCampus={chooseCampus} onOpenCalendar={onOpenCalendar} onAsk={(q) => send(q, 'starter')} />
           </div>
         </div>
       ) : (
@@ -271,7 +248,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
             )}
             <div className="mx-auto w-full max-w-3xl">
               {composer}
-              <div className="mt-2">{gradePicker}</div>
+              <div className="relative z-20 mt-1 text-center">{prefs}</div>
               <p className="ink-2 mt-2 text-center text-[11px] leading-snug">NuevAI can make mistakes — verify important dates. Anonymous analytics only; no account or personal data.</p>
             </div>
           </div>

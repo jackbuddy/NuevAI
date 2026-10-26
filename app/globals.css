@@ -71,3 +71,9 @@ body { background: var(--bg); color: var(--ink); font-family: var(--font-sans); 
 .on-navy:focus-visible { outline-color: var(--color-brand-300); }
 html { -webkit-text-size-adjust: 100%; }
 .wrap-any { overflow-wrap: anywhere; word-break: break-word; }
+
+/* soft atmosphere behind the home screen: two blurred washes of the brand blues, nothing heavier */
+.hero-glow { background:
+  radial-gradient(48rem 26rem at 18% -6%, rgb(170 195 227 / .38), transparent 70%),
+  radial-gradient(40rem 24rem at 88% 4%, rgb(125 211 252 / .22), transparent 70%),
+  linear-gradient(to bottom, #f7faff, #ffffff 55%); }
