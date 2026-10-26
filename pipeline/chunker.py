@@ -225,8 +225,12 @@ def annotate_freshness(chunks: list[dict], pages: list[dict], today: date | None
                 day = _day_of_file(facts.DIR / url[len("facts://"):])
             elif src in ("calendar", "calendar_day"):
                 day = cal_day
+            elif src == "lunch":
+                day = m.get("fetched_on")                # the day the menu PDF was read
             else:
                 day = None
+        if src == "lunch" and m.get("event_date"):      # the school year of the menu's own date, not of the day it was read
+            cls = {"school_year": freshness.label(freshness.current_start(date.fromisoformat(m["event_date"]))), "stale": False, "stale_reason": ""}
         if src == "calendar_sheet" and url in by_url:        # a team schedule page: structured and current, dated by its fetch
             cls = freshness.classify("", "calendar_sheet", today)
         m["indexed_at"] = now
@@ -304,6 +308,8 @@ def run(log=print) -> list[dict]:
         })
     if config.CALENDAR_FILE.exists():
         chunks.extend(json.loads(config.CALENDAR_FILE.read_text(encoding="utf-8")))
+    if config.LUNCH_FILE.exists():                   # the cafe's monthly menus, parsed by pipeline/lunch.py (one structured record per campus per day)
+        chunks.extend(json.loads(config.LUNCH_FILE.read_text(encoding="utf-8")))
     unique, seen_ids = [], set()
     for c in chunks:                    # one row per id: Postgres rejects duplicates inside a single upsert
         if c["chunk_id"] not in seen_ids:

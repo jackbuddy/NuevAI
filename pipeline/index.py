@@ -118,15 +118,29 @@ def _embed_and_upsert(sb, batch: list[dict]) -> int:
     return 0
 
 
-def run(prune=False, prune_legacy=False, dry_run=False, log=print, keep_expired=False) -> dict:
+def prunable_lunch(i: str, source, lunch_campuses: set) -> bool:
+    """A lunch row (pipeline/lunch.py) may be pruned only when this run produced menus for the same campus: a campus whose menu could not be
+    fetched keeps its rows, so the app still answers from the last menu instead of going blank. Rows of a past month then age out normally."""
+    return freshness.lunch_campus(i) in lunch_campuses
+
+
+def run(prune=False, prune_legacy=False, dry_run=False, log=print, keep_expired=False, only_source: str | None = None) -> dict:
+    """only_source (e.g. "lunch") restricts the whole plan (embed, patch, flag, prune) to rows of that source, so one stage can be indexed
+    without touching anything else."""
     chunks = json.loads(config.CHUNKS_FILE.read_text(encoding="utf-8"))
     chunks = list({c["chunk_id"]: c for c in chunks}.values())          # one row per id
+    if only_source:
+        chunks = [c for c in chunks if c["metadata"].get("source") == only_source]
     sb = client()
     have = existing(sb)
+    if only_source:
+        have = {i: v for i, v in have.items() if v[2] == only_source}
     new_ids = {c["chunk_id"] for c in chunks}
+    lunch_campuses = {c["metadata"].get("campus") for c in chunks if c["metadata"].get("source") == "lunch"}
     todo = [c for c in chunks if have.get(c["chunk_id"], (None,))[0] != c["metadata"]["content_hash"]]
-    stale = [i for i, (h, u, s) in have.items() if u and i not in new_ids]       # written by this pipeline
-    legacy = [i for i, (h, u, s) in have.items() if not u]                       # old pipeline
+    stale = [i for i, (h, u, s) in have.items() if u and i not in new_ids
+             and (not freshness.is_lunch_row(i, s) or prunable_lunch(i, s, lunch_campuses))]       # written by this pipeline
+    legacy = [i for i, (h, u, s) in have.items() if not u and not freshness.is_lunch_row(i, s)]       # old pipeline
     # Expired calendar events are removed automatically (only when this run produced calendar chunks).
     expired_cal = [i for i, (h, u, s) in have.items() if s in ("calendar", "calendar_day") and i not in new_ids] \
         if any(c["metadata"].get("source") in ("calendar", "calendar_day") for c in chunks) else []
@@ -145,7 +159,8 @@ def run(prune=False, prune_legacy=False, dry_run=False, log=print, keep_expired=
     superseded = [i for i, (h, u, s) in have.items() if s in WORKBOOK_SOURCES and s in present and i not in new_ids]
     stats = {"table": settings.CHUNKS_TABLE, "total_chunks": len(chunks), "to_embed": len(todo), "unchanged": len(chunks) - len(todo),
              "stale_in_db": len(stale), "legacy_in_db": len(legacy), "expired_calendar": len(expired_cal),
-             "metadata_patch": len(patch), "orphans_to_flag": len(superseded)}
+             "metadata_patch": len(patch), "orphans_to_flag": len(superseded),
+             "lunch_rows_held_back_from_prune": sum(1 for i, (h, u, s) in have.items() if freshness.is_lunch_row(i, s) and i not in new_ids and not prunable_lunch(i, s, lunch_campuses))}
     log(f"index plan: {stats}")
     if dry_run:
         return stats

@@ -16,7 +16,7 @@ import re
 from datetime import date, datetime, timedelta
 
 CURRENT_BY_CONSTRUCTION = {"school_day", "school_courses", "school_clubs", "school_advisory", "school_facts",
-                           "calendar", "calendar_day", "calendar_sheet", "link_registry", "email"}
+                           "calendar", "calendar_day", "calendar_sheet", "link_registry", "email", "lunch"}
 
 YEAR_RANGE = re.compile(r"(?<!\d)(20\d{2})\s*[-–—/]\s*(?:20)?(\d{2})(?![\d:])")
 SHORT_RANGE = re.compile(r"(?<![\d:.$/])(2[3-9])\s*[-–]\s*(2[4-9])(?![\d:%])")
@@ -138,6 +138,20 @@ def is_email_row(chunk_id: str = "", source: str | None = None, metadata: dict |
     or row-count routine must leave them alone."""
     m = metadata or {}
     return str(chunk_id or "").startswith(EMAIL_ID_PREFIX) or source == "email" or m.get("source") == "email" or m.get("source_type") == "email"
+
+
+# ---------------------------------------------------------------- the cafe's monthly lunch menu (pipeline/lunch.py)
+LUNCH_ID_PREFIX = "lunch-"
+LUNCH_ID = re.compile(r"^lunch-(san_mateo|hillsborough)-\d{8}$")
+
+
+def is_lunch_row(chunk_id: str = "", source: str | None = None) -> bool:
+    return str(chunk_id or "").startswith(LUNCH_ID_PREFIX) or source == "lunch"
+
+
+def lunch_campus(chunk_id: str) -> str | None:
+    m = LUNCH_ID.match(str(chunk_id or ""))
+    return m.group(1) if m else None
 
 
 def email_meta(source_date: str, now: datetime | None = None) -> dict:

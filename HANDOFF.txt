@@ -57,6 +57,7 @@ Key files (repo root unless noted):
   guard.py          pre-LLM safety layer (self-harm care reply, student/staff privacy, injection, homework/essay, harmful), context scrubbing, output leak check
   followup.py       deterministic follow-up rewriting ("what about JV?", "who teaches it?") from previous user turns; no LLM
   freshness.py      chunk freshness metadata (indexed_at, source_date, school_year, stale); retrieval demotes prior-year docs
+  lunch_lookup.py + pipeline/lunch.py   cafe lunch menu (section 10)
   eval_retrieval.py 296 offline cases (68 hand-written + plain-fact golden questions + follow-ups; fixed "today" 2026-10-22, EVAL_TODAY overrides). RUN BEFORE EVERY PUSH.
   eval_golden.py + eval_golden.json   312 graded questions in 18 categories, run against a base URL (default localhost:8765 or GOLDEN_BASE); --category, --limit,
                     --sleep, --only-failed; writes data/eval/golden_*.json (gitignored). Costs Groq quota (~3.5k tokens/answer).
@@ -199,3 +200,20 @@ Prune safety: pipeline/index.py, index_guard.py (rows not counted), audit_data.p
 mark_superseded refuse them. rag.py: recency boost (<=0.10, 30-day half-life), "[School email, sent <date>]" label, never stale.
 SYSTEM_PERSONA has a school-email rule. Tests: test_email_ingest.py (in ci.yml). Open: attachments/PDFs ignored; answer cache (L2, 6 h) can keep
 serving an old answer after a new email; real Gmail header format only verified against synthetic messages (see NEEDS_USER.md for the end-to-end test).
+
+======================================================================================================================
+10. CAFE LUNCH MENU (worktree branch worktree-agent-a36ef63a650b7ac1b, 25 Oct 2026; NOT merged, NOT deployed; October 2026 rows ARE in the live index)
+======================================================================================================================
+"What's for lunch?" for both campuses. The cafe (Epicurean Group, nuevaschoolcafe.com) publishes one PDF per campus per month (San Mateo = Upper School;
+Hillsborough = Lower+Middle School; PreK-K is a separate PDF that is ignored). pipeline/lunch.py (stage `lunch`, in run_pipeline.py and the daily workflow) finds
+the PDFs through the cafe page's public Google Calendar iCal feed (month events carry the PDFs as attachments; Drive uc?export=download, one GET per file) or manual
+drops data/pipeline/manual_docs/lunch/<san_mateo|hillsborough>_<YYYY>-<MM>.pdf (a drop wins), parses the grid with pdfplumber (content-stream order, picture-covered
+cells = closed days), refuses a file whose own header disagrees with its name or that has parse warnings, and writes data/pipeline/lunch_chunks.json -> chunker -> index.
+Records: chunk_id lunch-<campus>-<YYYYMMDD>, metadata source=lunch, campus, event_date, month, closed, items, source_url, freshness fields. No dietary tag is inferred
+(the PDF key is icons only). Prune: lunch rows are pruned only when the run produced menus for the same campus; email-* still exempt; `--only-source lunch` restricts the index stage.
+Reading: lunch_lookup.py (5 min cache; weekend / closed with reason from school_day + calendar_day / month not posted), intent.parse_lunch + is_lunch_question
+(a bare "lunch" needs a date or campus; club/bell-time questions are not lunch questions), rag.lunch_data/lunch_context (no vector search), query_server: optional
+`campus` on the chat request (never logged/cached/tracked), lunch questions skip L1+L2, note guaranteed last, GET /lunch (rate limited, no LLM). Tests: test_lunch.py;
+eval_retrieval lunch cases (skip when October is pruned); eval_golden.json category lunch (16, October facts); audit lunch.* groups.
+Open: real LLM answers for lunch were not verified (Groq quota); next month's PDFs may need a parser tweak (the stage refuses what it cannot parse cleanly and the old rows stay);
+frontend (campus setting + /api/lunch proxy) is another agent's work.

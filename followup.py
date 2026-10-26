@@ -23,8 +23,10 @@ TRAIL_VERB = re.compile(r"\s+(?:meet|meets|start|starts|end|ends|play|plays|run|
 PRONOUN = re.compile(r"\b(it|its|that|this|them|they|those|these|he|she|him|her|his|there)\b", re.I)
 LEAD_FOLLOW = re.compile(r"^\s*(?:and|also|then|so|or|but|what about|how about|what if|what of)\b[\s,]*", re.I)
 SELF_CONTAINED = re.compile(rf"^\s*{WH}\b", re.I)
-VARIANT_GROUPS = [("jv", "varsity"), ("junior varsity", "varsity"), ("boys", "girls"), ("home", "away"), ("fall", "spring")]
-VARIANT_WORDS = {"jv": "JV", "junior varsity": "JV", "varsity": "varsity", "boys": "boys", "girls": "girls", "home": "home", "away": "away", "fall": "fall", "spring": "spring"}
+VARIANT_GROUPS = [("jv", "varsity"), ("junior varsity", "varsity"), ("boys", "girls"), ("home", "away"), ("fall", "spring"),
+                  ("san mateo", "hillsborough"), ("upper school", "middle school", "lower school")]
+VARIANT_WORDS = {"jv": "JV", "junior varsity": "JV", "varsity": "varsity", "boys": "boys", "girls": "girls", "home": "home", "away": "away", "fall": "fall", "spring": "spring",
+                 "san mateo": "San Mateo", "hillsborough": "Hillsborough", "upper school": "upper school", "middle school": "middle school", "lower school": "lower school"}
 DATE_PHRASE = re.compile(
     r"\b(today|tonight|tomorrow|yesterday|this week|next week|this weekend|next weekend|this (?:mon|tues|wednes|thurs|fri|satur|sun)day|next (?:mon|tues|wednes|thurs|fri|satur|sun)day|"
     r"(?:mon|tues|wednes|thurs|fri|satur|sun)day|"

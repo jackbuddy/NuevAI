@@ -210,3 +210,118 @@ def parse_intent(question: str, today: date, previous_user_msg: str = "") -> Cal
     if not (sport or kind or category or keywords or rng or dayinfo):
         return None
     return CalendarIntent(start, end, sport, kind, category, gender, division, home_away, keywords, date_given, next_only, label, dayinfo, [x.lower() for x in HOLIDAY_RX.findall(q)])
+
+
+# ---------------------------------------------------------------------------------------------- lunch (the cafe's monthly menus)
+# A menu signal on its own: the word "lunch" alone is NOT one ("which clubs meet at lunch", "and lunch?" after a bell question).
+LUNCH_STRONG = re.compile(r"\b(menus?|cafeteria|cafe|caf[eé])\b|\bfor (?:lunch|eating)\b|\blunch(?:es)? (?:menu|options?|specials?|items?)\b|"
+                          r"\bwhat(?:'s|s| is| are)? (?:on )?(?:the |today'?s |tomorrow'?s )?(?:lunch|soups?)\b|\bwhat(?:'s|s| is| are)? to eat\b|"
+                          r"\bwhat (?:can|do|should) (?:i|we) eat\b|\bsoups? of the day\b|\bsandwich favorite\b|\bsuperfood\b|\bearthly selections?\b|\bplant inspired\b", re.I)
+LUNCH_BARE = re.compile(r"\blunch(?:es)?\b", re.I)
+DATE_HINT = re.compile(r"\b(today|tonight|tomorrow|day after|next week|this week|weekend|mon(?:day)?|tues?(?:day)?|wed(?:nesday)?|thu(?:rs)?(?:day)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?|"
+                       r"jan\w*|feb\w*|mar\w*|apr\w*|may|jun\w*|jul\w*|aug\w*|sep\w*|oct\w*|nov\w*|dec\w*)\b|\b\d{1,2}/\d{1,2}\b", re.I)
+NOT_MENU = re.compile(r"\b(meets?|meeting|meetings|clubs?|advisory|office hours|tutorial|appointments?|practice|rehearsal|class(?:es)?|block)\b", re.I)
+DIET_WORD = re.compile(r"\b(vegetarian|veggie|vegan|plant[- ]based|gluten[- ]?free|dairy[- ]?free|nut[- ]?free|halal|kosher|pescatarian|allerg\w+)\b", re.I)
+DIET_CONTEXT = re.compile(r"\b(options?|available|eat|food|offer(?:ed|s)?|serv\w+|school|campus|cafe|caf[eé]|cafeteria|meals?|today|tomorrow)\b", re.I)
+LUNCH_NOT = re.compile(r"\blunch (?:and learn|club|duty|detention|period|block|time|bell|schedule)\b|\b(?:advisory|bell) (?:and )?lunch\b", re.I)
+TIME_WORD = re.compile(r"\b(what time|when|how long|how many minutes|schedule|bell|starts?|ends?|begins?|duration)\b", re.I)
+MENU_CUE = re.compile(r"\b(menu|what'?s|whats|what is|what are|eat|eating|options?|vegetarian|vegan|gluten|dairy|nut|soup|sandwich|salad|serving today|for lunch)\b", re.I)
+HOURS_Q = re.compile(r"\b(cafe|caf[eé]|cafeteria)\b.*\b(hours?|open|opens|close|closes)\b|\b(hours?|open|opens)\b.*\b(cafe|caf[eé]|cafeteria)\b", re.I)
+PREK_WORD = re.compile(r"\bpre[\s-]?k\b|\bprek\b|\bkindergarten\b", re.I)
+LUNCH_GENERIC = set("""soup soups sandwich sandwiches salad salads entree entrees main dish dishes item items special specials food foods meal meals option options choice choices
+available serving served serve lunch lunches menu menus cafe cafeteria campus school anything something there offer offered offers today's todays vegetarian vegan
+veggie gluten dairy free nuts eat eating hillsborough mateo upper lower middle high san week weekend month hours hour open opens close closes""".split())
+
+
+@dataclass
+class LunchIntent:
+    days: list[date]
+    label: str
+    date_given: bool
+    campuses: list[str]                 # one campus when known, else both
+    campus_from: str                    # "text" | "setting" | "none"
+    diet: str | None = None
+    keywords: list[str] = field(default_factory=list)       # dish words for "when is pizza day" (only when no date was given)
+    hours: bool = False
+    prek: bool = False
+    wide: bool = False                  # the asked range was longer than a week (a month, "this month")
+    hours_only: bool = False            # "cafe hours": no menu is wanted, only the opening hours
+
+
+def campus_in_text(question: str) -> list[str]:
+    """Campuses the question names itself: Hillsborough / HB / middle or lower school / MS / LS -> hillsborough;
+    San Mateo / SM / upper school / high school / US -> san_mateo. 'MS', 'LS', 'US', 'SM', 'HB' count in capitals anywhere and in
+    lowercase only right before lunch/menu/cafe (so "tell us", "Ms. Lee" and "ls" do not)."""
+    q = question
+    hb = bool(re.search(r"\bhillsborough\b|\bmiddle school\b|\blower school\b", q, re.I) or re.search(r"\b(?:HB|MS|LS)\b", q)
+              or re.search(r"\b(?:ms|ls|hb)\b(?=\W+(?:lunch|menu|cafe|caf[eé]|food))", q, re.I))
+    sm = bool(re.search(r"\bsan mateo\b|\bupper school\b|\bhigh school\b", q, re.I) or re.search(r"\b(?:SM|US)\b", q)
+              or re.search(r"\b(?:us|sm|hs)\b(?=\W+(?:lunch|menu|cafe|caf[eé]|food))", q, re.I))
+    return (["san_mateo"] if sm else []) + (["hillsborough"] if hb else [])
+
+
+def is_lunch_question(question: str) -> bool:
+    """True for 'what's for lunch', 'cafe menu', 'lunch tomorrow', 'Hillsborough lunch', 'any vegan options at the cafeteria', 'cafe hours';
+    false for bell-time questions ('what time is lunch', 'lunch schedule'), club or meeting times ('which clubs meet at lunch'), bare 'lunch?'
+    follow-ups, and unrelated uses of the word ('lunch and learn', 'lunch duty')."""
+    q = question
+    if LUNCH_NOT.search(q):
+        return False
+    if HOURS_Q.search(q):
+        return True
+    if LUNCH_STRONG.search(q):
+        return not (TIME_WORD.search(q) and not MENU_CUE.search(q)) and not (NOT_MENU.search(q) and not re.search(r"\b(menu|for lunch|what'?s on|eat|serving)\b", q, re.I))
+    if LUNCH_BARE.search(q):
+        if NOT_MENU.search(q) or (TIME_WORD.search(q) and not MENU_CUE.search(q)):
+            return False
+        return bool(DATE_HINT.search(q) or campus_in_text(q))
+    return bool(DIET_WORD.search(q) and DIET_CONTEXT.search(q) and re.search(r"\b(options?|available|eat|food|offer\w*|serv\w+|meals?)\b", q, re.I))
+
+
+def parse_lunch(question: str, today: date, campus: str | None = None, previous_user_msg: str = "") -> LunchIntent | None:
+    """-> LunchIntent or None. `campus` is the optional saved setting ('san_mateo' | 'hillsborough'); a campus named in the question wins."""
+    q = question.lower()
+    rng = parse_range(q, today)
+    if not is_lunch_question(question):
+        # "and the day after?" / "what about the day before?" right after a lunch question: same question, neighbouring day
+        rel = re.search(r"\b(the )?(next|following) day\b|\bday after( that)?\b|\b(the )?(previous|day before)\b", q)
+        if not (rel and previous_user_msg and is_lunch_question(previous_user_msg) and len(q.split()) <= 8):
+            return None
+        prev = parse_range(previous_user_msg.lower(), today) or (today, today, "today")
+        step = -1 if re.search(r"\b(previous|day before)\b", q) else 1
+        d = prev[1 if step > 0 else 0] + timedelta(days=step)
+        base = parse_lunch(previous_user_msg, today, campus)
+        if not base:
+            return None
+        base.days, base.label, base.date_given, base.wide, base.keywords = [d], d.strftime("%B %-d"), True, False, []
+        return base
+    date_given = rng is not None
+    if rng:
+        start, end, label = rng
+    else:
+        start = end = today
+        label = "today"
+    wide = (end - start).days > 6
+    n = min((end - start).days + 1, 31)
+    days = [start + timedelta(days=i) for i in range(n)]
+    if len(days) > 1:
+        days = [d for d in days if d.weekday() < 5]            # a week or a month: school days only
+    if wide:
+        days = [d for d in days if d >= today][:5] or days[:5]
+    named = campus_in_text(question)
+    saved = campus if campus in ("san_mateo", "hillsborough") else None
+    if named:
+        campuses, src = named, "text"
+    elif saved:
+        campuses, src = [saved], "setting"
+    else:
+        campuses, src = ["san_mateo", "hillsborough"], "none"
+    diet = (DIET_WORD.search(question) or [None, None])[0] if DIET_WORD.search(question) else None
+    kws = []
+    if not date_given:
+        words = re.findall(r"[a-z][a-z'-]{3,}", q)
+        taken = set(MONTHS) | set(WEEKDAYS) | STOP | LUNCH_GENERIC
+        kws = [w.rstrip("s") if w.endswith("s") and len(w) > 4 else w for w in words if w not in taken and not DIET_WORD.fullmatch(w)][:3]
+    hours = bool(HOURS_Q.search(q))
+    hours_only = hours and not date_given and not re.search(r"\bmenu\b|what'?s|whats|what is|for lunch|\beat\b|serving|options?|vegetarian|vegan", q)
+    return LunchIntent(days, label, date_given, campuses, src, diet, kws, hours, bool(PREK_WORD.search(q)), wide, hours_only)

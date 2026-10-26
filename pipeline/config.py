@@ -10,6 +10,7 @@ LINKS_FILE = DATA_DIR / "links.json"    # classified important links
 NEEDS_ACCESS_FILE = DATA_DIR / "needs_access.json"   # docs we could not read
 CHUNKS_FILE = DATA_DIR / "chunks.json"
 CALENDAR_FILE = DATA_DIR / "calendar_chunks.json"
+LUNCH_FILE = DATA_DIR / "lunch_chunks.json"       # written by pipeline/lunch.py
 PUBLIC_MARKER = DATA_DIR / "public_crawled.json"   # public site is crawled once, not refreshed
 MANUAL_LIST_FILE = DATA_DIR / "DOWNLOAD_THESE.md"
 REPORT_FILE = DATA_DIR / "report.json"
