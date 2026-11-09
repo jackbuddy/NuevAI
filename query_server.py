@@ -26,6 +26,9 @@ from followup import grade_relevant, valid_grade
 from intent import is_lunch_question
 import guard
 import lunch_lookup
+import audience
+import chat_trace
+from chat_trace import Trace
 
 load_dotenv()
 
@@ -108,7 +111,7 @@ def _warm():
             return
         popular = []
         try:
-            popular = [q for q, n in analytics.summary(30).get("top_questions", []) if n >= 2][:WARM_TOP]   # what people really ask
+            popular = [q for q, n in analytics.summary(30).get("top_questions", []) if n >= 2][:WARM_TOP]   # what real users ask (test traffic excluded)
         except Exception:
             pass
         todo = list(dict.fromkeys(STARTERS + [p for p in popular if p.lower() not in [s.lower() for s in STARTERS]]))[:WARM_TOP]
@@ -133,7 +136,13 @@ def _warm():
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     threading.Thread(target=_warm, daemon=True).start()
+    try:
+        analytics.record("server_boot", audience.SYSTEM_ID, "", {"reason": "start", "version": os.getenv("RENDER_GIT_COMMIT", "")[:8] or "local",
+                                                              "model": LLM_MODEL}, path="/boot", server_event=True)
+    except Exception:
+        pass
     yield
+    analytics.flush_all()          # SIGTERM / redeploy: write what is still buffered (the 5 s timer would lose it)
 
 
 app = FastAPI(title="NuevAI RAG Service", lifespan=lifespan)
@@ -201,6 +210,13 @@ class QueryRequest(BaseModel):
     campus: str | None = None
     anon_id: str = Field(default="", max_length=64)
     session_id: str = Field(default="", max_length=64)
+    # analytics envelope from the browser: i = marked internal ("me"), wd = webdriver/headless, dev = localhost/dev build. Nothing else is accepted.
+    flags: list[str] = Field(default_factory=list, max_length=6)
+
+    @field_validator("flags", mode="before")
+    @classmethod
+    def _clean_flags(cls, v):
+        return [x for x in (v if isinstance(v, list) else []) if x in ("i", "wd", "dev")][:3]
 
     @field_validator("campus", mode="before")
     @classmethod
@@ -393,7 +409,7 @@ def suggestions_for(result: dict, query: str, grade: int | None = None, history=
     return out[:3]
 
 
-def _prepare(req: QueryRequest):
+def _prepare(req: QueryRequest, trace: Trace | None = None):
     """Retrieval + prompt assembly. Returns everything the LLM step and the logs need."""
     now = datetime.now(PACIFIC)
     try:
@@ -403,6 +419,14 @@ def _prepare(req: QueryRequest):
             print(f"KNOWLEDGE BASE UNREACHABLE ({str(e)[:80]}) - check SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY", flush=True)
             raise KnowledgeBaseUnavailable()
         raise
+    if trace is not None:
+        trace.topic_hint = _topic_hint(result)
+        trace.dep_errors = result.get("dep_errors") or []
+        for d in trace.dep_errors:
+            try:
+                analytics.record("dependency_error", req.anon_id or audience.SYSTEM_ID, req.session_id, d, path="/chat", ua="", server_event=True, flags=_flags(req, None))
+            except Exception:
+                pass        # analytics never breaks chat
     context, sources = build_context(result)
     if not context.strip():
         if not data_status()["rows"]:
@@ -475,37 +499,51 @@ def _retry_after(text: str) -> float:
     return (int(mins or 0) * 60) + (float(val) / 1000 if unit == "ms" else float(val))
 
 
-def _create(msgs, model: str, stream: bool, _round: int = 0):
+def _create(msgs, model: str, stream: bool, _round: int = 0, trace: Trace | None = None):
     """Groq call that moves to the next model on rate limits, missing models, overload or timeouts (each model has its
     own token budget). If every model is rate limited it waits the few seconds Groq asks for and tries once more,
-    then gives the visitor a friendly message."""
+    then gives the visitor a friendly message. Every attempt is recorded on `trace` (analytics only; never affects the flow)."""
     from groq import APIConnectionError, APIStatusError
     last, all_rate_limited, waits = None, True, []
     deadline = time.time() + LLM_BUDGET_S
+    if trace is not None and trace.requested_model is None:
+        trace.requested_model = model
     for m in [model] + [x for x in FALLBACK_MODELS if x != model]:
         left = deadline - time.time()
         if left < 2 and last is not None:
             print("LLM time budget used up; giving up", flush=True)
             all_rate_limited = False
             break
+        t_a = time.time()
         try:
-            return groq_client.with_options(timeout=max(3.0, min(left, 20.0))).chat.completions.create(messages=msgs, stream=stream, **_llm_kwargs(m)), m
+            out = groq_client.with_options(timeout=max(3.0, min(left, 20.0))).chat.completions.create(messages=msgs, stream=stream, **_llm_kwargs(m))
+            if trace is not None:
+                trace.attempt(m, "ok", ms=(time.time() - t_a) * 1000)
+            return out, m
         except APIStatusError as e:
             last = e
+            ra = _retry_after(str(e)) if e.status_code == 429 else 0.0
+            if trace is not None:
+                trace.attempt(m, "error", e.status_code, chat_trace.error_kind(e.status_code, type(e).__name__), (time.time() - t_a) * 1000, ra)
             if e.status_code not in RETRYABLE_STATUS:
                 raise
             all_rate_limited &= e.status_code == 429
-            if e.status_code == 429 and _retry_after(str(e)) > 0:
-                waits.append(_retry_after(str(e)))
+            if e.status_code == 429 and ra > 0:
+                waits.append(ra)
             print(f"LLM {m} unavailable (HTTP {e.status_code}); trying next model", flush=True)
         except APIConnectionError as e:
             last, all_rate_limited = e, False
+            if trace is not None:
+                trace.attempt(m, "error", None, chat_trace.error_kind(None, type(e).__name__), (time.time() - t_a) * 1000)
             print(f"LLM {m} unreachable ({type(e).__name__}); trying next model", flush=True)
     wait = min(waits) if waits else 0.0           # the first model to recover is enough
     if all_rate_limited and _round == 0 and 0 < wait <= 8:
         print(f"All models rate limited; waiting {wait:.1f}s and retrying once", flush=True)
         time.sleep(wait + 0.3)
-        return _create(msgs, model, stream, _round=1)
+        if trace is not None:
+            trace.retries += 1
+            trace.waited_ms += round((wait + 0.3) * 1000)
+        return _create(msgs, model, stream, _round=1, trace=trace)
     if all_rate_limited:
         raise HTTPException(429, "The assistant is getting a lot of questions right now - please try again in a few seconds.")
     raise HTTPException(503, "The assistant is temporarily unavailable - please try again in a moment.") from last
@@ -518,10 +556,41 @@ def _llm_kwargs(model: str) -> dict:
     return kw
 
 
-def _track(req: QueryRequest, request: Request | None, props: dict):
-    if req.anon_id:
-        analytics.record("chat_answered", req.anon_id, req.session_id, props,
-                         path="/chat", ua=(request.headers.get("user-agent", "") if request else ""))
+def _client_ua(request: Request | None) -> str:
+    """The visitor's browser UA. The Next.js proxy forwards it as x-client-ua (its own UA is just 'node')."""
+    if not request:
+        return ""
+    return (request.headers.get("x-client-ua") or request.headers.get("user-agent", ""))[:200]
+
+
+def _flags(req: QueryRequest, request: Request | None) -> dict:
+    f = {"internal": "i" in req.flags, "webdriver": "wd" in req.flags, "dev": "dev" in req.flags}
+    if request is not None and request.headers.get("x-nuevai-test"):
+        f["test"] = True
+    return f
+
+
+def _track(req: QueryRequest, request: Request | None, props: dict, trace: Trace | None = None):
+    try:
+        if req.anon_id:
+            if trace is not None:
+                topic = chat_trace.topic_of(req.query, trace.topic_hint)
+                props = trace.props({**props, "topic": topic})
+            analytics.record("chat_answered", req.anon_id, req.session_id, props, path="/chat", ua=_client_ua(request),
+                             flags=_flags(req, request), server_event=True)
+    except Exception:
+        pass            # analytics never breaks chat
+
+
+def _topic_hint(result: dict | None) -> str | None:
+    if not result:
+        return None
+    if result.get("lunch"):
+        return "lunch"
+    it = result.get("intent")
+    if it is not None:
+        return "athletics" if getattr(it, "category", "") == "athletics" or getattr(it, "sport", None) else "calendar"
+    return "courses" if result.get("entities") else None
 
 
 def _cache_key(req: QueryRequest, now: datetime):
@@ -534,17 +603,21 @@ def _cache_key(req: QueryRequest, now: datetime):
     return (_norm(req.query), now.strftime("%Y-%m-%d"), req.model or LLM_MODEL)
 
 
-def _cache_get(req: QueryRequest, key):
+def _cache_get(req: QueryRequest, key, trace: Trace | None = None):
     """L1 (memory) then L2 (Supabase). Returns the payload or None."""
     if not key:
         return None
     if hit := answer_cache.get(key):
+        if trace is not None:
+            trace.cache_layer = "l1"
         return hit
     if req.model:
         return None
     if hit := answer_l2.get(req.query):
         ttl = DATE_ANSWER_TTL if hit.pop("date_bound", False) else 3600
         answer_cache.set(key, hit, ttl=ttl)
+        if trace is not None:
+            trace.cache_layer = "l2"
         return hit
     return None
 
@@ -562,27 +635,48 @@ def answer_once(query: str) -> dict:
     return _answer(req, None)
 
 
+def _canned_route(q: str) -> str:
+    try:
+        return "guard" if guard.check(q) is not None else "canned"
+    except Exception:
+        return "canned"
+
+
 def _answer(req: QueryRequest, request: Request | None) -> dict:
+    trace = Trace()
+    trace.inflight, trace.cold = chat_trace.inflight_enter()
+    try:
+        return _answer_inner(req, request, trace)
+    finally:
+        chat_trace.inflight_exit()
+
+
+def _answer_inner(req: QueryRequest, request: Request | None, trace: Trace) -> dict:
     t0 = time.time()
     now = datetime.now(PACIFIC)
     if (canned := smalltalk(req.query)) is not None:
-        _track(req, request, {"query": req.query[:300], "cached": True, "smalltalk": True, "total_ms": 0, "ttft_ms": 0, "sources": 0})
+        trace.route = _canned_route(req.query)
+        _track(req, request, {"query": req.query[:300], "cached": True, "smalltalk": True, "total_ms": 0, "ttft_ms": 0, "sources": 0, "alen": len(canned)}, trace)
         return {"answer": canned, "model_used": "none", "sources": [], "suggestions": [], "cached": True, "timings": {"total_ms": 0}}
     key = _cache_key(req, now)
-    if key and (hit := _cache_get(req, key)):
+    if key and (hit := _cache_get(req, key, trace)):
         total = round((time.time() - t0) * 1000)
-        _track(req, request, {"query": req.query[:300], "cached": True, "total_ms": total, "ttft_ms": total, "sources": len(hit["sources"])})
+        trace.route = "cache_" + (trace.cache_layer or "l1")
+        _track(req, request, {"query": req.query[:300], "cached": True, "total_ms": total, "ttft_ms": total, "sources": len(hit["sources"]), "alen": len(hit["answer"])}, trace)
         return {**hit, "cached": True, "timings": {"total_ms": total}}
-    msgs, sources, result, now = _prepare(req)
+    msgs, sources, result, now = _prepare(req, trace)
     model = req.model or LLM_MODEL
+    trace.requested_model = model
     t_llm = time.time()
     try:
-        completion, model = _create(msgs, model, stream=False)
+        completion, model = _create(msgs, model, stream=False, trace=trace)
         answer = completion.choices[0].message.content or ""
+        trace.model = model
+        trace.usage_from(completion, msgs, answer)
     except HTTPException as e:
         if e.status_code not in (429, 503):
             raise
-        return _degraded_response(req, request, sources, result, t0, e)
+        return _degraded_response(req, request, sources, result, t0, e, trace)
     if guard.leak_check(answer):
         print("OUTPUT LEAK BLOCKED", flush=True)
         answer = guard.LEAK_REPLY
@@ -592,18 +686,23 @@ def _answer(req: QueryRequest, request: Request | None) -> dict:
     if key and sources:       # never cache an answer that had nothing behind it
         intent = result["intent"]
         _cache_put(req, key, payload, intent)
+    trace.route = "llm"
     _track(req, request, {"query": req.query[:300], "cached": False, "sources": len(sources), "no_context": not sources,
                           "fallback": bool(re.search(r"(isn't|is not|not) (in|available)|not on the school calendar", answer, re.I)),
-                          "ttft_ms": timings["total_ms"], **timings})
+                          "ttft_ms": timings["total_ms"], "alen": len(answer), **timings}, trace)
     return {**payload, "cached": False, "timings": timings}
 
 
-def _degraded_response(req, request, sources, result, t0, exc) -> dict:
+def _degraded_response(req, request, sources, result, t0, exc, trace: Trace | None = None) -> dict:
     """LLM unavailable: answer with the retrieved facts and links. Never cached; flagged so the UI/analytics can tell."""
     total = round((time.time() - t0) * 1000)
+    if trace is not None:
+        trace.route = "structured" if (result or {}).get("lunch") else "degraded"
+    answer = degraded_answer(sources, result)
     _track(req, request, {"query": req.query[:300], "cached": False, "degraded": True, "llm_status": exc.status_code,
-                          "sources": len(sources), "total_ms": total, "ttft_ms": total})
-    return {"answer": degraded_answer(sources, result), "model_used": "none", "sources": sources, "suggestions": [],
+                          "sources": len(sources), "total_ms": total, "ttft_ms": total, "alen": len(answer),
+                          **(result or {}).get("timings", {})}, trace)
+    return {"answer": answer, "model_used": "none", "sources": sources, "suggestions": [],
             "cached": False, "degraded": True, "timings": {**result.get("timings", {}), "total_ms": total}}
 
 
@@ -616,7 +715,8 @@ def chat_endpoint(req: QueryRequest, request: Request):
         raise
     except Exception as e:
         if req.anon_id:
-            analytics.record("chat_error", req.anon_id, req.session_id, {"error": str(e)[:200], "query": req.query[:200]})
+            analytics.record("chat_error", req.anon_id, req.session_id, {"error": str(e)[:200], "query": req.query[:200]}, ua=_client_ua(request),
+                             flags=_flags(req, request), server_event=True)
         print(f"chat error: {type(e).__name__}: {str(e)[:200]}", flush=True)
         raise HTTPException(status_code=500, detail="Something went wrong on my side. Please try again in a moment.")
 
@@ -625,6 +725,14 @@ _hits: dict[str, list[float]] = {}
 _hits_lock = threading.Lock()
 PER_USER_PER_MIN = int(os.getenv("RATE_PER_USER_PER_MIN", "20"))
 GLOBAL_PER_MIN = int(os.getenv("RATE_GLOBAL_PER_MIN", "150"))
+
+
+def _note_rate_limited(req, request, limiter: str):
+    try:
+        analytics.record("rate_limited", req.anon_id or audience.SYSTEM_ID, req.session_id, {"limiter": limiter, "inflight": chat_trace.inflight_now()},
+                         path="/chat", ua=_client_ua(request), flags=_flags(req, request) if req.anon_id else None, server_event=True)
+    except Exception:
+        pass
 
 
 def _rate_limit(req: "QueryRequest", request: Request):
@@ -636,6 +744,7 @@ def _rate_limit(req: "QueryRequest", request: Request):
             window = [t for t in _hits.get(key, []) if now - t < 60]
             if len(window) >= limit:
                 _hits[key] = window
+                _note_rate_limited(req, request, "user" if key != "*" else "global")
                 raise HTTPException(429, "You're asking very quickly - please wait a few seconds and try again.")
             window.append(now)
             _hits[key] = window
@@ -652,86 +761,106 @@ def _sse(event: str, data: dict) -> str:
 def chat_stream(req: QueryRequest, request: Request):
     """Server-sent events: meta (sources) -> delta* (text) -> done (timings). Cached answers replay instantly."""
     _rate_limit(req, request)
+
     def gen():
-        t0 = time.time()
+        trace = Trace()
+        trace.inflight, trace.cold = chat_trace.inflight_enter()
         try:
-            now = datetime.now(PACIFIC)
-            if (canned := smalltalk(req.query)) is not None:
-                yield _sse("meta", {"sources": [], "cached": True})
-                yield _sse("delta", {"t": canned})
-                yield _sse("done", {"cached": True, "timings": {"total_ms": 0, "ttft_ms": 0}, "suggestions": []})
-                _track(req, request, {"query": req.query[:300], "cached": True, "smalltalk": True, "total_ms": 0, "ttft_ms": 0, "sources": 0})
-                return
-            key = _cache_key(req, now)
-            hit = _cache_get(req, key)
-            if hit:
-                yield _sse("meta", {"sources": hit["sources"], "cached": True})
-                text = hit["answer"]
-                for i in range(0, len(text), 60):          # replay quickly so the UI looks the same as a live stream
-                    yield _sse("delta", {"t": text[i:i + 60]})
-                total = round((time.time() - t0) * 1000)
-                yield _sse("done", {"cached": True, "timings": {"total_ms": total, "ttft_ms": 0}, "suggestions": hit.get("suggestions", [])})
-                _track(req, request, {"query": req.query[:300], "cached": True, "total_ms": total, "ttft_ms": total, "sources": len(hit["sources"])})
-                return
-            msgs, sources, result, now = _prepare(req)
-            yield _sse("meta", {"sources": sources, "cached": False, "intent": bool(result["intent"])})
-            model = req.model or LLM_MODEL
-            t_llm, ttft, parts = time.time(), None, []
-            try:
-                stream, model = _create(msgs, model, stream=True)
-            except HTTPException as e:
-                if e.status_code not in (429, 503):
-                    raise
-                d = _degraded_response(req, request, sources, result, t0, e)
-                yield _sse("delta", {"t": d["answer"]})
-                yield _sse("done", {"cached": False, "degraded": True, "timings": d["timings"], "suggestions": []})
-                return
-            broke = False
-            try:
-                for chunk in stream:
-                    delta = chunk.choices[0].delta.content if chunk.choices else None
-                    if delta:
-                        if guard.leak_check("".join(parts) + delta):
-                            print("OUTPUT LEAK BLOCKED (stream)", flush=True)
-                            yield _sse("delta", {"t": "\n\n" + guard.LEAK_REPLY})
-                            parts = [guard.LEAK_REPLY]
-                            break
-                        if ttft is None:
-                            ttft = round((time.time() - t0) * 1000)
-                        parts.append(delta)
-                        yield _sse("delta", {"t": delta})
-            except Exception as e:           # connection dropped or timed out mid-answer
-                print(f"LLM stream broke ({type(e).__name__})", flush=True)
-                broke = True
-                if parts:
-                    yield _sse("delta", {"t": "\n\n(The answer was cut off because the AI service stopped responding. Please ask again for the full answer.)"})
-                else:
-                    d = _degraded_response(req, request, sources, result, t0, HTTPException(503))
-                    yield _sse("delta", {"t": d["answer"]})
-                    yield _sse("done", {"cached": False, "degraded": True, "timings": d["timings"], "suggestions": []})
-                    return
-            answer = "".join(parts)
-            if result.get("lunch") and not broke and lunch_lookup.NOTE not in answer:
-                tail = "\n\n" + lunch_lookup.NOTE
-                yield _sse("delta", {"t": tail})              # the cafe note is always the last line, even if the model left it out
-                answer += tail
-            timings = {**result["timings"], "ttft_ms": ttft, "llm_ms": round((time.time() - t_llm) * 1000),
-                       "total_ms": round((time.time() - t0) * 1000)}
-            suggestions = suggestions_for(result, req.query, req.grade, req.history)
-            yield _sse("done", {"cached": False, "timings": timings, "suggestions": suggestions})
-            if key and answer and sources and not broke:
-                _cache_put(req, key, {"answer": answer, "model_used": model, "sources": sources, "suggestions": suggestions}, result["intent"])
-            _track(req, request, {"query": req.query[:300], "cached": False, "sources": len(sources), "no_context": not sources,
-                                  "fallback": bool(re.search(r"(isn't|is not|not) (in|available)|not on the school calendar", answer, re.I)),
-                                  **timings})
-        except Exception as e:
-            if req.anon_id:
-                analytics.record("chat_error", req.anon_id, req.session_id, {"error": str(e)[:200], "query": req.query[:200]})
-            print(f"stream error: {type(e).__name__}: {str(e)[:200]}", flush=True)
-            yield _sse("error", {"message": e.detail if isinstance(e, HTTPException) else "Something went wrong on my side. Please try again in a moment."})
+            yield from _stream_inner(req, request, trace)
+        finally:
+            chat_trace.inflight_exit()
 
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"})
+
+
+def _stream_inner(req: QueryRequest, request: Request, trace: Trace):
+    t0 = time.time()
+    try:
+        now = datetime.now(PACIFIC)
+        if (canned := smalltalk(req.query)) is not None:
+            yield _sse("meta", {"sources": [], "cached": True})
+            yield _sse("delta", {"t": canned})
+            yield _sse("done", {"cached": True, "timings": {"total_ms": 0, "ttft_ms": 0}, "suggestions": []})
+            trace.route = _canned_route(req.query)
+            _track(req, request, {"query": req.query[:300], "cached": True, "smalltalk": True, "total_ms": 0, "ttft_ms": 0, "sources": 0, "alen": len(canned)}, trace)
+            return
+        key = _cache_key(req, now)
+        hit = _cache_get(req, key, trace)
+        if hit:
+            yield _sse("meta", {"sources": hit["sources"], "cached": True})
+            text = hit["answer"]
+            for i in range(0, len(text), 60):          # replay quickly so the UI looks the same as a live stream
+                yield _sse("delta", {"t": text[i:i + 60]})
+            total = round((time.time() - t0) * 1000)
+            yield _sse("done", {"cached": True, "timings": {"total_ms": total, "ttft_ms": 0}, "suggestions": hit.get("suggestions", [])})
+            trace.route = "cache_" + (trace.cache_layer or "l1")
+            _track(req, request, {"query": req.query[:300], "cached": True, "total_ms": total, "ttft_ms": total, "sources": len(hit["sources"]), "alen": len(text)}, trace)
+            return
+        msgs, sources, result, now = _prepare(req, trace)
+        yield _sse("meta", {"sources": sources, "cached": False, "intent": bool(result["intent"])})
+        model = req.model or LLM_MODEL
+        trace.requested_model = model
+        t_llm, ttft, parts = time.time(), None, []
+        try:
+            stream, model = _create(msgs, model, stream=True, trace=trace)
+            trace.model = model
+        except HTTPException as e:
+            if e.status_code not in (429, 503):
+                raise
+            d = _degraded_response(req, request, sources, result, t0, e, trace)
+            yield _sse("delta", {"t": d["answer"]})
+            yield _sse("done", {"cached": False, "degraded": True, "timings": d["timings"], "suggestions": []})
+            return
+        broke = False
+        try:
+            for chunk in stream:
+                if getattr(chunk, "x_groq", None) is not None or getattr(chunk, "usage", None) is not None:
+                    trace.usage_from(chunk)          # the provider reports usage on the final chunk when it supports it
+                delta = chunk.choices[0].delta.content if chunk.choices else None
+                if delta:
+                    if guard.leak_check("".join(parts) + delta):
+                        print("OUTPUT LEAK BLOCKED (stream)", flush=True)
+                        yield _sse("delta", {"t": "\n\n" + guard.LEAK_REPLY})
+                        parts = [guard.LEAK_REPLY]
+                        break
+                    if ttft is None:
+                        ttft = round((time.time() - t0) * 1000)
+                    parts.append(delta)
+                    yield _sse("delta", {"t": delta})
+        except Exception as e:           # connection dropped or timed out mid-answer
+            print(f"LLM stream broke ({type(e).__name__})", flush=True)
+            broke = True
+            trace.attempt(model, "stream_broke", None, chat_trace.error_kind(None, type(e).__name__))
+            if parts:
+                yield _sse("delta", {"t": "\n\n(The answer was cut off because the AI service stopped responding. Please ask again for the full answer.)"})
+            else:
+                d = _degraded_response(req, request, sources, result, t0, HTTPException(503), trace)
+                yield _sse("delta", {"t": d["answer"]})
+                yield _sse("done", {"cached": False, "degraded": True, "timings": d["timings"], "suggestions": []})
+                return
+        answer = "".join(parts)
+        if result.get("lunch") and not broke and lunch_lookup.NOTE not in answer:
+            tail = "\n\n" + lunch_lookup.NOTE
+            yield _sse("delta", {"t": tail})              # the cafe note is always the last line, even if the model left it out
+            answer += tail
+        timings = {**result["timings"], "ttft_ms": ttft, "llm_ms": round((time.time() - t_llm) * 1000),
+                   "total_ms": round((time.time() - t0) * 1000)}
+        suggestions = suggestions_for(result, req.query, req.grade, req.history)
+        yield _sse("done", {"cached": False, "timings": timings, "suggestions": suggestions})
+        if key and answer and sources and not broke:
+            _cache_put(req, key, {"answer": answer, "model_used": model, "sources": sources, "suggestions": suggestions}, result["intent"])
+        trace.usage_from(None, msgs, answer)          # no-op when the provider already reported real usage; otherwise a labelled estimate
+        trace.route = "llm"
+        _track(req, request, {"query": req.query[:300], "cached": False, "sources": len(sources), "no_context": not sources,
+                              "fallback": bool(re.search(r"(isn't|is not|not) (in|available)|not on the school calendar", answer, re.I)),
+                              "alen": len(answer), **({"broke": True} if broke else {}), **timings}, trace)
+    except Exception as e:
+        if req.anon_id:
+            analytics.record("chat_error", req.anon_id, req.session_id, {"error": str(e)[:200], "query": req.query[:200]}, ua=_client_ua(request),
+                             flags=_flags(req, request), server_event=True)
+        print(f"stream error: {type(e).__name__}: {str(e)[:200]}", flush=True)
+        yield _sse("error", {"message": e.detail if isinstance(e, HTTPException) else "Something went wrong on my side. Please try again in a moment."})
 
 
 # ------------------------------------------------------------------ calendar + links for the UI
@@ -789,6 +918,10 @@ def _lunch_rate_limit(request: Request):
             window = [t for t in _lunch_hits.get(key, []) if now - t < 60]
             if len(window) >= limit:
                 _lunch_hits[key] = window
+                try:
+                    analytics.record("rate_limited", audience.SYSTEM_ID, "", {"limiter": "lunch_ip" if key != "*" else "lunch_global"}, path="/lunch", server_event=True)
+                except Exception:
+                    pass
                 raise HTTPException(429, "Too many lunch requests - please wait a few seconds and try again.")
             window.append(now)
             _lunch_hits[key] = window
@@ -830,34 +963,99 @@ class TrackEvent(BaseModel):
     event: str
     props: dict = Field(default_factory=dict)
     ts: str | None = None
+    eid: str | None = None          # client-generated event id: makes retries and double flushes harmless
 
 
 class TrackBatch(BaseModel):
     anon_id: str
     session_id: str = ""
     path: str = ""
+    # envelope: set by the browser, never buried in props. i = this browser was marked internal, wd = webdriver/headless, dev = localhost build
+    flags: list[str] = Field(default_factory=list, max_length=6)
     events: list[TrackEvent] = Field(max_length=50)
 
 
 @app.post("/api/track")
 async def track(batch: TrackBatch, request: Request):
-    ua = request.headers.get("user-agent", "")
-    accepted = sum(analytics.record(e.event, batch.anon_id, batch.session_id, e.props, batch.path, ua, e.ts) for e in batch.events)
+    ua = _client_ua(request)
+    fl = {"internal": "i" in batch.flags, "webdriver": "wd" in batch.flags, "dev": "dev" in batch.flags, "test": bool(request.headers.get("x-nuevai-test"))}
+    accepted = sum(analytics.record(e.event, batch.anon_id, batch.session_id, e.props, batch.path, ua, e.ts, flags=fl, eid=e.eid) for e in batch.events)
     return {"accepted": accepted}
 
 
-@app.get("/api/metrics")
-def metrics(request: Request, days: int = 14, token: str = ""):
+def _check_token(request: Request, token: str = ""):
     expected = os.getenv("METRICS_TOKEN", "")
     if not expected:
         raise HTTPException(503, "Metrics are disabled: set METRICS_TOKEN on the server.")
     supplied = request.headers.get("x-metrics-token") or token
     if not supplied or not hmac.compare_digest(supplied.encode(), expected.encode()):
         raise HTTPException(401, "Invalid metrics token.")
-    out = analytics.summary(min(max(days, 1), 60))
-    out["server"] = {"answer_cache": answer_cache.stats(), "embed_cache": retriever.embed_cache.stats(),
-                     "embedding": "supabase-edge:gte-small", "llm_model": LLM_MODEL}
+
+
+def _clamp_days(days: int) -> int:
+    """24 h / 7 / 30 / 90 days or 0 = all time. Anything else rounds UP to the next allowed range (so a range is never smaller than
+    asked for) and is capped at 90; zero or negative means all time. Never an error."""
+    if days <= 0:
+        return 0
+    return next((d for d in (1, 7, 30, 90) if days <= d), 90)
+
+
+@app.get("/api/metrics")
+def metrics(request: Request, days: int = 7, token: str = "", aud: str = "users", refresh: int = 0):
+    _check_token(request, token)
+    sel = aud if aud in ("users", "users_internal", "test_bots", "all") else "users"
+    out = analytics.summary(_clamp_days(days), sel, force=bool(refresh))
+    out = {**out, "server": {"answer_cache": answer_cache.stats(), "embed_cache": retriever.embed_cache.stats(), "embedding": "supabase-edge:gte-small",
+                             "llm_model": LLM_MODEL, "fallbacks": FALLBACK_MODELS, "inflight": chat_trace.inflight_now(), "uptime_s": round(time.time() - chat_trace.BOOT_TS),
+                             "rss_mb": chat_trace.rss_mb()}}
     return out
+
+
+@app.get("/api/metrics/day")
+def metrics_day(request: Request, date: str = "", token: str = "", aud: str = "users"):
+    _check_token(request, token)
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date or ""):
+        raise HTTPException(400, "date must be YYYY-MM-DD")
+    try:
+        return analytics.day(date, aud if aud in ("users", "users_internal", "test_bots", "all") else "users")
+    except ValueError:
+        raise HTTPException(400, "date must be YYYY-MM-DD")
+
+
+@app.get("/api/metrics/inspect")
+def metrics_inspect(request: Request, key: str = "", days: int = 30, token: str = "", aud: str = "users"):
+    _check_token(request, token)
+    return {"rows": analytics.inspect(key[:160], _clamp_days(days), aud if aud in ("users", "users_internal", "test_bots", "all") else "users")}
+
+
+@app.get("/api/metrics/ids")
+def metrics_ids(request: Request, token: str = ""):
+    _check_token(request, token)
+    return analytics.heaviest(40)
+
+
+class MarkBody(BaseModel):
+    id: str = Field(max_length=32)
+    audience: str | None = Field(default=None, max_length=12)     # None clears the override
+    note: str = Field(default="", max_length=200)
+
+
+@app.post("/api/metrics/mark")
+def metrics_mark(body: MarkBody, request: Request, token: str = ""):
+    _check_token(request, token)
+    if body.audience is not None and body.audience not in audience.AUDIENCES:
+        raise HTTPException(400, "audience must be user, internal, test or bot (or null to clear)")
+    try:
+        return analytics.mark(body.id, body.audience, body.note)
+    except KeyError:
+        raise HTTPException(404, "Unknown browser id (the list may have changed; reload it).")
+
+
+@app.get("/api/metrics/whoami")
+def metrics_whoami(request: Request, token: str = ""):
+    """Token check only (used by 'mark this browser as me': the browser asks, and on 200 sets its own localStorage flag)."""
+    _check_token(request, token)
+    return {"ok": True}
 
 
 if __name__ == "__main__":

@@ -509,6 +509,11 @@ class Retriever:
         search_q = expand_query(resolved if followed else f"{prev_user} {query}" if prev_user and len(query.split()) <= 6 else query)
         intent = (parse_intent(resolved, today, prev_user) if followed else None) or parse_intent(query, today, prev_user)
         timings = {}
+        dep_errors = []         # analytics only: which dependency failed and how (never shown to the visitor)
+
+        def _dep(dep: str, e: Exception):
+            n = type(e).__name__.lower()
+            dep_errors.append({"dep": dep, "kind": "timeout" if "timeout" in n else "connection" if "connect" in n else "error", "err": type(e).__name__[:40]})
 
         def vec_task():
             t = time.time()
@@ -548,6 +553,7 @@ class Retriever:
             vec_rows = f_vec.result(timeout=VECTOR_BUDGET_S)
         except Exception as e:        # embedding function 546/5xx, slow database: carry on with the structured lookups
             degraded = True
+            _dep("embedding" if "embed_ms" not in timings else "vector", e)
             print(f"vector search unavailable ({type(e).__name__}: {str(e)[:100]}); continuing without it", flush=True)
         try:
             fts_rows = f_fts.result(timeout=3)
@@ -558,10 +564,12 @@ class Retriever:
             link_rows = f_links.result(timeout=12)
         except Exception as e:
             link_rows = []
+            _dep("links", e)
             print(f"link lookup failed: {e}", flush=True)
         try:
             events = f_cal.result(timeout=12)
         except Exception as e:
+            _dep("calendar", e)
             print(f"calendar lookup failed: {e}", flush=True)
 
         rows = [r for r in rows if (r.get("metadata") or {}).get("source") != "lunch"          # day records are reached only through the lunch lookup
@@ -593,7 +601,7 @@ class Retriever:
             events, intent = [], None      # "Biology Research Teams 2" is a course, not a sports-team question: no team overview
         pin_ids = {p["chunk_id"] for p in pinned}
         docs = [d for d in docs if d["chunk_id"] not in ent_ids | pin_ids]
-        return {"pinned": pinned, "docs": docs, "events": events, "intent": intent, "timings": timings, "candidates": len(rows), "entities": ents, "degraded": degraded, "resolved": standalone}
+        return {"pinned": pinned, "docs": docs, "events": events, "intent": intent, "timings": timings, "candidates": len(rows), "entities": ents, "degraded": degraded, "resolved": standalone, "dep_errors": dep_errors}
 
 
 def fmt_event(r: dict) -> str:

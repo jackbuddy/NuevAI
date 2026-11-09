@@ -6,6 +6,10 @@
  *  - session_id: rotates after 30 minutes of inactivity.
  *  - track(event, props): queues a record that is always stamped with both ids, then batches
  *    it to /api/track (which forwards to the server, which stores it in Supabase).
+ *  - envelope flags (top level of every batch and chat request, never inside props): `i` = this browser was marked as the
+ *    owner/dev's ("Mark this browser as me" on /insights, or /?internal=1), `wd` = webdriver/headless, `dev` = localhost build.
+ *    The server turns them into the event's audience (user | internal | test | bot).
+ *  - visit counter: nuevai.visits is incremented whenever a new session starts.
  * Everything here fails silent: analytics must never break the app.
  */
 
@@ -13,11 +17,13 @@ const UID_KEY = 'nuevai.uid';
 const SID_KEY = 'nuevai.sid';
 const LAST_KEY = 'nuevai.last';
 const FIRST_KEY = 'nuevai.first';
+const VISITS_KEY = 'nuevai.visits';
+const INTERNAL_KEY = 'nuevai.internal';
 const SESSION_GAP_MS = 30 * 60 * 1000;
 const FLUSH_MS = 3000;
 
 type Props = Record<string, string | number | boolean | null | undefined>;
-interface Queued { event: string; props: Props; ts: string }
+interface Queued { event: string; props: Props; ts: string; eid: string }
 
 let queue: Queued[] = [];
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -52,23 +58,63 @@ export function getIds(): { anonId: string; sessionId: string; newSession: boole
   if (!sessionId || now - last > SESSION_GAP_MS) {
     sessionId = uuid();
     newSession = true;
-    try { ls?.setItem(SID_KEY, sessionId); } catch {}
+    try {
+      ls?.setItem(SID_KEY, sessionId);
+      ls?.setItem(VISITS_KEY, String((Number(ls?.getItem(VISITS_KEY)) || 0) + 1));
+      if (!ls?.getItem(FIRST_KEY)) ls?.setItem(FIRST_KEY, new Date().toISOString());
+    } catch {}
   }
   try { ls?.setItem(LAST_KEY, String(now)); } catch {}
   ids = { anonId, sessionId };
   return { anonId, sessionId, newSession, returning };
 }
 
+/** Visit info for this browser: how many sessions it has had and since when. Safe on the server (returns nulls). */
+export function getVisitInfo(): { visit_number: number | null; first_visit: boolean | null; first_seen: string | null; days_since_first: number | null } {
+  const ls = store('local');
+  if (!ls) return { visit_number: null, first_visit: null, first_seen: null, days_since_first: null };
+  const n = Number(ls.getItem(VISITS_KEY)) || 1;
+  const first = ls.getItem(FIRST_KEY);
+  const t = first ? Date.parse(first) : NaN;
+  return {
+    visit_number: n,
+    first_visit: n <= 1,
+    first_seen: first,
+    days_since_first: Number.isFinite(t) ? Math.max(0, Math.floor((Date.now() - t) / 86_400_000)) : null,
+  };
+}
+
+/** Is this browser marked as the owner's / a developer's? Stored only in this browser. */
+export function isInternal(): boolean {
+  try { return store('local')?.getItem(INTERNAL_KEY) === '1'; } catch { return false; }
+}
+export function setInternal(on: boolean) {
+  try { if (on) store('local')?.setItem(INTERNAL_KEY, '1'); else store('local')?.removeItem(INTERNAL_KEY); } catch {}
+}
+
+/** Envelope flags understood by the server. */
+export function envelopeFlags(): string[] {
+  const f: string[] = [];
+  try {
+    if (isInternal()) f.push('i');
+    const ua = navigator.userAgent || '';
+    if (navigator.webdriver || /HeadlessChrome|PhantomJS/i.test(ua)) f.push('wd');
+    const h = location.hostname;
+    if (h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h.endsWith('.localhost') || h.endsWith('.test') || h.endsWith('.local')) f.push('dev');
+  } catch {}
+  return f;
+}
+
 /** Ids to attach to any request that should be tied to this user (e.g. chat). */
-export function currentIds(): { anon_id: string; session_id: string } {
+export function currentIds(): { anon_id: string; session_id: string; flags: string[] } {
   const i = getIds();
-  return { anon_id: i.anonId, session_id: i.sessionId };
+  return { anon_id: i.anonId, session_id: i.sessionId, flags: envelopeFlags() };
 }
 
 function send(batch: Queued[], beacon = false) {
   if (!batch.length) return;
   const { anonId, sessionId } = ids ?? getIds();
-  const body = JSON.stringify({ anon_id: anonId, session_id: sessionId, path: location.pathname + location.search.slice(0, 40), events: batch });
+  const body = JSON.stringify({ anon_id: anonId, session_id: sessionId, flags: envelopeFlags(), path: location.pathname + location.search.slice(0, 40), events: batch });
   try {
     if (beacon && navigator.sendBeacon) {
       navigator.sendBeacon('/api/track', new Blob([body], { type: 'application/json' }));
@@ -89,7 +135,7 @@ export function track(event: string, props: Props = {}) {
   if (typeof window === 'undefined') return;
   try {
     getIds();
-    queue.push({ event, props, ts: new Date().toISOString() });
+    queue.push({ event, props, ts: new Date().toISOString(), eid: uuid().replace(/-/g, '').slice(0, 20) });
     if (queue.length >= 20) flush();
     else if (!timer) timer = setTimeout(() => flush(), FLUSH_MS);
   } catch {}
@@ -100,11 +146,23 @@ export function startAnalytics() {
   if (typeof window === 'undefined' || started) return;
   started = true;
   try {
+    // /?internal=1 marks this browser as the owner's (events from it are labelled "internal" and left out of the real-user numbers); /?internal=0 undoes it
+    try {
+      const q = new URLSearchParams(location.search);
+      if (q.has('internal')) {
+        setInternal(q.get('internal') !== '0');
+        q.delete('internal');
+        history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
+      }
+    } catch {}
     const { newSession, returning } = getIds();
     if (newSession) {
       const w = window.innerWidth;
       track('session_start', {
         returning,
+        visit_number: getVisitInfo().visit_number,
+        first_visit: getVisitInfo().first_visit,
+        days_since_first: getVisitInfo().days_since_first,
         device: w < 640 ? 'mobile' : w < 1024 ? 'tablet' : 'desktop',
         viewport: `${w}x${window.innerHeight}`,
         referrer: document.referrer ? new URL(document.referrer).host : 'direct',
