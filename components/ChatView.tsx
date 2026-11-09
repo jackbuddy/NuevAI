@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, CalendarDays, Check, ChevronDown, Copy, Link2, MapPin, RotateCw, Info, Square, SquarePen, ThumbsDown, ThumbsUp, Trophy, UtensilsCrossed, Users, Zap } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowDown, ArrowUp, CalendarDays, Check, ChevronDown, Copy, History, Lightbulb, Link2, MapPin, RotateCw, Info, ShieldCheck, Square, SquarePen, ThumbsDown, ThumbsUp, Trophy, UtensilsCrossed, Users, Zap } from 'lucide-react';
 import { Markdown } from './Markdown';
 import { Logo } from './Logo';
 import { track } from '@/lib/analytics';
@@ -9,32 +9,51 @@ import { Message, Role, Campus, loadCampus, loadRole, saveCampus, saveGrade, sav
 import { nowLA } from '@/lib/calendar';
 import { Preferences } from './Preferences';
 import { Happening } from './Happening';
+import { IdeasSheet } from './IdeasSheet';
+import { Hint } from './Hint';
+import { InstallPrompt } from './InstallPrompt';
+import { WhatsNew } from './WhatsNew';
+import { PLACEHOLDERS } from '@/lib/ideas';
+import { HintId, Starter, Topic, chooseHint, provenance, rankStarters, topicOf } from '@/lib/ux-logic';
+import { Visit, addRecent, endOnboarding, hintResolved, hintShown, markUsed, noteAnswer, onUxChange, onboardingShown, readVisit, recents, ux } from '@/lib/visit';
 
-// short, concrete things people actually ask; the role only swaps one or two of them
-const STARTERS = [
-  { icon: Trophy, label: 'What games are today?' },
-  { icon: UtensilsCrossed, label: 'What’s for lunch today?' },
-  { icon: Users, label: 'What clubs meet at lunch?' },
-  { icon: CalendarDays, label: 'Is there school tomorrow?' },
+// short, concrete things people actually ask. The first four lead with answers that are quick and reliable (lunch, games,
+// school days, clubs); the extras only matter once someone has already asked the first ones. Policy/course questions live in Ideas.
+type StarterItem = Starter & { icon: typeof Trophy };
+const STARTERS: StarterItem[] = [
+  { icon: Trophy, label: 'What games are this week?', topic: 'games' },
+  { icon: UtensilsCrossed, label: 'What’s for lunch today?', topic: 'lunch' },
+  { icon: CalendarDays, label: 'Is there school tomorrow?', topic: 'school_day' },
+  { icon: Users, label: 'Which clubs meet today?', topic: 'clubs' },
+  { icon: Trophy, label: 'When is the next home game?', topic: 'games' },
+  { icon: UtensilsCrossed, label: 'What’s for lunch tomorrow?', topic: 'lunch' },
 ];
-const STARTERS_BY_ROLE: Record<Role, typeof STARTERS> = {
+const STARTERS_BY_ROLE: Record<Role, StarterItem[]> = {
   student: STARTERS,
   parent: [
-    { icon: Trophy, label: 'What games are this week?' },
-    { icon: UtensilsCrossed, label: 'What’s for lunch today?' },
-    { icon: MapPin, label: 'How do I book a campus tour?' },
-    { icon: CalendarDays, label: 'Is there school tomorrow?' },
+    { icon: UtensilsCrossed, label: 'What’s for lunch today?', topic: 'lunch' },
+    { icon: Trophy, label: 'What games are this week?', topic: 'games' },
+    { icon: CalendarDays, label: 'Is there school tomorrow?', topic: 'school_day' },
+    { icon: MapPin, label: 'How do I book a campus tour?', topic: 'resources' },
+    { icon: CalendarDays, label: 'When is the next no-school day?', topic: 'calendar' },
+    { icon: UtensilsCrossed, label: 'What’s for lunch tomorrow?', topic: 'lunch' },
   ],
   staff: [
-    { icon: CalendarDays, label: 'What kind of day is it tomorrow?' },
-    { icon: UtensilsCrossed, label: 'What’s for lunch today?' },
-    { icon: CalendarDays, label: 'When are the next PD days?' },
-    { icon: Trophy, label: 'What games are this week?' },
+    { icon: CalendarDays, label: 'What kind of day is it tomorrow?', topic: 'school_day' },
+    { icon: UtensilsCrossed, label: 'What’s for lunch today?', topic: 'lunch' },
+    { icon: CalendarDays, label: 'When are the next PD days?', topic: 'calendar' },
+    { icon: Trophy, label: 'What games are this week?', topic: 'games' },
+    { icon: Users, label: 'Which clubs meet today?', topic: 'clubs' },
+    { icon: UtensilsCrossed, label: 'What’s for lunch tomorrow?', topic: 'lunch' },
   ],
+};
+const LOADING_LABEL: Partial<Record<Topic, string>> = {
+  lunch: 'Checking the lunch menu…', games: 'Looking at the athletics calendar…', school_day: 'Checking the school calendar…',
+  calendar: 'Checking the school calendar…', clubs: 'Looking through the clubs list…', resources: 'Looking for the right link…',
 };
 const STORE_KEY = 'nuevai.chat.v2';
 
-export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendingAsk: string | null; onAskConsumed: () => void; onOpenCalendar: () => void }) {
+export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar, onOpenResources }: { pendingAsk: string | null; onAskConsumed: () => void; onOpenCalendar: () => void; onOpenResources: () => void }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -55,6 +74,11 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
   const campusRef = useRef<Campus | null>(null);
   campusRef.current = campus;
   const [hydrated, setHydrated] = useState(false);   // do not save until the saved chat has been read back
+  const [vis, setVis] = useState<Visit | null>(null);  // first visit / returning, read after hydration
+  const [hint, setHint] = useState<{ msgId: string; id: HintId } | null>(null);
+  const [ideasOpen, setIdeasOpen] = useState(false);
+  const [phIdx, setPhIdx] = useState(0);
+  const [focused, setFocused] = useState(false);
 
   // restore conversation for this browser tab
   useEffect(() => {
@@ -66,10 +90,12 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
     saveGrade(null);   // the grade selector is gone: drop any value saved by an earlier version
     setRole(loadRole());
     setCampus(loadCampus());
+    setVis(readVisit());
     setHydrated(true);
     const { date: d, hour: h } = nowLA();
     setGreeting(h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening');
   }, []);
+  useEffect(() => onUxChange(() => setVis(readVisit())), []);
   useEffect(() => { if (!hydrated) return; try { sessionStorage.setItem(STORE_KEY, JSON.stringify(messages.slice(-24))); } catch {} }, [messages, hydrated]);
   const toBottom = useCallback((smooth = false) => {
     const el = scrollRef.current;
@@ -95,11 +121,13 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
     t.style.height = Math.min(t.scrollHeight, 160) + 'px';
   }, [input]);
 
-  const send = useCallback(async (text: string, via: 'typed' | 'starter' | 'ask' | 'retry' = 'typed') => {
+  const send = useCallback(async (text: string, via: 'typed' | 'starter' | 'ask' | 'retry' | 'idea' | 'recent' = 'typed') => {
     const q = text.trim();
     if (!q || busy) return;
     const history = msgsRef.current.filter((m) => !m.error && !m.streaming && m.content).map((m) => ({ role: m.role, content: m.content }));
     const aId = uid();
+    setHint(null);
+    if (via !== 'retry') { endOnboarding(via); addRecent(q); }
     setMessages((p) => [...p, { id: uid(), role: 'user', content: q }, { id: aId, role: 'assistant', content: '', streaming: true, query: q }]);
     setInput('');
     stick.current = true;
@@ -108,6 +136,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
     setWaking(false);
     const t0 = performance.now();
     let first = 0;
+    let done: { cached: boolean; degraded?: boolean } | null = null;
     track('chat_sent', { via, chars: q.length, turn: history.filter((m) => m.role === 'user').length + 1 });
     const wake = setTimeout(() => setWaking(true), 6500);
     const ac = new AbortController();
@@ -119,7 +148,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
           await streamChat(q, history, {
             onMeta: (m) => patch((x) => ({ ...x, sources: m.sources, cached: m.cached })),
             onDelta: (t) => { if (!first) { first = performance.now() - t0; setWaking(false); } patch((x) => ({ ...x, content: x.content + t })); },
-            onDone: (d) => { setAnnounce('Answer ready'); patch((x) => ({ ...x, streaming: false, cached: d.cached, degraded: !!d.degraded, suggestions: d.suggestions ?? [], ms: Math.round(first), totalMs: Math.round(performance.now() - t0) })); },
+            onDone: (d) => { done = d; setAnnounce('Answer ready'); patch((x) => ({ ...x, streaming: false, cached: d.cached, degraded: !!d.degraded, suggestions: d.suggestions ?? [], ms: Math.round(first), totalMs: Math.round(performance.now() - t0) })); },
           }, ac.signal, null, campusRef.current);
           break;
         } catch (err: any) {
@@ -133,6 +162,15 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
         }
       }
       track('chat_rendered', { first_ms: Math.round(first), total_ms: Math.round(performance.now() - t0) });
+      if (first > 0 && done) {
+        const topic = topicOf(q);
+        const wasFirst = ux().answers === 0;
+        noteAnswer(topic);
+        if (wasFirst) track('first_answer_seen', { ms: Math.round(first), total_ms: Math.round(performance.now() - t0), route: done.degraded ? 'degraded' : done.cached ? 'cached' : 'llm', topic, via });
+        const u = ux();
+        const id = chooseHint({ topic, answers: u.answers, hasCampus: !!campusRef.current, campusInQuestion: /hillsborough|san mateo/i.test(q), used: u.used, degraded: !!done.degraded, error: false }, u.hints, Date.now());
+        if (id) { hintShown(id); setHint({ msgId: aId, id }); }
+      }
     } catch (e: any) {
       if (e?.name === 'AbortError') { setAnnounce('Stopped'); patch((x) => ({ ...x, streaming: false, stopped: true, ...(x.content ? {} : { error: true, content: 'Stopped before an answer arrived.' }) })); }
       else {
@@ -153,12 +191,64 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
 
   const retry = (m: Message) => { if (m.query) { setMessages((p) => p.filter((x) => x.id !== m.id).slice(0, -1)); setTimeout(() => send(m.query!, 'retry'), 0); } };
   const clear = () => { abortRef.current?.abort(); setMessages([]); track('chat_cleared'); };
-  const chooseRole = (r: Role | null) => { setRole(r); saveRole(r); };
-  const chooseCampus = (c: Campus | null) => { setCampus(c); saveCampus(c); };
+  const chooseRole = (r: Role | null) => { setRole(r); saveRole(r); track('pref_set', { role: r ?? 'none' }); if (r) endOnboarding('pref'); };
+  const chooseCampus = (c: Campus | null) => { setCampus(c); saveCampus(c); track('pref_set', { campus: c ?? 'none' }); if (c) endOnboarding('pref'); };
   const empty = messages.length === 0;
+  const firstRun = empty && !!vis?.firstRun && !role && !campus;
+  useEffect(() => { if (firstRun) onboardingShown('first_run_v1'); }, [firstRun]);
+
+  const openIdeas = useCallback((from: string) => { markUsed('ideas'); track('ideas_open', { from }); endOnboarding('ideas'); setIdeasOpen(true); }, []);
+  const closeIdeas = useCallback(() => setIdeasOpen(false), []);
+  const pickIdea = (q: string, category: string) => { track('idea_click', { category, label: q.slice(0, 80) }); setIdeasOpen(false); send(q, 'idea'); };
+  const actHint = () => {
+    if (!hint) return;
+    const id = hint.id;
+    hintResolved(id, 'click'); setHint(null);
+    if (id === 'games_calendar' || id === 'calendar_tab') onOpenCalendar();
+    else if (id === 'resources') onOpenResources();
+    else if (id === 'ideas') openIdeas('hint');
+  };
+  const hintCampus = (c: Campus) => { hintResolved('campus', 'click'); chooseCampus(c); setHint(null); };
+  const dismissHint = () => { if (hint) hintResolved(hint.id, 'dismiss'); setHint(null); };
+
+  // a rotating placeholder of real questions teaches what is askable; it stops on focus/typing and never moves for reduced-motion users
+  useEffect(() => {
+    if (!empty || focused || input || typeof matchMedia !== 'function' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const t = setInterval(() => setPhIdx((i) => (i + 1) % PLACEHOLDERS.length), 4500);
+    return () => clearInterval(t);
+  }, [empty, focused, input]);
+  // "/" jumps to the composer (desktop habit); ignored while typing elsewhere or when Chat is not the visible tab
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey || ideasOpen) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
+      const ta = taRef.current;
+      if (!ta || ta.offsetParent === null) return;
+      e.preventDefault(); ta.focus();
+    };
+    document.addEventListener('keydown', k);
+    return () => document.removeEventListener('keydown', k);
+  }, [ideasOpen]);
+
+  const startersShown = useMemo(() => {
+    const pool = STARTERS_BY_ROLE[role ?? 'student'];
+    if (!hydrated || firstRun) return pool.slice(0, 4);
+    return rankStarters(pool, ux().topics, recents(), 4);
+  }, [role, hydrated, firstRun, empty]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const recentShown = useMemo(() => (hydrated && empty ? recents().slice(0, 2) : []), [hydrated, empty]);   // eslint-disable-line react-hooks/exhaustive-deps
 
 
-  const prefs = <Preferences role={role} campus={campus} onRole={chooseRole} onCampus={chooseCampus} />;
+  const prefs = (
+    <div className="inline-flex items-center">
+      <Preferences role={role} campus={campus} onRole={chooseRole} onCampus={chooseCampus} />
+      <span aria-hidden className="mx-0.5 h-3.5 w-px bg-[var(--line)]" />
+      <button type="button" onClick={() => openIdeas('button')} aria-haspopup="dialog"
+              className="tap-h inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium text-brand-700 transition hover:bg-brand-100">
+        <Lightbulb className="h-3.5 w-3.5" aria-hidden />Ideas
+      </button>
+    </div>
+  );
 
   const composer = (
     <form onSubmit={(e) => { e.preventDefault(); send(input); }}
@@ -170,7 +260,8 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
                   if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && !composing.current && e.keyCode !== 229) { e.preventDefault(); send(input); }
                 }}
                 enterKeyHint="send" autoComplete="off"
-                placeholder={empty ? 'Ask about courses, games, policies…' : 'Ask a follow-up…'} aria-label="Ask NuevAI"
+                onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+                placeholder={empty ? PLACEHOLDERS[phIdx] : 'Ask a follow-up…'} aria-label="Ask NuevAI"
                 className="bare max-h-40 min-h-[2.75rem] min-w-0 flex-1 resize-none bg-transparent py-3 text-base outline-none placeholder:text-[var(--ink-2)] sm:text-[15px]" />
       {messages.length > 0 && (
         <button type="button" onClick={clear} aria-label="New chat" title="New chat" className="ink-2 tap-box h-11 shrink-0 gap-1.5 rounded-full px-3 text-xs font-semibold hover:bg-[var(--surface-2)] max-sm:w-11 max-sm:px-0"><SquarePen className="h-4 w-4" aria-hidden /><span className="hidden sm:inline">New chat</span></button>
@@ -200,13 +291,30 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
               <h1 className="text-balance text-4xl font-bold leading-[1.1] tracking-tight text-brand-900 md:text-[3.25rem]">
                 What would you like to <span className="bg-gradient-to-r from-brand-600 to-sky-500 bg-clip-text text-transparent">know</span>?
               </h1>
+              {firstRun && (
+                <p className="ink-2 mt-3 max-w-xl text-[13px] leading-relaxed sm:text-sm">Answers come from Nueva’s calendar, lunch menus and school documents, and can be wrong. Check the sources.</p>
+              )}
             </div>
 
             <div className="animate-rise mt-8" style={{ animationDelay: '70ms' }}>{composer}</div>
             <div className="animate-rise relative z-20 mt-3 text-center" style={{ animationDelay: '100ms' }}>{prefs}</div>
 
+            {recentShown.length > 0 && (
+              <div className="animate-rise mt-4 text-center" style={{ animationDelay: '120ms' }}>
+                <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-brand-500">Pick up where you left off</p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {recentShown.map((q) => (
+                    <button key={q} onClick={() => { track('recent_click'); send(q, 'recent'); }}
+                            className="surface tap-h inline-flex max-w-full items-center gap-2 rounded-full px-4 py-2 text-[13px] font-medium text-brand-800 transition hover:bg-white hover:shadow-soft">
+                      <History className="h-3.5 w-3.5 shrink-0 text-brand-500" aria-hidden /><span className="truncate">{q}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="animate-rise mt-4 flex flex-wrap justify-center gap-2" style={{ animationDelay: '140ms' }}>
-              {STARTERS_BY_ROLE[role ?? 'student'].map((s) => (
+              {startersShown.map((s) => (
                 <button key={s.label} onClick={() => { track('starter_click', { label: s.label }); send(s.label, 'starter'); }}
                         className="surface-2 tap-h inline-flex items-center gap-2 rounded-full border border-transparent px-4 py-2 text-[13px] font-medium text-brand-800 transition hover:border-[var(--line)] hover:bg-white hover:shadow-soft">
                   <s.icon className="h-3.5 w-3.5 text-brand-500" />{s.label}
@@ -214,7 +322,9 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
               ))}
             </div>
 
+            <WhatsNew />
             <Happening campus={campus} onCampus={chooseCampus} onOpenCalendar={onOpenCalendar} onAsk={(q) => send(q, 'starter')} />
+            <InstallPrompt idle={empty && !input && !busy && !ideasOpen} />
           </div>
         </div>
       ) : (
@@ -223,10 +333,11 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
             <div role="log" aria-label="Conversation" className="mx-auto w-full max-w-3xl space-y-7 px-4 pb-6 pt-8 md:px-6">
               {messages.map((m, i) => (
                 <div key={m.id}>
-                  <Bubble m={m} waking={waking && !!m.streaming && !m.content} onRetry={() => retry(m)} />
+                  <Bubble m={m} waking={waking && !!m.streaming && !m.content} onRetry={() => retry(m)} onOpenCalendar={onOpenCalendar} onHome={clear} />
                   {i === messages.length - 1 && !busy && !m.error && m.suggestions && m.suggestions.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-2 pl-[38px]">
-                      {m.suggestions.map((s) => (
+                      {/* while the campus hint is offering the same choice, do not show it twice */}
+                      {m.suggestions.filter((s) => !(hint?.id === 'campus' && hint.msgId === m.id && /\b(san mateo|hillsborough)\b/i.test(s.label))).map((s) => (
                         <button key={s.label} onClick={() => { track('suggestion_click', { label: s.label }); s.action === 'calendar' ? onOpenCalendar() : s.query && send(s.query, 'starter'); }}
                                 className="surface-2 tap-h rounded-full border border-transparent px-3.5 py-1.5 text-[13px] font-medium text-brand-800 transition hover:border-[var(--line)] hover:bg-white hover:shadow-soft">
                           {s.label}
@@ -234,6 +345,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
                       ))}
                     </div>
                   )}
+                  {i === messages.length - 1 && !busy && hint && hint.msgId === m.id && <Hint id={hint.id} onAct={actHint} onCampus={hintCampus} onDismiss={dismissHint} />}
                 </div>
               ))}
               <div ref={endRef} />
@@ -249,19 +361,31 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar }: { pendin
             <div className="mx-auto w-full max-w-3xl">
               {composer}
               <div className="relative z-20 mt-1 text-center">{prefs}</div>
-              <p className="ink-2 mt-2 text-center text-[11px] leading-snug">NuevAI can make mistakes — verify important dates. Anonymous analytics only; no account or personal data.</p>
+              <p className="ink-2 mt-2 text-center text-[11px] leading-snug">NuevAI can make mistakes — check sources for anything important. Anonymous analytics only; no account or personal data.</p>
             </div>
           </div>
         </>
       )}
+      <IdeasSheet open={ideasOpen} onClose={closeIdeas} onPick={pickIdea} />
     </div>
   );
 }
 
-function Bubble({ m, waking, onRetry }: { m: Message; waking: boolean; onRetry: () => void }) {
+function Bubble({ m, waking, onRetry, onOpenCalendar, onHome }: { m: Message; waking: boolean; onRetry: () => void; onOpenCalendar: () => void; onHome: () => void }) {
   const [copied, setCopied] = useState(false);
   const [showSrc, setShowSrc] = useState(false);
   const [fb, setFb] = useState<'up' | 'down' | undefined>(m.feedback);
+  const prov = provenance(m.sources);
+  const problem = !m.streaming && m.role === 'assistant' && (!!m.error || (!!m.degraded && !!m.content));
+  useEffect(() => { if (problem) track('hint_shown', { id: 'fallback' }); }, [problem]);
+  const fallback = (
+    <p className="ink-2 mt-2 text-xs leading-snug">
+      The calendar and Home still work without the assistant:{' '}
+      <button type="button" onClick={() => { track('hint_click', { id: 'fallback', to: 'calendar' }); onOpenCalendar(); }} className="tap-h font-semibold text-brand-600 hover:underline">open the calendar</button>
+      {' or '}
+      <button type="button" onClick={() => { track('hint_click', { id: 'fallback', to: 'home' }); onHome(); }} className="tap-h font-semibold text-brand-600 hover:underline">go to Home</button>.
+    </p>
+  );
   if (m.role === 'user') {
     return (
       <div className="animate-rise flex justify-end">
@@ -277,13 +401,14 @@ function Bubble({ m, waking, onRetry }: { m: Message; waking: boolean; onRetry: 
           <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4 text-sm">
             <p className="text-brand-800">{m.content}</p>
             <button onClick={onRetry} className="tap-box mt-3 gap-1.5 rounded-full bg-brand-900 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"><RotateCw className="h-3.5 w-3.5" />Try again</button>
+            {fallback}
           </div>
         ) : !m.content ? (
           <div className="surface rounded-2xl p-4">
             <div className="space-y-2.5">
               <div className="shimmer h-3 w-3/4 rounded-full" /><div className="shimmer h-3 w-1/2 rounded-full" /><div className="shimmer h-3 w-2/3 rounded-full" />
             </div>
-            {waking && <p className="ink-2 mt-3 text-xs">Waking up the assistant — the first question after a quiet period can take up to a minute. After this it’s fast.</p>}
+            <p className="ink-2 mt-3 text-xs">{waking ? 'Waking up the assistant — the first question after a quiet period can take up to a minute. After this it’s fast.' : (LOADING_LABEL[topicOf(m.query ?? '')] ?? 'Searching school documents…')}</p>
           </div>
         ) : (
           <div className={m.streaming ? 'caret' : ''} aria-busy={!!m.streaming}><Markdown streaming={!!m.streaming}>{m.content}</Markdown></div>
@@ -291,6 +416,10 @@ function Bubble({ m, waking, onRetry }: { m: Message; waking: boolean; onRetry: 
         {!m.streaming && !m.error && m.content && m.stopped && <p className="ink-2 mt-1 text-xs">Stopped.</p>}
         {!m.streaming && !m.error && m.content && m.degraded && (
           <p role="note" className="ink-2 mt-2 flex items-start gap-1.5 text-xs leading-snug"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />This is a quick summary from the school’s pages; the assistant couldn’t write a full answer just now. Try again in a minute for a better one.</p>
+        )}
+        {!m.streaming && !m.error && m.content && m.degraded && fallback}
+        {!m.streaming && !m.error && m.content && !m.degraded && prov.length > 0 && (
+          <p className="ink-2 mt-2 flex items-start gap-1.5 text-xs leading-snug"><ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-500" aria-hidden />From {prov.join(' and ')}</p>
         )}
 
         {!m.streaming && !m.error && m.content && (

@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarX2, Sparkles, Trophy, UtensilsCrossed } from 'lucide-react';
+import { CalendarX2, Sparkles, Star, Trophy, UtensilsCrossed } from 'lucide-react';
 import { CalEvent, iso, nowLA, parseISO, timeLabel } from '@/lib/calendar';
 import { CAMPUSES, Campus } from '@/lib/chat';
 import { track } from '@/lib/analytics';
+import { Followed, getFollows, onFollowsChange } from '@/lib/visit';
+import { parseTeam } from '@/lib/ux-logic';
 
 interface Lunch { items?: string[]; available?: boolean; month_available?: boolean; month_label?: string; closed_reason?: string | null }
 
@@ -23,6 +25,12 @@ const dishNames = (items: string[]) => {
   }
   return out;
 };
+// San Mateo is the Upper School ("US ..." teams); Hillsborough is the Lower/Middle School. Prefer the viewer's campus when it has anything.
+const forCampusOf = (campus: Campus | null) => (list: CalEvent[]) => {
+  if (!campus) return list;
+  const mine = list.filter((e) => (campus === 'san_mateo') === /^US\b/.test(e.summary.trim()));
+  return mine.length ? mine : list;
+};
 const byTime = (a: CalEvent, b: CalEvent) => a.event_date.localeCompare(b.event_date) || (a.start_time ?? '').localeCompare(b.start_time ?? '');
 
 /** What is going on that people might not already know about: the next games, programming and today's lunch. */
@@ -32,10 +40,12 @@ export function Happening({ campus, onCampus, onOpenCalendar, onAsk }: {
   const [today] = useState(() => nowLA().date);
   const [events, setEvents] = useState<CalEvent[] | null>(null);
   const [lunch, setLunch] = useState<Lunch | null | undefined>(undefined);   // undefined: loading, null: unavailable
+  const [follows, setFollows] = useState<Followed[]>([]);   // read after mount: localStorage is not available during the server render
+  useEffect(() => { setFollows(getFollows()); return onFollowsChange(() => setFollows([...getFollows()])); }, []);
 
   useEffect(() => {
     const ac = new AbortController();
-    fetch(`/api/calendar?from=${today}&to=${addDays(today, 7)}&limit=300`, { signal: ac.signal }).then((r) => (r.ok ? r.json() : null)).then((j) => setEvents(j?.events ?? [])).catch(() => {});
+    fetch(`/api/calendar?from=${today}&to=${addDays(today, 14)}&limit=400`, { signal: ac.signal }).then((r) => (r.ok ? r.json() : null)).then((j) => setEvents(j?.events ?? [])).catch(() => {});
     return () => ac.abort();
   }, [today]);
 
@@ -47,8 +57,16 @@ export function Happening({ campus, onCampus, onOpenCalendar, onAsk }: {
     return () => ac.abort();
   }, [campus, today]);
 
-  const { noSchool, games, programs } = useMemo(() => {
-    const ev = (events ?? []).filter((e) => e.event_date <= addDays(today, 7));
+  const { noSchool, games, programs, mine } = useMemo(() => {
+    const forCampus = forCampusOf(campus);
+    const all = events ?? [];
+    // followed teams: the next game (or match-day event) of each, soonest first, from the two-week window
+    const mine = follows.map((f) => {
+      const ofTeam = all.filter((e) => e.category === 'athletics' && e.kind !== 'practice' && e.end_date >= today && parseTeam(e.summary)?.key === f.key).sort(byTime);
+      const next = ofTeam.find((e) => e.kind === 'game') ?? ofTeam[0] ?? null;   // a real game beats a "first day of scrimmages" notice
+      return { team: f, next };
+    }).sort((a, b) => (a.next?.event_date ?? '9').localeCompare(b.next?.event_date ?? '9') || (a.next?.start_time ?? '').localeCompare(b.next?.start_time ?? ''));
+    const ev = all.filter((e) => e.event_date <= addDays(today, 7));
     const upcoming = (list: CalEvent[]) => {
       const sorted = [...list].sort(byTime);
       const first = sorted[0]?.event_date;   // today's items if there are any, otherwise the next day that has some
@@ -56,10 +74,11 @@ export function Happening({ campus, onCampus, onOpenCalendar, onAsk }: {
     };
     return {
       noSchool: ev.find((e) => e.category === 'no_school' && e.event_date <= today && e.end_date >= today) ?? null,
-      games: upcoming(ev.filter((e) => e.kind === 'game')),
+      games: upcoming(forCampus(ev.filter((e) => e.kind === 'game'))),
       programs: upcoming(ev.filter((e) => e.kind === 'event' && e.category !== 'athletics' && e.category !== 'no_school')),
+      mine,
     };
-  }, [events, today]);
+  }, [events, today, follows, campus]);
 
   const campusName = CAMPUSES.find((c) => c.id === campus)?.label;
   const card = 'surface shadow-soft group flex min-w-[15.5rem] flex-1 snap-start flex-col gap-2 rounded-2xl p-3.5 text-left transition hover:-translate-y-0.5 hover:shadow-lift sm:min-w-0';
@@ -100,6 +119,24 @@ export function Happening({ campus, onCampus, onOpenCalendar, onAsk }: {
     );
   }
 
+  if (mine.length && events) {
+    cards.push(
+      <button key="mine" type="button" onClick={() => { track('happening_click', { card: 'your_teams' }); onOpenCalendar(); }} className={card}>
+        <span className="flex items-center gap-2"><span className={chip('bg-brand-100 text-brand-700')}><Star className="h-4 w-4" aria-hidden /></span><span className={`${label} text-brand-700`}>Your teams</span></span>
+        <span className="space-y-1.5">
+          {mine.slice(0, 3).map(({ team, next }) => (
+            <span key={team.key} className="block">
+              <span className="wrap-any block text-sm font-semibold leading-snug">{team.label}</span>
+              <span className="ink-2 block text-xs">{next
+                ? `${dayLabel(next.event_date, today)} · ${timeLabel(next)}${next.home_away === 'home' ? ' · Home' : next.home_away === 'away' ? ' · Away' : ''}${parseTeam(next.summary)?.opponent ? ` · ${parseTeam(next.summary)!.opponent}` : ''}`
+                : 'No games in the next two weeks'}</span>
+            </span>
+          ))}
+        </span>
+      </button>,
+    );
+  }
+
   if (games.length) {
     cards.push(
       <button key="games" type="button" onClick={() => { track('happening_click', { card: 'games' }); onOpenCalendar(); }} className={card}>
@@ -116,7 +153,7 @@ export function Happening({ campus, onCampus, onOpenCalendar, onAsk }: {
 
   cards.push(
     <div key="lunch" className={`${card} cursor-default hover:translate-y-0 hover:shadow-soft`}>
-      <button type="button" onClick={() => { track('happening_click', { card: 'lunch' }); onAsk('What’s for lunch today?'); }} className="flex items-center gap-2 text-left">
+      <button type="button" onClick={() => { track('happening_click', { card: 'lunch' }); onAsk("What’s for lunch today?"); }} className="tap-h flex items-center gap-2 text-left">
         <span className={chip('bg-amber-100 text-amber-800')}><UtensilsCrossed className="h-4 w-4" aria-hidden /></span>
         <span className={`${label} text-amber-800`}>Lunch{campusName ? ` · ${campusName}` : ''}{lunchDay(today) !== today ? ` · ${dayLabel(lunchDay(today), today)}` : ''}</span>
       </button>

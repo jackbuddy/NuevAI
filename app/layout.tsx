@@ -7,6 +7,8 @@ const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope', displa
 export const metadata: Metadata = {
   title: 'NuevAI',
   description: 'Courses, calendar, sports schedules and campus resources for The Nueva School community.',
+  applicationName: 'NuevAI',
+  appleWebApp: { capable: true, title: 'NuevAI', statusBarStyle: 'default' },
 };
 export const viewport: Viewport = { themeColor: '#ffffff', width: 'device-width', initialScale: 1, viewportFit: 'cover' };
 

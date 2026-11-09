@@ -219,7 +219,7 @@ Open: real LLM answers for lunch were not verified (Groq quota); next month's PD
 frontend (campus setting + /api/lunch proxy) is another agent's work.
 
 ======================================================================================================================
-11. INSIGHTS DASHBOARD + ANALYTICS V2 (worktree branch worktree-agent-ab54199a937e126d9, 9 Nov 2026; NOT merged, NOT deployed)
+11. INSIGHTS DASHBOARD + ANALYTICS V2 (9 Nov 2026; NOT deployed)
 ======================================================================================================================
 Files: audience.py (user|internal|test|bot rules), chat_trace.py (per-request trace, topics), analytics.py (ingestion, flush, health, overrides, window loading), insights.py (all aggregation, pure),
 query_server.py (instrumentation in _create/_answer/_stream_inner, /api/track envelope, /api/metrics + /day /inspect /ids /mark /whoami), lib/analytics.ts (flags, eid, visits), app/api/metrics/[action],
@@ -229,3 +229,22 @@ Rules to remember: reserved props keys start with "_" (_aud _why _eid _src; clie
 Live objects created: table analytics_audience_overrides, functions analytics_anon_profile (used) and analytics_anon_summary (unused). Env: INSIGHTS_MAX_ROWS (default 60000).
 Dev note: in a worktree with a symlinked node_modules use `npx next dev --webpack` / `next build --webpack` (Turbopack refuses symlinks out of the root).
 Open: confirm real streaming token usage appears (tok_src "api" vs "est") after deploy; consider SQL-side aggregation if a range exceeds ~60k events; first-time-UX events (onboarding_*, hint_*, ...) are rendered as "not collected yet" until the other branch emits them.
+
+======================================================================================================================
+12. DISCOVERY AND RETURN HABITS (9 Nov 2026)
+======================================================================================================================
+Front-end only (no backend/analytics changes). Decision rules are pure functions in lib/ux-logic.ts (tests: node scripts/ux-logic.test.mjs and
+node scripts/visit-storage.test.mjs, no dependencies); lib/visit.ts is the localStorage layer (keys nuevai.ux, nuevai.recent, nuevai.follows; reads
+nuevai.uid / nuevai.first / nuevai.visits; every access is try/catch with an in-memory fallback). Pieces: first-run line (ChatView), contextual hints
+(components/Hint.tsx; at most one per 6 h, each id once, 6 lifetime, never on the first answer except the campus choice after a lunch answer that listed both
+campuses, never on failed/degraded answers), Ideas sheet (components/IdeasSheet.tsx, lib/ideas.ts) + rotating placeholder + "/" to focus, recent
+questions + adaptive starters, Follow team (Calendar) -> "Your teams" card on Home + star on calendar days, What's new (lib/whatsnew.ts: bump id/releasedAt),
+install prompt (components/InstallPrompt.tsx, lib/install.ts), manifest + generated icons (app/manifest.ts, icon.tsx, apple-icon.tsx, pwa-icon/[size]).
+NO service worker on purpose (nothing cached, so no stale data or broken deploys); installability on Android Chrome is unverified on a real device.
+Events (all via track(); props are small primitives, no free text from the user except what already existed):
+  onboarding_shown{variant:'first_run_v1'}  onboarding_dismiss{reason: starter|typed|ask|idea|recent|pref|ideas|navigate}
+  first_answer_seen{ms (time to first words), total_ms, route: llm|cached|degraded, topic, via}   (once per browser)
+  hint_shown{id} hint_click{id,(to)} hint_dismiss{id}   ids: campus games_calendar calendar_tab resources ideas fallback (fallback = error/degraded answer, not rate limited)
+  ideas_open{from: button|hint} idea_click{category,label (static list text)} recent_click{} pref_set{role|campus: value or 'none'}
+  follow_team{team} unfollow_team{team} (public team name)  whatsnew_open{id}
+  install_prompt_shown{platform: android|ios} install_accept{platform} install_dismiss{platform,(via)}
