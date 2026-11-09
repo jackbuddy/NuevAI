@@ -4,7 +4,7 @@ import { brandIcon } from '@/lib/brand-icon';
 // Icons referenced by app/manifest.ts: /pwa-icon/192, /pwa-icon/512, and ?maskable=1 for the full-bleed Android adaptive icon.
 const SIZES = new Set([192, 512]);
 
-export async function GET(req: Request, ctx: RouteContext<'/pwa-icon/[size]'>) {
+export async function GET(req: Request, ctx: { params: Promise<{ size: string }> }) {
   const { size } = await ctx.params;
   const n = Number(size);
   if (!SIZES.has(n)) return new Response('Not found', { status: 404 });

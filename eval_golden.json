@@ -1797,7 +1797,8 @@
    "(?i)october 23"
   ],
   "forbid": [],
-  "src": "synthetic"
+  "src": "synthetic",
+  "dynamic": true
  },
  {
   "category": "calendar_events",
