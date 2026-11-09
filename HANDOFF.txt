@@ -217,3 +217,23 @@ Reading: lunch_lookup.py (5 min cache; weekend / closed with reason from school_
 eval_retrieval lunch cases (skip when October is pruned); eval_golden.json category lunch (16, October facts); audit lunch.* groups.
 Open: real LLM answers for lunch were not verified (Groq quota); next month's PDFs may need a parser tweak (the stage refuses what it cannot parse cleanly and the old rows stay);
 frontend (campus setting + /api/lunch proxy) is another agent's work.
+
+
+======================================================================================================================
+11. DISCOVERY AND RETURN HABITS (worktree branch, 9 Nov 2026; NOT merged, NOT deployed)
+======================================================================================================================
+Front-end only (no backend/analytics changes). Decision rules are pure functions in lib/ux-logic.ts (tests: node scripts/ux-logic.test.mjs and
+node scripts/visit-storage.test.mjs, no dependencies); lib/visit.ts is the localStorage layer (keys nuevai.ux, nuevai.recent, nuevai.follows; reads
+nuevai.uid / nuevai.first / nuevai.visits; every access is try/catch with an in-memory fallback). Pieces: first-run line (ChatView), contextual hints
+(components/Hint.tsx; at most one per 6 h, each id once, 6 lifetime, never on the first answer except the campus choice after a lunch answer that listed both
+campuses, never on failed/degraded answers), Ideas sheet (components/IdeasSheet.tsx, lib/ideas.ts) + rotating placeholder + "/" to focus, recent
+questions + adaptive starters, Follow team (Calendar) -> "Your teams" card on Home + star on calendar days, What's new (lib/whatsnew.ts: bump id/releasedAt),
+install prompt (components/InstallPrompt.tsx, lib/install.ts), manifest + generated icons (app/manifest.ts, icon.tsx, apple-icon.tsx, pwa-icon/[size]).
+NO service worker on purpose (nothing cached, so no stale data or broken deploys); installability on Android Chrome is unverified on a real device.
+Events (all via track(); props are small primitives, no free text from the user except what already existed):
+  onboarding_shown{variant:'first_run_v1'}  onboarding_dismiss{reason: starter|typed|ask|idea|recent|pref|ideas|navigate}
+  first_answer_seen{ms (time to first words), total_ms, route: llm|cached|degraded, topic, via}   (once per browser)
+  hint_shown{id} hint_click{id,(to)} hint_dismiss{id}   ids: campus games_calendar calendar_tab resources ideas fallback (fallback = error/degraded answer, not rate limited)
+  ideas_open{from: button|hint} idea_click{category,label (static list text)} recent_click{} pref_set{role|campus: value or 'none'}
+  follow_team{team} unfollow_team{team} (public team name)  whatsnew_open{id}
+  install_prompt_shown{platform: android|ios} install_accept{platform} install_dismiss{platform,(via)}

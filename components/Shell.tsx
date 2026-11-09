@@ -8,6 +8,8 @@ import { ResourcesView } from './ResourcesView';
 import { Logo } from './Logo';
 import { FeedbackButton } from './FeedbackButton';
 import { startAnalytics, track } from '@/lib/analytics';
+import '@/lib/install';   // captures beforeinstallprompt early
+import { endOnboarding, markUsed } from '@/lib/visit';
 
 type Tab = 'calendar' | 'chat' | 'resources';
 const TABS: { id: Tab; label: string; icon: typeof CalendarDays }[] = [
@@ -35,6 +37,7 @@ export function Shell() {
       if (u.searchParams.get('tab') !== t) { u.searchParams.set('tab', t); history.pushState(null, '', u); }
     } catch {}
     track('tab_view', { tab: t, source });
+    if (t === 'calendar' || t === 'resources') { markUsed(t); endOnboarding('navigate'); }
   }, []);
 
   useEffect(() => {
@@ -120,7 +123,7 @@ export function Shell() {
       </header>
 
       <main id="main" tabIndex={-1} className="relative flex min-h-0 flex-1 flex-col outline-none">
-        <div role="tabpanel" id="panel-chat" aria-labelledby="tab-chat" className={tab === 'chat' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}><ChatView pendingAsk={pendingAsk} onAskConsumed={consumed} onOpenCalendar={() => go('calendar', 'today_strip')} /></div>
+        <div role="tabpanel" id="panel-chat" aria-labelledby="tab-chat" className={tab === 'chat' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}><ChatView pendingAsk={pendingAsk} onAskConsumed={consumed} onOpenCalendar={() => go('calendar', 'today_strip')} onOpenResources={() => go('resources', 'hint')} /></div>
         {visited.has('calendar') && <div role="tabpanel" id="panel-calendar" aria-labelledby="tab-calendar" className={tab === 'calendar' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}><CalendarView onAsk={ask} /></div>}
         {visited.has('resources') && <div role="tabpanel" id="panel-resources" aria-labelledby="tab-resources" className={tab === 'resources' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}><ResourcesView onAsk={ask} /></div>}
       </main>

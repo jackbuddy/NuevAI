@@ -1,9 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarPlus, ChevronLeft, ChevronRight, Clock, MapPin, MessageCircle, Search, X, CalendarX2, Home, Plane } from 'lucide-react';
+import { CalendarPlus, ChevronLeft, ChevronRight, Clock, MapPin, MessageCircle, Search, Star, X, CalendarX2, Home, Plane } from 'lucide-react';
 import { CATEGORIES, CalEvent, catMeta, downloadIcs, iso, onDay, parseISO, timeLabel, todayLA } from '@/lib/calendar';
 import { track } from '@/lib/analytics';
+import { Followed, getFollows, onFollowsChange, toggleFollow } from '@/lib/visit';
+import { parseTeam } from '@/lib/ux-logic';
 
 type View = 'month' | 'agenda';
 
@@ -25,6 +27,9 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
   const [selected, setSelected] = useState<string>(todayIso);
   const [events, setEvents] = useState<CalEvent[]>([]);
   const [state, setState] = useState<'loading' | 'ok' | 'error'>('loading');
+  const [follows, setFollows] = useState<Followed[]>([]);
+  useEffect(() => { setFollows(getFollows()); return onFollowsChange(() => setFollows([...getFollows()])); }, []);
+  const followKeys = useMemo(() => new Set(follows.map((f) => f.key)), [follows]);
 
   const grid = useMemo(() => {
     const first = new Date(cursor);
@@ -141,12 +146,13 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
               </div>
               <div role="group" aria-label={`${monthLabel}, ${filtered.length} events`} aria-busy={state === 'loading'} className={`grid grid-cols-7 transition-opacity ${state === 'loading' ? 'opacity-50' : ''}`}>
                 {grid.map((d) => {
-                  const k = iso(d), list = byDay.get(k) ?? [], inMonth = d.getMonth() === cursor.getMonth(), isToday = k === todayIso, isSel = k === selected;
+                  const k = iso(d), list = byDay.get(k) ?? [], mine = followKeys.size > 0 && list.some((e) => isMine(e, followKeys)), inMonth = d.getMonth() === cursor.getMonth(), isToday = k === todayIso, isSel = k === selected;
                   return (
                     <button key={k} onClick={() => pick(k, list.length)} aria-pressed={isSel} aria-current={isToday ? 'date' : undefined}
-                            aria-label={`${d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}${isToday ? ', today' : ''}, ${list.length ? `${list.length} event${list.length === 1 ? '' : 's'}` : 'no events'}`}
+                            aria-label={`${d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}${isToday ? ', today' : ''}, ${list.length ? `${list.length} event${list.length === 1 ? '' : 's'}` : 'no events'}${mine ? ', one of your teams plays' : ''}`}
                             className={`relative min-h-[4.25rem] min-w-0 border-b border-r hairline p-1.5 text-left transition hover:bg-[var(--surface-2)] focus-visible:z-10 md:min-h-[6rem] ${!inMonth ? 'opacity-70' : ''} ${d.getDay() % 6 === 0 && !isSel ? 'bg-brand-50/70' : ''} ${isSel ? 'bg-brand-500/10 ring-2 ring-inset ring-brand-500' : ''}`}>
                       <span aria-hidden className={`grid h-6 w-6 place-items-center rounded-full text-xs font-semibold ${isToday ? 'bg-brand-600 text-white shadow-soft' : ''}`}>{d.getDate()}</span>
+                      {mine && <Star aria-hidden className="absolute right-1.5 top-1.5 h-3 w-3 fill-amber-400 text-amber-500" />}
                       <div aria-hidden className="mt-1 hidden space-y-0.5 md:block">
                         {list.slice(0, 2).map((e, i) => (
                           <div key={i} className={`truncate rounded px-1 py-0.5 text-[11px] font-medium leading-tight ${catMeta(e.category).chip}`}>{e.summary.trim()}</div>
@@ -166,7 +172,7 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
               <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">{selected === todayIso ? 'Today' : 'Selected day'}</p>
               <h3 className="wrap-any mb-3 text-xl font-bold">{parseISO(selected).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</h3>
               {dayEvents.length === 0 ? <Empty practicesHidden={!practices && events.some((e) => onDay(e, selected) && e.kind === 'practice')} /> :
-                <div className="space-y-2.5">{dayEvents.map((e, i) => <EventCard key={`${e.event_date}-${e.start_time}-${e.summary}-${i}`} e={e} onAsk={onAsk} />)}</div>}
+                <div className="space-y-2.5">{dayEvents.map((e, i) => <EventCard key={`${e.event_date}-${e.start_time}-${e.summary}-${i}`} e={e} onAsk={onAsk} followKeys={followKeys} />)}</div>}
             </aside>
           </div>
         )}
@@ -181,7 +187,7 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
                   <span className={k === todayIso ? 'text-brand-700' : ''}>{parseISO(k).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</span>
                   {k === todayIso && <span className="rounded-full bg-brand-700 px-2 py-0.5 text-[10px] text-white">Today</span>}
                 </h3>
-                <div className="grid gap-2.5 md:grid-cols-2">{list.map((e, i) => <EventCard key={i} e={e} onAsk={onAsk} />)}</div>
+                <div className="grid gap-2.5 md:grid-cols-2">{list.map((e, i) => <EventCard key={i} e={e} onAsk={onAsk} followKeys={followKeys} />)}</div>
               </section>
             ))}
           </div>
@@ -205,10 +211,14 @@ function Empty({ practicesHidden, filtered }: { practicesHidden?: boolean; filte
   );
 }
 
-function EventCard({ e, onAsk }: { e: CalEvent; onAsk: (q: string) => void }) {
+const isMine = (e: CalEvent, keys: Set<string>) => e.category === 'athletics' && keys.has(parseTeam(e.summary)?.key ?? '');
+
+function EventCard({ e, onAsk, followKeys }: { e: CalEvent; onAsk: (q: string) => void; followKeys: Set<string> }) {
   const cat = catMeta(e.category);
+  const team = e.category === 'athletics' ? parseTeam(e.summary) : null;
+  const following = !!team && followKeys.has(team.key);
   return (
-    <div className={`surface rounded-2xl border-l-4 p-3.5 ${cat.edge}`}>
+    <div className={`surface rounded-2xl border-l-4 p-3.5 ${cat.edge} ${following ? 'ring-1 ring-amber-300' : ''}`}>
       <div className="flex items-start gap-2.5">
         <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${cat.dot}`} />
         <div className="min-w-0 flex-1">
@@ -227,6 +237,12 @@ function EventCard({ e, onAsk }: { e: CalEvent; onAsk: (q: string) => void }) {
           <div className="mt-2.5 flex flex-wrap gap-1.5">
             <button onClick={() => { downloadIcs(e); track('calendar_add', { summary: e.summary.slice(0, 60) }); }} className="surface-2 tap-box gap-1 rounded-full px-3 py-1 text-xs font-semibold hover:bg-brand-500/10"><CalendarPlus className="h-3 w-3" />Add to calendar</button>
             <button onClick={() => { track('calendar_ask', { summary: e.summary.slice(0, 60) }); onAsk(`Tell me about "${e.summary.trim()}" on ${e.when}`); }} className="surface-2 tap-box gap-1 rounded-full px-3 py-1 text-xs font-semibold hover:bg-brand-500/10"><MessageCircle className="h-3 w-3" />Ask NuevAI</button>
+            {team && (
+              <button onClick={() => toggleFollow(team)} aria-pressed={following} aria-label={following ? `Following ${team.label}. Tap to unfollow` : `Follow ${team.label}`}
+                      className={`tap-box gap-1 rounded-full px-3 py-1 text-xs font-semibold ${following ? 'bg-amber-100 text-amber-900 hover:bg-amber-200' : 'surface-2 hover:bg-brand-500/10'}`}>
+                <Star className={`h-3 w-3 ${following ? 'fill-amber-500 text-amber-600' : ''}`} />{following ? 'Following' : 'Follow team'}
+              </button>
+            )}
           </div>
         </div>
       </div>
