@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     const body = await req.text();
     const upstream = await fetch(`${BACKEND}/api/chat/stream`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-client-ua': (req.headers.get('user-agent') ?? '').slice(0, 200) },
       body,
       signal: AbortSignal.timeout(58_000),
       cache: 'no-store',

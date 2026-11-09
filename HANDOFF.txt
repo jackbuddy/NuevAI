@@ -217,3 +217,15 @@ Reading: lunch_lookup.py (5 min cache; weekend / closed with reason from school_
 eval_retrieval lunch cases (skip when October is pruned); eval_golden.json category lunch (16, October facts); audit lunch.* groups.
 Open: real LLM answers for lunch were not verified (Groq quota); next month's PDFs may need a parser tweak (the stage refuses what it cannot parse cleanly and the old rows stay);
 frontend (campus setting + /api/lunch proxy) is another agent's work.
+
+======================================================================================================================
+11. INSIGHTS DASHBOARD + ANALYTICS V2 (worktree branch worktree-agent-ab54199a937e126d9, 9 Nov 2026; NOT merged, NOT deployed)
+======================================================================================================================
+Files: audience.py (user|internal|test|bot rules), chat_trace.py (per-request trace, topics), analytics.py (ingestion, flush, health, overrides, window loading), insights.py (all aggregation, pure),
+query_server.py (instrumentation in _create/_answer/_stream_inner, /api/track envelope, /api/metrics + /day /inspect /ids /mark /whoami), lib/analytics.ts (flags, eid, visits), app/api/metrics/[action],
+app/insights/{page,sections,ui}.tsx, supabase/analytics_v2.sql (already applied live), test_insights.py (offline, also in ci.yml).
+Rules to remember: reserved props keys start with "_" (_aud _why _eid _src; clients cannot set them); event audience is stamped at ingestion but the dashboard re-classifies per browser over its whole history
+(override > test > internal > bot > user); a bare "node" UA is NOT a bot; days param rounds up to 1/7/30/90 (0 or less = all time); dashboard default audience = real users; tokens (Groq quota) always count every audience and use UTC days.
+Live objects created: table analytics_audience_overrides, functions analytics_anon_profile (used) and analytics_anon_summary (unused). Env: INSIGHTS_MAX_ROWS (default 60000).
+Dev note: in a worktree with a symlinked node_modules use `npx next dev --webpack` / `next build --webpack` (Turbopack refuses symlinks out of the root).
+Open: confirm real streaming token usage appears (tok_src "api" vs "est") after deploy; consider SQL-side aggregation if a range exceeds ~60k events; first-time-UX events (onboarding_*, hint_*, ...) are rendered as "not collected yet" until the other branch emits them.

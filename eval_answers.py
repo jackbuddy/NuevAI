@@ -32,7 +32,7 @@ QUESTIONS = [
 
 
 def ask(q):
-    req = urllib.request.Request(BASE + "/api/chat", data=json.dumps({"query": q}).encode(), headers={"Content-Type": "application/json"})
+    req = urllib.request.Request(BASE + "/api/chat", data=json.dumps({"query": q, "anon_id": "test-answers-read"}).encode(), headers={"Content-Type": "application/json", "x-nuevai-test": "1"})
     t = time.time()
     try:
         d = json.loads(urllib.request.urlopen(req, timeout=120).read())
