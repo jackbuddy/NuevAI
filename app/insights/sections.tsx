@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { Flagged } from './flagged';
 import { Bars, Card, catColor, DataTable, Delta, Empty, fmtInt, fmtMs, fmtPct, fmtTok, HBars, Heat, Help, Kpi, Meter, Notice, pac, Pill, SimpleTable, Stacked, ago, PAL } from './ui';
 
 // The payload is built by insights.py; it is typed loosely here on purpose (the server owns the shape, empty states handle gaps).
@@ -227,7 +228,7 @@ export function Questions(ctx: Ctx) {
 }
 
 // ------------------------------------------------------------------ Quality
-export function Quality({ m }: Ctx) {
+export function Quality({ m, api, days, aud }: Ctx) {
   const q = m.quality;
   return (
     <div className="space-y-4">
@@ -237,6 +238,7 @@ export function Quality({ m }: Ctx) {
         <Kpi label="Degraded" value={fmtPct(q.degraded_rate, 1)} help="The AI was unavailable (rate limit, overload, timeout); a facts-and-links reply was shown." />
         <Kpi label="No sources / not found" value={`${fmtPct(q.no_context_rate)} / ${fmtPct(q.not_found_rate)}`} help="No sources: retrieval found nothing to ground the answer. Not found: the answer said the information is not available." small />
       </div>
+      <Flagged api={api} days={days} aud={aud} />
       <Card title="By topic">
         <SimpleTable head={['Topic', 'Answers', 'Well', 'Degraded']} rows={q.by_topic.map((t: any) => [t.topic.replace(/_/g, ' '), t.n, fmtPct(t.well_rate), t.degraded])} />
       </Card>

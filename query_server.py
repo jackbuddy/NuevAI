@@ -1028,6 +1028,13 @@ def metrics_inspect(request: Request, key: str = "", days: int = 30, token: str 
     return {"rows": analytics.inspect(key[:160], _clamp_days(days), aud if aud in ("users", "users_internal", "test_bots", "all") else "users")}
 
 
+@app.get("/api/metrics/flagged")
+def metrics_flagged(request: Request, days: int = 7, token: str = "", aud: str = "users"):
+    """Flagged & low-rated answers (thumbs-down, 'not really', written reports, auto-flagged low quality). See flagged.py."""
+    _check_token(request, token)
+    return analytics.flagged(_clamp_days(days), aud if aud in ("users", "users_internal", "test_bots", "all") else "users")
+
+
 @app.get("/api/metrics/ids")
 def metrics_ids(request: Request, token: str = ""):
     _check_token(request, token)

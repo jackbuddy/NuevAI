@@ -3,9 +3,9 @@ import { BACKEND } from '@/lib/backend';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-/** Token-gated sub-endpoints of the Insights dashboard: day (hourly timeline), inspect (question drill-down), ids + mark (audience management),
+/** Token-gated sub-endpoints of the Insights dashboard: day (hourly timeline), inspect (question drill-down), flagged (answers to review), ids + mark (audience management),
  *  whoami (token check). Only these names are forwarded; the query string is rebuilt from an allow-list. */
-const GET_ACTIONS: Record<string, string[]> = { day: ['date', 'aud'], inspect: ['key', 'days', 'aud'], ids: [], whoami: [] };
+const GET_ACTIONS: Record<string, string[]> = { day: ['date', 'aud'], inspect: ['key', 'days', 'aud'], flagged: ['days', 'aud'], ids: [], whoami: [] };
 const POST_ACTIONS = new Set(['mark']);
 
 async function forward(req: Request, action: string, method: 'GET' | 'POST') {

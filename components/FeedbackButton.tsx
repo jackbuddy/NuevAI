@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, MessageSquarePlus, X } from 'lucide-react';
 import { flush, track } from '@/lib/analytics';
+import { clip, fitProps } from '@/lib/feedback-logic';
+import { recentAnswer } from '@/lib/lastanswer';
 
 const KINDS = ['Wrong answer', 'Missing info', 'Idea', 'Bug', 'Other'];
 
@@ -46,7 +48,9 @@ export function FeedbackButton({ tab }: { tab: string }) {
     e.preventDefault();
     const t = text.trim();
     if (!t) return;
-    track('feedback_text', { kind, text: t.slice(0, 600), tab });
+    // a note about a wrong/missing answer names the answer on screen (when recent) so it can be reviewed next to it
+    const la = kind === 'Wrong answer' || kind === 'Missing info' ? recentAnswer() : null;
+    track('feedback_text', fitProps({ kind, text: clip(t, 600), tab, ...(la ? { mid: la.id, lq: clip(la.query, 120), answer: clip(la.answer, 400) } : {}) }));
     flush();
     setSent(true);
     setText('');
