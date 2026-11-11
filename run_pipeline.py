@@ -5,7 +5,7 @@
     python run_pipeline.py --stages chunk,index # re-chunk and re-index already-downloaded pages
     python run_pipeline.py --dry-run            # crawl/chunk, then show what indexing WOULD change
 
-Stages: public (once), nexus, google, live, manual, calendar, lunch (cafe menus), chunk, index.  A JSON report of every run is
+Stages: public (once), public_pages (curated public pages, refreshed), nexus, google, live, manual, calendar, lunch (cafe menus), chunk, index.  A JSON report of every run is
 written to data/pipeline/report.json; documents that could not be read
 (private Google Docs) are listed in data/pipeline/needs_access.json.
 """
@@ -17,9 +17,9 @@ from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 
-from pipeline import calendar_feed, chunker, config, crawl_public, fetch_google, index, live_sheets, lunch, manual_import, nexus_import
+from pipeline import calendar_feed, chunker, config, crawl_public, fetch_google, index, live_sheets, lunch, manual_import, nexus_import, public_pages
 
-ALL = ["public", "nexus", "google", "live", "manual", "calendar", "lunch", "chunk", "index"]
+ALL = ["public", "public_pages", "nexus", "google", "live", "manual", "calendar", "lunch", "chunk", "index"]
 
 
 def main() -> int:
@@ -32,6 +32,7 @@ def main() -> int:
     ap.add_argument("--prune-legacy", action="store_true", help="delete rows from the old pipeline")
     ap.add_argument("--keep-expired", action="store_true", help="do not delete expired calendar events during indexing")
     ap.add_argument("--dry-run", action="store_true", help="do not embed or write to Supabase")
+    ap.add_argument("--additive-only", action="store_true", help="index stage: only INSERT rows whose chunk_id is not in the table yet; never rewrite, flag, patch or delete an existing row")
     ap.add_argument("--only-source", default=None, help="index stage: only plan and write rows of this metadata.source (for example lunch)")
     ap.add_argument("--no-lunch-download", action="store_true", help="lunch stage: read only manual drops (data/pipeline/manual_docs/lunch/), no network")
     args = ap.parse_args()
@@ -60,6 +61,7 @@ def main() -> int:
         return s
 
     stage("public", public)
+    stage("public_pages", lambda: public_pages.run())
     stage("nexus", lambda: nexus_import.run(args.refresh_nexus))
     stage("google", lambda: fetch_google.run([scraper_data / "google_links_deduped.json", scraper_data / "external_links.json"]))
     stage("live", live_sheets.run)
@@ -67,7 +69,7 @@ def main() -> int:
     stage("calendar", calendar_feed.run)
     stage("lunch", lambda: lunch.run_soft(discover_online=not args.no_lunch_download))
     stage("chunk", lambda: {"chunks": len(chunker.run())})
-    stage("index", lambda: index.run(args.prune, args.prune_legacy, args.dry_run, keep_expired=args.keep_expired, only_source=args.only_source))
+    stage("index", lambda: index.run(args.prune, args.prune_legacy, args.dry_run, keep_expired=args.keep_expired, only_source=args.only_source, additive_only=args.additive_only))
 
     report["finished"] = datetime.now(timezone.utc).isoformat()
     config.REPORT_FILE.write_text(json.dumps(report, indent=1), encoding="utf-8")

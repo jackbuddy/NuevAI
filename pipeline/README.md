@@ -11,15 +11,16 @@ python run_pipeline.py                    # the real run (needs SUPABASE_* in .e
 | Stage    | What it does | Needs a human? |
 |----------|--------------|----------------|
 | `public` | Crawls www.nuevaschool.org from the HTML `/site-map` + link following. Obeys robots.txt (incl. wildcard rules) and its 5 s crawl delay. | No |
+| `public_pages` | Re-reads a curated list of 11 public pages (`config.PUBLIC_PAGES`: admissions, FAQ, tuition, transportation) with one GET each, robots.txt and the crawl delay honoured, 20 h HTML cache. Keeps collapsed FAQ answers with their question. Own chunk ids (`#public`), earlier captures are flagged, never overwritten. | No |
 | `nexus`  | Imports pages from `../nexus-scraper`; `--refresh-nexus` re-scrapes with the saved session. Pages containing any term in `data/pipeline/private_terms.txt` are dropped. | Once, to sign in (SSO/2FA). Re-sign-in when the session expires; the run says so and still uses the last good scrape. |
 | `live` | Re-reads public Google Sheets that change during the year: the US Boys Basketball 26-27 tabs (fetched by tab id) and the Course Offerings workbook (downloaded as .xlsx). Configured in `pipeline/config.py` (`LIVE_SHEETS`). | No |
 | `manual` | Indexes files you download yourself into `data/pipeline/manual_docs/` (.docx .pdf .txt .md .html .csv). See `DOWNLOAD_THESE.md`. | You download them |
 | `calendar` | Reads the iCal feed in `NUEVAI_CALENDAR_URL` into dated event chunks + per-day digests; expired events are removed automatically. | No |
 | `google` | Exports every linked Google Doc / Sheet / Slides file (course catalog, handbooks, club lists), following links between docs 2 hops deep. | No, for "anyone with the link" files. Private files are listed in `needs_access.json`. |
-| `chunk`  | Heading-aware ~1,100-char chunks that carry their section trail; boilerplate de-duplicated. Builds the **link registry** and one retrievable "link card" per booking / form / payment / calendar / document / portal link. | No |
+| `chunk`  | Also builds the canonical lists (`pipeline/canonical.py`: clubs by day, departments and courses, no-class days, teams with schedules, forms/links directory) and the curated fact records, and removes credentials/passcodes/personal cell numbers (`pipeline/safety.py`). Heading-aware ~1,100-char chunks that carry their section trail; boilerplate de-duplicated. Builds the **link registry** and one retrievable "link card" per booking / form / payment / calendar / document / portal link. | No |
 | `index`  | Embeds only new or changed chunks (BAAI/bge-large-en-v1.5, same as the server) and upserts to `document_chunks`. | No |
 
-Useful flags: `--stages chunk,index`, `--max-public-pages N`, `--prune`
+Useful flags: `--additive-only` (index: insert new rows only, never rewrite/flag/delete; use with `--only-source`), `--stages chunk,index`, `--max-public-pages N`, `--prune`
 (delete chunks this pipeline wrote for pages that disappeared), `--prune-legacy`
 (delete rows from the old `parse_and_chunk.py` pipeline — only after checking
 answers on the new data).
