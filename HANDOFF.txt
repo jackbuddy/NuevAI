@@ -258,3 +258,11 @@ Files: pipeline/safety.py (never-index patterns), pipeline/canonical.py, pipelin
 For the retrieval agent: records are up to ~1,850 characters including header, rag.build_context cuts documents at 1,100 characters (answers like "tardy = 1-24 minutes" fall after the cut in the remaining handbook copy: pol-05); the not-offered record competes with the offerings record on generic sports questions (ath-01), see QUEUE_LOG 2026-11-11.
 Daily CI job: unchanged stages (calendar, chunk, index). It does not run public_pages or the workbook-derived lists; their rows stay in the table (school_canonical is not a workbook source, so they are never auto-flagged).
 Ordering note: merge the branch BEFORE the next daily calendar refresh; the deployed refresh still deletes calendar rows older than 14 days, including the 263 history rows added in this pass (the merged code keeps them, window_floor()).
+
+======================================================================================================================
+13. QUALITY FIXES (11 Nov 2026, branch worktree-agent-a956fc62ab8414208; NOT merged, NOT deployed)
+======================================================================================================================
+See QUALITY_AUDIT.md sections 9-10 and README "Answer quality fixes". New modules: qnorm.py (typos/rarity; needs vocab_freq.json, rebuild with scripts/build_vocab.py after data changes), refusal.py (shared refusal detector; canonical phrase "I don't have that").
+Server contract additions: SSE done {route, model, limited}; chat_answered {fallback (now the shared detector), refusal, canonical, redirect, hedged, rroute, div, chunks, answer_head}. Frontend TODO: read done.limited; log via:'suggestion' for chip clicks; a 'resources' suggestion action if wanted (the server cannot send one today).
+Owner/data action: 46 of 50 school_facts rows are superseded=true in the live index (they hold the quick answers); fix, then re-run `python eval_quality.py --mode retrieval`; run `--mode llm --sample 40` on a fresh Groq day (about 4.2k tokens per answer now).
+Tests: python test_quality_fixes.py (offline). The persona is 9.9k characters: trim before launch if quota is tight.
