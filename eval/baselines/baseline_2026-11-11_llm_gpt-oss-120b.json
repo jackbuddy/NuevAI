@@ -1,0 +1,796 @@
+{
+ "mode": "llm",
+ "model": "openai/gpt-oss-120b",
+ "primary_model": true,
+ "n_graded": 37,
+ "counts": {
+  "correct": 33,
+  "unnecessary_refusal": 2,
+  "wrong": 1,
+  "partial": 1
+ },
+ "not_graded": {
+  "ungraded_quota": 9
+ },
+ "correct_rate": 0.8918918918918919,
+ "strict_correct_rate": 0.8918918918918919,
+ "overhedge_rate": 0.0,
+ "unnecessary_refusal_rate": 0.05714285714285714,
+ "hallucination_rate": 0.0,
+ "by_category": {
+  "admissions_parent": {
+   "n": 2,
+   "correct": 2,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "advisory": {
+   "n": 2,
+   "correct": 2,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "athletics_games": {
+   "n": 3,
+   "correct": 3,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "athletics_teams": {
+   "n": 3,
+   "correct": 3,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "bell_schedule": {
+   "n": 2,
+   "correct": 1,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 1,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "calendar_schedules": {
+   "n": 2,
+   "correct": 2,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "campus_logistics": {
+   "n": 2,
+   "correct": 2,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "clubs_activities": {
+   "n": 2,
+   "correct": 2,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "courses_academics": {
+   "n": 2,
+   "correct": 2,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "day_types": {
+   "n": 2,
+   "correct": 2,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "events": {
+   "n": 2,
+   "correct": 0,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 1,
+   "partial": 0,
+   "wrong": 1,
+   "hallucinated": 0
+  },
+  "lunch": {
+   "n": 3,
+   "correct": 2,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 1,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "multi_part_follow_up": {
+   "n": 2,
+   "correct": 2,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "nexus_other": {
+   "n": 2,
+   "correct": 2,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "policies_handbook": {
+   "n": 2,
+   "correct": 2,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "staff_contacts": {
+   "n": 2,
+   "correct": 2,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "traps": {
+   "n": 2,
+   "correct": 2,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  }
+ },
+ "by_persona": {
+  "community_member": {
+   "n": 2,
+   "correct": 2,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "current_parent": {
+   "n": 5,
+   "correct": 4,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 1,
+   "hallucinated": 0
+  },
+  "ms_student": {
+   "n": 3,
+   "correct": 3,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "prospective_family": {
+   "n": 7,
+   "correct": 7,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "us_student": {
+   "n": 20,
+   "correct": 17,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 2,
+   "partial": 1,
+   "wrong": 0,
+   "hallucinated": 0
+  }
+ },
+ "by_phrasing": {
+  "abbreviation": {
+   "n": 1,
+   "correct": 1,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "clean": {
+   "n": 31,
+   "correct": 28,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 1,
+   "partial": 1,
+   "wrong": 1,
+   "hallucinated": 0
+  },
+  "follow_up": {
+   "n": 3,
+   "correct": 3,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "typo": {
+   "n": 1,
+   "correct": 0,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 1,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "vague": {
+   "n": 1,
+   "correct": 1,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  }
+ },
+ "by_behavior": {
+  "ambiguous": {
+   "n": 1,
+   "correct": 1,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "answer": {
+   "n": 32,
+   "correct": 29,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 2,
+   "partial": 1,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "partial": {
+   "n": 1,
+   "correct": 1,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  },
+  "past_event": {
+   "n": 1,
+   "correct": 0,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 1,
+   "hallucinated": 0
+  },
+  "redirect_ok": {
+   "n": 2,
+   "correct": 2,
+   "correct_overhedged": 0,
+   "unnecessary_refusal": 0,
+   "partial": 0,
+   "wrong": 0,
+   "hallucinated": 0
+  }
+ },
+ "launch_bar": {
+  "correct_ge_95": false,
+  "hallucinated_zero": true,
+  "unnecessary_refusal_lt_3": false,
+  "pass": false
+ },
+ "date": "2026-11-11",
+ "tokens_spent": 124359,
+ "measured": true,
+ "sample": "stratified by category, seed in log; NOT the full set",
+ "items": [
+  {
+   "id": "gm-19",
+   "label": "correct",
+   "category": "athletics_games",
+   "persona": "us_student",
+   "phrasing": "follow_up",
+   "behavior": "answer",
+   "tokens": 2501,
+   "reasons": []
+  },
+  {
+   "id": "ath-16",
+   "label": "correct",
+   "category": "athletics_teams",
+   "persona": "prospective_family",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 4191,
+   "reasons": []
+  },
+  {
+   "id": "lun-01",
+   "label": "correct",
+   "category": "lunch",
+   "persona": "us_student",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 2565,
+   "reasons": []
+  },
+  {
+   "id": "club-09",
+   "label": "correct",
+   "category": "clubs_activities",
+   "persona": "prospective_family",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 3260,
+   "reasons": []
+  },
+  {
+   "id": "nx-02",
+   "label": "correct",
+   "category": "nexus_other",
+   "persona": "us_student",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 3533,
+   "reasons": []
+  },
+  {
+   "id": "trap-04",
+   "label": "correct",
+   "category": "traps",
+   "persona": "us_student",
+   "phrasing": "clean",
+   "behavior": "redirect_ok",
+   "tokens": 3124,
+   "reasons": []
+  },
+  {
+   "id": "ev-05",
+   "label": "unnecessary_refusal",
+   "category": "events",
+   "persona": "us_student",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 3807,
+   "reasons": [
+    "said it doesn't know / redirected; expected fact absent: Gym; (Nov(ember)? 13|Nov(ember)? 5); 8:55"
+   ]
+  },
+  {
+   "id": "mp-12",
+   "label": "correct",
+   "category": "multi_part_follow_up",
+   "persona": "us_student",
+   "phrasing": "follow_up",
+   "behavior": "answer",
+   "tokens": 3172,
+   "reasons": []
+  },
+  {
+   "id": "adm-06",
+   "label": "correct",
+   "category": "admissions_parent",
+   "persona": "prospective_family",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 2894,
+   "reasons": []
+  },
+  {
+   "id": "adv-03",
+   "label": "correct",
+   "category": "advisory",
+   "persona": "us_student",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 3315,
+   "reasons": []
+  },
+  {
+   "id": "bell-08",
+   "label": "correct",
+   "category": "bell_schedule",
+   "persona": "us_student",
+   "phrasing": "abbreviation",
+   "behavior": "answer",
+   "tokens": 4339,
+   "reasons": []
+  },
+  {
+   "id": "cal-15",
+   "label": "correct",
+   "category": "calendar_schedules",
+   "persona": "current_parent",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 3589,
+   "reasons": []
+  },
+  {
+   "id": "camp-04",
+   "label": "correct",
+   "category": "campus_logistics",
+   "persona": "us_student",
+   "phrasing": "clean",
+   "behavior": "partial",
+   "tokens": 3242,
+   "reasons": []
+  },
+  {
+   "id": "crs-08",
+   "label": "correct",
+   "category": "courses_academics",
+   "persona": "prospective_family",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 3150,
+   "reasons": []
+  },
+  {
+   "id": "day-10",
+   "label": "correct",
+   "category": "day_types",
+   "persona": "us_student",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 4207,
+   "reasons": []
+  },
+  {
+   "id": "pol-02",
+   "label": "correct",
+   "category": "policies_handbook",
+   "persona": "current_parent",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 3763,
+   "reasons": []
+  },
+  {
+   "id": "staff-08",
+   "label": "correct",
+   "category": "staff_contacts",
+   "persona": "current_parent",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 2769,
+   "reasons": []
+  },
+  {
+   "id": "gm-04",
+   "label": "correct",
+   "category": "athletics_games",
+   "persona": "us_student",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 2448,
+   "reasons": []
+  },
+  {
+   "id": "ath-01",
+   "label": "correct",
+   "category": "athletics_teams",
+   "persona": "prospective_family",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 4424,
+   "reasons": []
+  },
+  {
+   "id": "lun-03",
+   "label": "unnecessary_refusal",
+   "category": "lunch",
+   "persona": "us_student",
+   "phrasing": "typo",
+   "behavior": "answer",
+   "tokens": 2317,
+   "reasons": [
+    "said it doesn't know / redirected; expected fact absent: Parmesan"
+   ]
+  },
+  {
+   "id": "club-06",
+   "label": "correct",
+   "category": "clubs_activities",
+   "persona": "us_student",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 4581,
+   "reasons": []
+  },
+  {
+   "id": "nx-03",
+   "label": "correct",
+   "category": "nexus_other",
+   "persona": "us_student",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 3229,
+   "reasons": []
+  },
+  {
+   "id": "trap-12",
+   "label": "correct",
+   "category": "traps",
+   "persona": "prospective_family",
+   "phrasing": "clean",
+   "behavior": "redirect_ok",
+   "tokens": 3070,
+   "reasons": []
+  },
+  {
+   "id": "ev-07",
+   "label": "wrong",
+   "category": "events",
+   "persona": "current_parent",
+   "phrasing": "clean",
+   "behavior": "past_event",
+   "tokens": 3067,
+   "reasons": [
+    "missing: (Oct(ober)? 23|HoCo|dance|spirit week)"
+   ]
+  },
+  {
+   "id": "mp-09",
+   "label": "correct",
+   "category": "multi_part_follow_up",
+   "persona": "ms_student",
+   "phrasing": "follow_up",
+   "behavior": "answer",
+   "tokens": 3437,
+   "reasons": []
+  },
+  {
+   "id": "adm-10",
+   "label": "correct",
+   "category": "admissions_parent",
+   "persona": "community_member",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 3335,
+   "reasons": []
+  },
+  {
+   "id": "adv-04",
+   "label": "correct",
+   "category": "advisory",
+   "persona": "us_student",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 4026,
+   "reasons": []
+  },
+  {
+   "id": "bell-05",
+   "label": "partial",
+   "category": "bell_schedule",
+   "persona": "us_student",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 4191,
+   "reasons": [
+    "missing: 12:35"
+   ]
+  },
+  {
+   "id": "cal-18",
+   "label": "correct",
+   "category": "calendar_schedules",
+   "persona": "us_student",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 3473,
+   "reasons": []
+  },
+  {
+   "id": "ms-01",
+   "label": "correct",
+   "category": "campus_logistics",
+   "persona": "ms_student",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 3598,
+   "reasons": []
+  },
+  {
+   "id": "crs-10",
+   "label": "correct",
+   "category": "courses_academics",
+   "persona": "us_student",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 3511,
+   "reasons": []
+  },
+  {
+   "id": "day-01",
+   "label": "correct",
+   "category": "day_types",
+   "persona": "us_student",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 4442,
+   "reasons": []
+  },
+  {
+   "id": "pol-07",
+   "label": "correct",
+   "category": "policies_handbook",
+   "persona": "current_parent",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 3252,
+   "reasons": []
+  },
+  {
+   "id": "staff-03",
+   "label": "correct",
+   "category": "staff_contacts",
+   "persona": "us_student",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 3350,
+   "reasons": []
+  },
+  {
+   "id": "gm-13",
+   "label": "correct",
+   "category": "athletics_games",
+   "persona": "community_member",
+   "phrasing": "vague",
+   "behavior": "ambiguous",
+   "tokens": 3535,
+   "reasons": []
+  },
+  {
+   "id": "ath-03",
+   "label": "correct",
+   "category": "athletics_teams",
+   "persona": "prospective_family",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 3771,
+   "reasons": []
+  },
+  {
+   "id": "lun-02",
+   "label": "correct",
+   "category": "lunch",
+   "persona": "ms_student",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 2446,
+   "reasons": []
+  },
+  {
+   "id": "club-02",
+   "label": "ungraded_quota",
+   "category": "clubs_activities",
+   "persona": "us_student",
+   "phrasing": "slang",
+   "behavior": "answer",
+   "tokens": 0,
+   "reasons": []
+  },
+  {
+   "id": "nx-10",
+   "label": "ungraded_quota",
+   "category": "nexus_other",
+   "persona": "current_parent",
+   "phrasing": "clean",
+   "behavior": "redirect_ok",
+   "tokens": 0,
+   "reasons": []
+  },
+  {
+   "id": "trap-01",
+   "label": "ungraded_quota",
+   "category": "traps",
+   "persona": "community_member",
+   "phrasing": "clean",
+   "behavior": "safety",
+   "tokens": 0,
+   "reasons": []
+  },
+  {
+   "id": "ev-02",
+   "label": "ungraded_quota",
+   "category": "events",
+   "persona": "community_member",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 0,
+   "reasons": []
+  },
+  {
+   "id": "mp-10",
+   "label": "ungraded_quota",
+   "category": "multi_part_follow_up",
+   "persona": "us_student",
+   "phrasing": "multi_part",
+   "behavior": "partial",
+   "tokens": 0,
+   "reasons": []
+  },
+  {
+   "id": "adm-08",
+   "label": "ungraded_quota",
+   "category": "admissions_parent",
+   "persona": "prospective_family",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 0,
+   "reasons": []
+  },
+  {
+   "id": "adv-05",
+   "label": "ungraded_quota",
+   "category": "advisory",
+   "persona": "us_student",
+   "phrasing": "clean",
+   "behavior": "safety",
+   "tokens": 0,
+   "reasons": []
+  },
+  {
+   "id": "bell-02",
+   "label": "ungraded_quota",
+   "category": "bell_schedule",
+   "persona": "us_student",
+   "phrasing": "slang",
+   "behavior": "answer",
+   "tokens": 0,
+   "reasons": []
+  },
+  {
+   "id": "ms-07",
+   "label": "ungraded_quota",
+   "category": "calendar_schedules",
+   "persona": "ms_student",
+   "phrasing": "clean",
+   "behavior": "answer",
+   "tokens": 0,
+   "reasons": []
+  }
+ ]
+}

@@ -121,4 +121,28 @@ Baseline: `eval_baseline.json` records which number is measured (239/274 = 87.2%
 `python scripts/check_baseline.py --report <report.json> --write-baseline` and commit the file. A red nightly run means a
 regression or an exhausted Groq quota (the message says which); open the `golden-report` artifact for the failing questions.
 
+### Quality eval (`eval_quality.py`, `eval/quality_set.json`, QUALITY_AUDIT.md)
+A deterministic accuracy harness built for the launch bar: >= 95% correct on verifiable questions, 0 hallucinated facts, < 3% unnecessary refusals.
+`eval/quality_set.json` has 241 curated questions (persona, campus, phrasing, behavior, expected facts, forbidden strings, source); `verified` items (234)
+were mechanically checked against the live index by `python eval/build_quality_set.py` (it rewrites the file; add or change questions there, never by hand).
+Unverified items are listed in `eval/UNVERIFIED.md` and skipped unless `--all`.
+
+```bash
+python eval_quality.py --mode retrieval                      # FREE, ~2 min: is the expected fact in the context the model would see? (also grades the no-LLM lunch/canned answers)
+python eval_quality.py --mode llm --sample 40 --seed 1       # real answers via Groq, same prompt as production (query_server._prepare), cached by prompt hash
+python eval_quality.py --mode llm --category lunch --token-budget 40000
+python eval_quality.py --mode llm --ids ath-05,gm-02         # specific questions
+python eval_quality.py --mode llm --only-failed data/eval/quality_<ts>.json
+python eval_quality.py --mode llm --model openai/gpt-oss-20b # alternate model: results are labelled NON-PRIMARY
+python eval_quality.py --self-test                           # grader unit tests, no network
+python eval/diagnose_retrieval.py data/eval/quality_<ts>.json   # for each retrieval miss: where the answer chunk was lost
+```
+Labels (one per answer): `correct`, `correct_overhedged` (right but hedges or redirects needlessly), `unnecessary_refusal` ("I don't have that" while the data covers it),
+`partial`, `wrong`, `hallucinated` (a date, time, phone, email, URL, room, score, amount, number or name that appears in neither the retrieved context, the question/history nor the index).
+Not graded and never counted as passes: `ungraded_quota`, `stale_dynamic` (a date-dependent question past its `valid_through`), `error`. Dynamic items (day type, lunch, "next game") are re-derived from the live index at run time.
+Cost control: Groq's free tier is ~200k tokens/day per model and 8k/min, shared with the live site; one answer is ~3.1k tokens. Answers are cached in `data/eval/cache` keyed by sha256(system prompt + context + question + history + model),
+so re-runs only pay for questions whose prompt changed (the date line is ignored for non-dynamic questions). `--token-budget` stops cleanly and the rest are reported as `ungraded_quota`; `--tpm` paces under the per-minute cap.
+Output: a table by category / persona / phrasing / behavior, taxonomy counts, over-hedge, unnecessary-refusal and hallucination rates, every flagged hallucination token, launch-bar status, `data/eval/quality_<ts>.json`;
+`--write-baseline` also writes the compact `eval/baselines/baseline_<date>_<mode>.json`. The exit code is 1 below the launch bar (`--no-fail` to disable). Test traffic is sent as `test-quality-<n>` so analytics files it under "test".
+
 More: [pipeline/README.md](pipeline/README.md) (ingestion, metrics, environment variables).
