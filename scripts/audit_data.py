@@ -21,6 +21,10 @@ What is checked (each line of output is a group of checks):
   lunch.*       the cafe's monthly lunch rows (chunk_id "lunch-<campus>-<date>"): metadata and freshness present, valid campus, no duplicate
                 dates, every weekday of each posted month present per campus, record text consistent with its items, index vs the parsed PDF;
                 lunch served on a no-classes day is listed as information only
+  canon.*       canonical lists (knowledge/*.md, pipeline/canonical.py): every fact verified against its stored source page, source/as-of/school
+                year on every record, sports offerings vs the teams that have schedules (and the not-offered list vs both), clubs and courses
+                directories vs their workbook/catalog, no-class days vs the master schedule, contacts (business addresses only), and index
+                hygiene (no unflagged credential, duplicate copy or missing refreshed public page)
   email.*       rows written by the email ingest (chunk_id "email-..."): metadata sanity (source_type, dates, hashes, no raw sender address)
                 and no non-staff email address or phone number in the text. They are kept out of every other group (they are not part of
                 the pipeline's plan, so they are never orphans or "missing freshness")
@@ -32,6 +36,7 @@ Nothing is written anywhere except the optional --json report. The feed URL is r
 import argparse
 import collections
 import csv
+import hashlib
 import io
 import json
 import os
@@ -45,11 +50,11 @@ sys.path.insert(0, str(ROOT))
 
 import openpyxl                     # noqa: E402
 import freshness                    # noqa: E402
-from pipeline import config, workbooks   # noqa: E402
+from pipeline import calendar_feed, config, workbooks   # noqa: E402
 
 KNOWN_FILE = ROOT / "scripts" / "audit_known.json"
 CAL_SOURCES = ("calendar", "calendar_day", "calendar_sheet")
-STRUCTURED = ("school_day", "school_courses", "school_clubs", "school_advisory", "school_facts", "link_registry") + CAL_SOURCES
+STRUCTURED = ("school_day", "school_courses", "school_clubs", "school_advisory", "school_facts", "school_canonical", "link_registry") + CAL_SOURCES
 
 
 # --------------------------------------------------------------------------- reporting
@@ -197,12 +202,16 @@ class Sources:
         self.email_db = [r for r in (self.db or []) if freshness.is_email_row(r["chunk_id"], None, r.get("metadata"))]
         if self.db is not None:
             self.db = [r for r in self.db if not freshness.is_email_row(r["chunk_id"], None, r.get("metadata"))]
+        self.db_all = self.db
+        if self.db is not None:                 # rows flagged by scripts/flag_rows.py are ignored by retrieval, so the content groups ignore them too
+            self.db = [r for r in self.db if not (r["metadata"] or {}).get("flagged_at")]
 
     def current(self):
         """Rows the current pipeline output still contains. Rows it no longer produces (superseded copies, renamed records) are
         orphans: they wait for a prune, which this audit never performs."""
         ids = {c["chunk_id"] for c in self.local_chunks}
-        return [r for r in (self.db or []) if not ids or r["chunk_id"] in ids or (r["metadata"] or {}).get("source") in CAL_SOURCES]
+        return [r for r in (self.db or []) if not (r["metadata"] or {}).get("flagged_at")           # flagged by scripts/flag_rows.py: retrieval ignores them
+                and (not ids or r["chunk_id"] in ids or (r["metadata"] or {}).get("source") in CAL_SOURCES)]
 
     def orphans(self):
         ids = {c["chunk_id"] for c in self.local_chunks}
@@ -1000,7 +1009,7 @@ def audit_ical(A: Audit, S: Sources):
         A.check(g, e["end_date"] >= e["date"], f"{e['summary']!r} ends before it starts ({e['raw_start']} .. {e['raw_end']})")
         A.check(g, e["all_day"] or e["end"] is None or e["end_date"] > e["date"] or e["end"] >= e["start"], f"{e['summary']!r} {e['date']}: end time {e['end']} before start {e['start']}")
 
-    lo, hi = S.today - timedelta(days=14), S.today + timedelta(days=430)
+    lo, hi = calendar_feed.window_floor(S.today), S.today + timedelta(days=430)
     seen, uniq = set(), []
     for e in sorted(ev, key=lambda x: (x["date"], x["start"] or "", x["summary"])):
         if e["end_date"] < lo or e["date"] > hi:
@@ -1135,13 +1144,15 @@ def audit_fresh(A: Audit, S: Sources):
         if m.get("source") not in STRUCTURED:
             docs[m.get("source_url")].append(r)
     nstale = 0
-    pages = {}
+    pages, pages_by_prefix = {}, {}
     for pth in config.PAGES_DIR.glob("*.json") if config.PAGES_DIR.exists() else []:
         d = json.loads(pth.read_text(encoding="utf-8"))
         pages[d["url"]] = d
+        pages_by_prefix[hashlib.sha1(d.get("id_seed", d["url"]).encode()).hexdigest()[:12]] = d      # a refreshed copy has its own chunk-id namespace
     for url, rs in docs.items():
-        if url in pages:             # the classifier reads the saved page (a short first line such as "Last updated: ..." never becomes a chunk)
-            text = (pages[url].get("title") or "") + "\n" + (pages[url].get("text") or "")
+        page = pages_by_prefix.get(rs[0]["chunk_id"][:12]) or pages.get(url)
+        if page is not None:             # the classifier reads the saved page (a short first line such as "Last updated: ..." never becomes a chunk)
+            text = (page.get("title") or "") + "\n" + (page.get("text") or "")
         else:
             body = "\n".join(r["content"].split("\n\n", 1)[-1] for r in sorted(rs, key=lambda r: r["chunk_id"]))
             text = (rs[0]["metadata"].get("title", "")) + "\n" + body
@@ -1163,6 +1174,8 @@ def audit_fresh(A: Audit, S: Sources):
     byt = collections.defaultdict(dict)
     for url, rs in docs.items():
         m = rs[0]["metadata"]
+        if m.get("source") == "public_site":
+            continue                # distinct public pages share titles ("Lower School: Visit and Apply" is four pages): not one document in two years
         k = freshness.title_key(m.get("title", ""))
         sy = m.get("school_year")
         if k and sy:
@@ -1182,7 +1195,8 @@ def audit_fresh(A: Audit, S: Sources):
         if m.get("source") in ("school_day", "calendar", "calendar_sheet", "calendar_day"):
             d = m.get("event_date")
             if m.get("source") != "school_day":
-                if d and d < (S.today - timedelta(days=15)).isoformat():
+                floor = calendar_feed.window_floor(S.today) if m.get("source") in ("calendar", "calendar_day") else S.today - timedelta(days=15)
+                if d and d < floor.isoformat():
                     old_cal.append(f"{m.get('source')} row {r['chunk_id']} dated {d}")
                 A.passed(g)
             else:
@@ -1225,6 +1239,197 @@ def audit_orphans(A: Audit, S: Sources):
         elif "source_url" not in m:
             A.check(g, False, f"row {r['chunk_id']} has no source_url (old pipeline)", "orphan")
     A.passed(g, len(S.db) - len(orph))
+
+
+SPORT_WORDS = [("beach volleyball", "beach volleyball"), ("volleyball", "volleyball"), ("basketball", "basketball"), ("soccer", "soccer"), ("tennis", "tennis"),
+               ("golf", "golf"), ("swim", "swim"), ("track", "track"), ("cross", "cross-country"), ("flag football", "flag football"), ("ultimate", "ultimate frisbee")]
+
+
+def sport_of(text: str) -> str | None:
+    t = text.lower()
+    for key, name in SPORT_WORDS:
+        if key in t:
+            return name
+    return None
+
+
+def sports_in(text: str) -> set[str]:
+    t = text.lower()
+    return {name for key, name in SPORT_WORDS if key in t}
+
+
+def md_sections(name: str) -> dict[str, str]:
+    from pipeline import facts as F
+    _, _, secs = F.split_file(F.DIR / name)
+    return {h: b for h, b, _ in secs}
+
+
+def audit_canon(A: Audit, S: Sources):
+    """Canonical lists (knowledge/*.md and pipeline/canonical.py): sourced, dated, consistent with each other and with the schedules."""
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import check_facts
+    from pipeline import facts as F, safety
+    g = "canon.verify"
+    pages_ok = any(config.PAGES_DIR.glob("*.json")) if config.PAGES_DIR.exists() else False
+    if not pages_ok:
+        A.skip(g, "no stored source pages (data/pipeline/pages) to verify the fact files against")
+    else:
+        n, problems = check_facts.check()
+        for p in problems:
+            A.check(g, False, p)
+        A.passed(g, n)
+
+    # --- every record of the fact files and canonical lists carries its source, as-of date and school year
+    g = "canon.freshness"
+    recs = [c for c in S.local_chunks if (c["metadata"] or {}).get("source") in ("school_canonical",) or
+            ((c["metadata"] or {}).get("source") == "school_facts" and (c["metadata"] or {}).get("as_of"))]
+    A.check(g, len(recs) >= 30, f"only {len(recs)} canonical/dated fact records in chunks.json (run the chunk stage)") if S.local_chunks else A.skip(g, "no chunks.json")
+    for c in recs:
+        m, t = c["metadata"], c["content"]
+        A.check(g, bool(re.search(r"^Source: .{8,}", t, re.M)) and bool(re.search(r"^Last updated: \d{4}-\d{2}-\d{2}", t, re.M)), f"{m.get('title', '')[:60]!r}: no Source/Last updated lines")
+        A.check(g, bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(m.get("as_of", "")))) and m.get("as_of") <= S.today.isoformat(), f"{m.get('title', '')[:60]!r}: bad as_of {m.get('as_of')!r}")
+        A.check(g, bool(re.search(r"20\d\d.\d\d|school year", t)), f"{m.get('title', '')[:60]!r}: names no school year")
+        A.check(g, m.get("stale") in (False, None) and m.get("indexed_at") is not None, f"{m.get('title', '')[:60]!r}: stale or not annotated")
+        A.check(g, len(t) <= 1900, f"{m.get('title', '')[:60]!r}: record is {len(t)} chars (shown cut by the context builder)")
+    if S.db is not None:
+        have = {r["chunk_id"] for r in S.db}
+        miss = [c["metadata"].get("title", "")[:50] for c in recs if c["chunk_id"] not in have]
+        A.check(g, not miss, f"{len(miss)} canonical records are not in the index yet: {miss[:3]} (python run_pipeline.py --stages chunk,index --additive-only ...)", "orphan")
+
+    # --- sports: the offerings list vs the teams that actually have schedules, and the negative list vs everything
+    g = "canon.sports"
+    secs = md_sections("athletics_sports.md")
+    off = next((b for h, b in secs.items() if h.startswith("Upper School interscholastic sports 2026-27")), "")
+    ms = next((b for h, b in secs.items() if h.startswith("Middle School and Lower School")), "")
+    neg = next((b for h, b in secs.items() if h.startswith("Does Nueva have football")), "")
+    if not off or not ms:
+        A.check(g, False, "athletics_sports.md lost its offerings sections")
+    else:
+        us_sports, ms_sports = sports_in(off.split("Levels:")[0]), sports_in(ms)
+        for c in S.local_chunks:
+            m = c["metadata"]
+            if m.get("source") in ("calendar", "calendar_sheet") and m.get("kind") in ("game", "practice"):
+                name = (m.get("summary") or "")
+                sp = sport_of(name)
+                lvl = "US" if name.startswith("US") else "MS" if name.startswith("MS") else None
+                if lvl and sp:
+                    A.check(g, sp in (us_sports if lvl == "US" else ms_sports), f"{lvl} team on the calendar with a sport missing from the offerings list: {name[:70]!r}")
+        # gender must agree with the list for the US teams that have schedules
+        for c in S.local_chunks:
+            m = c["metadata"]
+            if m.get("source") == "calendar_sheet" and m.get("kind") == "game" and str(m.get("summary", "")).startswith("US"):
+                name = m["summary"].lower()
+                sp = sport_of(name)
+                gender = "girls" if "girls" in name else "boys" if "boys" in name else None
+                segs = [x.lower() for x in re.split(r"[;\n]", off) if sp and sp in sports_in(x)]
+                A.check(g, not gender or any(gender in x or "coed" in x or ("girls" in x and "boys" in x) for x in segs), f"{m['summary'][:60]!r}: {gender} {sp} is not in the offerings list")
+        negs = [w.strip() for w in re.findall(r"\b(tackle football|ice hockey|field hockey|baseball|softball|lacrosse|rugby|wrestling|water polo)\b", neg)]
+        for w in negs:
+            A.check(g, w not in off.lower() and w not in ms.lower(), f"{w!r} is listed as NOT offered but appears in an offerings list")
+        if S.db is not None:
+            for r in S.db:
+                m = r["metadata"] or {}
+                if m.get("source") in ("calendar", "calendar_sheet") and m.get("kind") in ("game", "practice") and not m.get("superseded"):
+                    for w in negs:
+                        A.check(g, w not in (m.get("summary") or "").lower(), f"a {w!r} team is scheduled on the calendar ({m.get('summary')!r}) but listed as not offered")
+        A.info(g, f"US sports in the offerings list: {sorted(us_sports)}; MS: {sorted(ms_sports)}")
+
+    # --- clubs directory vs the workbook, courses directory vs the catalog, no-class days vs the day records
+    from pipeline import canonical
+    g = "canon.clubs"
+    if S.clubs_path:
+        clubs = canonical.clubs_rows(S.clubs_path)
+        dirs = [c for c in S.local_chunks if (c["metadata"] or {}).get("list") == "clubs"]
+        if dirs:
+            body = "\n".join(c["content"] for c in dirs if "by meeting day" in c["metadata"]["title"])
+            alpha = "\n".join(c["content"] for c in dirs if "Alphabetical" in c["metadata"]["title"])
+            A.check(g, len(clubs) == len({c["name"] for c in clubs}), "duplicate club names in the workbook")
+            for c in clubs:
+                A.check(g, f"- {c['name']}" in body and f"- {c['name']}" in alpha, f"club {c['name']!r} missing from the directory")
+            A.check(g, f"{len(clubs)} clubs and affinity groups" in body, f"directory total does not say {len(clubs)} clubs")
+        else:
+            A.skip(g, "no clubs directory in chunks.json")
+    else:
+        A.skip(g, "no clubs workbook")
+    g = "canon.courses"
+    cat = next((p for p in (json.loads(x.read_text(encoding="utf-8")) for x in config.PAGES_DIR.glob("*.json")) if p.get("title", "").strip() == "2026-27 Course Catalog"), None) if config.PAGES_DIR.exists() else None
+    cdir = [c for c in S.local_chunks if (c["metadata"] or {}).get("list") == "courses"]
+    if cat and cdir:
+        text = flat(cat["text"])
+        n = 0
+        for c in cdir:
+            for ln in c["content"].splitlines():
+                if ln.startswith("- "):
+                    n += 1
+                    A.check(g, flat(ln[2:]) in text, f"course {ln[2:60]!r} is not in the 2026-27 catalog text")
+        A.check(g, n >= 100, f"only {n} courses listed")
+    else:
+        A.skip(g, "no catalog page or courses directory")
+    g = "canon.calendar"
+    nc = [c for c in S.local_chunks if (c["metadata"] or {}).get("list") == "us_no_class_days"]
+    if S.master is not None and nc:
+        days = workbooks.parse_days(S.master)
+        off_days = sorted(d for d, v in days.items() if any("no class" in l.lower() for l in v["labels"]))
+        body = "\n".join(c["content"] for c in nc)
+        # every listed range must start and end on a no-class day of the sheet
+        for a, b in re.findall(r"- (\w{3} \w{3} \d+, \d{4})(?: to (\w{3} \w{3} \d+, \d{4}))?:", body):
+            for x in filter(None, (a, b)):
+                d = datetime.strptime(x, "%a %b %d, %Y").date()
+                A.check(g, d in off_days, f"{x} is listed as a no-class day but the master schedule does not say so")
+        listed = sum(1 for ln in body.splitlines() if ln.startswith("- "))
+        A.check(g, listed >= 15, f"only {listed} no-class ranges listed")
+        ce = " ".join(md_sections("calendar_essentials.md").values())
+        for label, a, b in (("Fall Break", date(2026, 11, 23), date(2026, 11, 27)), ("Winter Break", date(2026, 12, 21), date(2027, 1, 1)),
+                            ("February Break", date(2027, 2, 15), date(2027, 2, 19)), ("Spring Break", date(2027, 3, 29), date(2027, 4, 2))):
+            labelled = [d for d in off_days if (days[d]["type"] or "").lower() == label.lower()]
+            A.check(g, bool(labelled) and min(labelled) == a and max(labelled) == b, f"{label}: master schedule says {min(labelled) if labelled else None}..{max(labelled) if labelled else None}, essentials say {a}..{b}")
+            A.check(g, bool(re.search(re.escape(a.strftime("%b %-d")) + r"(, \d{4})? to " + re.escape(b.strftime("%a %b %-d")), ce)), f"{label}: calendar_essentials.md does not state {a:%b %-d} to {b:%a %b %-d}")
+        first = min(days)
+        A.check(g, f"{first.strftime('%B %-d, %Y')}" in ce and "First day of classes" in ce, f"first class day {first} (master schedule) is not what calendar_essentials.md says")
+    else:
+        A.skip(g, "no master schedule or no-class list")
+
+    # --- contacts: business addresses only, no secrets in the fact files, no conflicting phone numbers for the same office
+    g = "canon.contacts"
+    allfacts = {}
+    for p in sorted(F.DIR.glob("*.md")):
+        allfacts[p.name] = p.read_text(encoding="utf-8")
+    for name, t in allfacts.items():
+        A.check(g, not safety.find(t), f"{name}: contains a credential/personal-number pattern {safety.find(t)}")
+        for em in set(re.findall(r"[\w.+-]+@[\w-]+\.[\w.-]*\w", t)):
+            A.check(g, em.lower().endswith("@nuevaschool.org") or em.lower() == "extendedday@nuevaschool.org", f"{name}: non-school address {em}")
+    phones = collections.defaultdict(set)
+    for name, t in allfacts.items():
+        for ln in t.splitlines():
+            for ph in re.findall(r"\b\d{3}-\d{3}-\d{4}\b", ln):
+                m = re.search(r"(front desk|main office|main line|business|admissions|financial assistance)", ln, re.I)
+                if m:
+                    phones[(m.group(1).lower(), ph)].add(name)
+    by_office = collections.defaultdict(set)
+    for (office, ph), _ in phones.items():
+        by_office[office].add(ph)
+    A.info(g, f"office numbers stated: { {k: sorted(v) for k, v in by_office.items()} }")
+
+    # --- the index: nothing sensitive left unflagged, no unflagged duplicate copies, refreshed public pages present
+    g = "canon.index_hygiene"
+    if S.db is None:
+        return A.skip(g, f"database not read ({S.db_err or 'offline'})")
+    import flag_rows
+    live = [r for r in S.db if not (r["metadata"] or {}).get("superseded")]
+    for r in live:
+        m = r["metadata"] or {}
+        if m.get("source") in ("calendar", "calendar_day", "calendar_sheet", "lunch"):
+            if safety.find(r["content"]):
+                A.info(g, f"{r['chunk_id']}: calendar text with a meeting passcode awaits the next daily refresh (the calendar stage now scrubs it)")
+            continue
+        A.check(g, not safety.find(r["content"]), f"{r['chunk_id']} ({m.get('title', '')[:40]!r}): unflagged sensitive content {safety.find(r['content'])}", "sensitive")
+    pending = flag_rows.plan(S.db_all)
+    A.check(g, not pending, f"{len(pending)} rows still match a flag rule (python scripts/flag_rows.py --apply)")
+    for u in config.PUBLIC_PAGES:
+        pref = hashlib.sha1((u + "#public").encode()).hexdigest()[:12]
+        A.check(g, any(r["chunk_id"].startswith(pref) for r in S.db), f"refreshed public page {u} is not in the index (run --stages public_pages,chunk,index --additive-only)", "orphan")
+    flagged = [r for r in S.db_all if (r["metadata"] or {}).get("flagged_at")]
+    A.info(g, f"{len(flagged)} rows are flagged superseded by scripts/flag_rows.py and waiting for the owner's delete (NEEDS_USER.md)")
 
 
 def audit_email(A: Audit, S: Sources):
@@ -1359,7 +1564,7 @@ def main() -> int:
     if S.db is None and not args.offline:
         print(f"note: database not read ({S.db_err}); database groups are skipped\n")
     for name, fn in (("days", audit_days), ("bell", audit_bell), ("courses", audit_courses), ("clubs", audit_clubs),
-                     ("teams", audit_teams), ("ical", audit_ical), ("fresh", audit_fresh), ("index", audit_orphans), ("email", audit_email), ("lunch", audit_lunch)):
+                     ("teams", audit_teams), ("ical", audit_ical), ("fresh", audit_fresh), ("index", audit_orphans), ("email", audit_email), ("lunch", audit_lunch), ("canon", audit_canon)):
         try:
             fn(A, S)
         except Exception as e:

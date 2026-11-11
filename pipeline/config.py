@@ -32,6 +32,21 @@ PUBLIC_SEEDS = [
     f"https://{PUBLIC_HOST}/contact-us",
 ]
 MAX_PUBLIC_PAGES = int(os.getenv("MAX_PUBLIC_PAGES", "1500"))
+# Public pages re-read on every `public_pages` run (admissions, transportation: they change each year and hold FAQ answers).
+# One GET each, robots.txt and the 5 s crawl delay honoured; see pipeline/public_pages.py.
+PUBLIC_PAGES = [f"https://{PUBLIC_HOST}{p}" for p in (
+    "/admissions/visit-and-apply",
+    "/admissions/visit-and-apply/pre-kindergarten-visit-and-apply",
+    "/admissions/visit-and-apply/kindergarten-visit-and-apply",
+    "/admissions/visit-and-apply/grades-1-4-visit-and-apply",
+    "/admissions/visit-and-apply/middle-school-visit-and-apply",
+    "/admissions/visit-and-apply/upper-school-school-visit-and-apply",
+    "/admissions/faq",
+    "/admissions/affording-nueva",
+    "/admissions/grades-prek8-iq-assessment",
+    "/admissions/meet-the-admissions-team",
+    "/school-life/transportation-and-directions",
+)]
 # robots.txt asks for Crawl-delay 5; we never go faster than the site asks.
 MIN_DELAY_SECONDS = 5.0
 
