@@ -312,6 +312,21 @@ class Analytics:
         rows, _ = self.raw_window(days)
         return insights.inspect_question(rows, key, selector, self._profiles(), self.overrides())
 
+    def flagged(self, days: int, selector: str = "users", force: bool = False) -> dict:
+        """Flagged & low-rated answers for the Quality tab (flagged.py). Bounded (<= flagged.MAX_ROWS rows) and cached for CACHE_S like the rest."""
+        import flagged
+        key = ("flagged", days, selector)
+        c = self._out_cache.get(key)
+        if c and not force and time.time() - c[0] < CACHE_S:
+            return c[1]
+        if force:
+            self.summary(days, "all", force=True)            # reload the raw window too
+        rows, truncated = self.raw_window(days)
+        out = flagged.build(rows, datetime.now(timezone.utc), days, selector, self._profiles(), self.overrides())
+        out["meta"]["truncated_source"] = truncated
+        self._out_cache[key] = (time.time(), out)
+        return out
+
     def heaviest(self, limit: int = 40) -> dict:
         import insights
         return {"ids": insights.heaviest(self._profiles(), self.overrides(), limit), "overrides_ok": self.overrides_ok, "profiles_ok": self.profiles_ok}

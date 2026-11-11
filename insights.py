@@ -27,7 +27,7 @@ GROQ_DAILY_TOKENS = 200_000
 GROQ_TPM = 8_000
 
 PASSIVE = {"session_start", "page_view", "perf_load", "web_vitals", "backend_warm", "server_boot", "rate_limited", "dependency_error",
-           "client_error", "chat_error", "onboarding_shown", "hint_shown", "install_prompt_shown", "first_answer_seen", "chat_rendered"}
+           "client_error", "chat_error", "onboarding_shown", "hint_shown", "install_prompt_shown", "first_answer_seen", "chat_rendered", "answer_fallback"}
 ASK_EVENTS = {"chat_sent", "chat_answered"}
 
 FEATURES = [  # (label, predicate(name, props))
@@ -49,7 +49,7 @@ FEATURES = [  # (label, predicate(name, props))
 DISCOVERY = ["onboarding_shown", "onboarding_dismiss", "hint_shown", "hint_click", "hint_dismiss", "ideas_open", "idea_click", "recent_click",
              "follow_team", "unfollow_team", "install_prompt_shown", "install_accept", "install_dismiss", "whatsnew_open", "pref_set", "first_answer_seen"]
 KNOWN_EVENTS = set(PASSIVE) | {"tab_view", "chat_sent", "chat_answered", "feedback", "feedback_text", "feedback_open", "starter_click", "suggestion_click",
-                               "sources_toggle", "copy_answer", "chat_cleared", "chat_auto_retry", "chat_error_ui", "outbound_click", "answer_link_click"} | set(DISCOVERY)
+                               "feedback_detail", "answer_check", "answer_fallback", "sources_toggle", "copy_answer", "chat_cleared", "chat_auto_retry", "chat_error_ui", "outbound_click", "answer_link_click"} | set(DISCOVERY)
 
 
 # ---------------------------------------------------------------- small helpers
@@ -119,6 +119,19 @@ class Ev:
         self.aud = "user"
 
 
+def latest_feedback(events: list) -> list:
+    """A person can change their mind (No, then Yes): when `feedback` events share an answer id (props.mid) for the same browser only the latest
+    one counts. Events without a mid (older versions) are all kept."""
+    last = {}
+    for i, e in enumerate(events):
+        mid = e.p.get("mid")
+        if e.name == "feedback" and mid:
+            last[(e.anon, mid)] = i
+    if not last:
+        return events
+    return [e for i, e in enumerate(events) if not (e.name == "feedback" and e.p.get("mid") and last[(e.anon, e.p["mid"])] != i)]
+
+
 def dedupe(rows) -> tuple[list[dict], int]:
     """Drop repeated events (client retries / double flushes) by their ingestion id. Rows without one are kept."""
     seen, out, dup = set(), [], 0
@@ -185,6 +198,7 @@ def build(rows, now: datetime, days: int, selector: str = "users", profiles=None
             continue
         events.append(Ev(t, r["anon_id"], r.get("session_id"), r.get("event") or "", r.get("props") or {}, r.get("ua") or ""))
     events.sort(key=lambda e: e.t)
+    events = latest_feedback(events)
 
     # ---- per-browser profile (all-time) + audience --------------------------------
     ev_aud, ev_ua = defaultdict(set), defaultdict(set)

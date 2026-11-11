@@ -15,6 +15,9 @@ export interface Message {
   totalMs?: number;
   query?: string;       // for assistant messages: the question it answers
   feedback?: 'up' | 'down';
+  check?: 'yes' | 'no';        // "Did this answer your question?" on a fallback-style reply
+  fbReason?: string;           // chosen reason chip
+  fbDone?: boolean;            // the optional follow-up (reason / comment) was sent or skipped
   suggestions?: Suggestion[];
 }
 

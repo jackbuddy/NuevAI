@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   applicationName: 'NuevAI',
   appleWebApp: { capable: true, title: 'NuevAI', statusBarStyle: 'default' },
 };
-export const viewport: Viewport = { themeColor: '#ffffff', width: 'device-width', initialScale: 1, viewportFit: 'cover' };
+export const viewport: Viewport = { themeColor: '#ffffff', width: 'device-width', initialScale: 1, viewportFit: 'cover', interactiveWidget: 'resizes-content' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
