@@ -46,6 +46,7 @@ def norm_words(s: str) -> str:
 
 LINK_GENERIC = set("book booking schedule reserve register registration sign up tour visit appointment event link use form submit fill out".split())
 LIST_WORDS = re.compile(r"\b(list|all|every|which|what (courses?|classes|electives?|sports|clubs|departments?)|offered|options|available|are there (any|some)|is there (any|a) (list|club))\b", re.I)
+MONEY_Q = re.compile(r"\bhow much\b|\bcosts?\b|\bprices?\b|\bfees?\b|\btuition\b|\bhow expensive\b", re.I)
 CLUB_Q = re.compile(r"\bclubs?\b|\baffinity\b", re.I)
 
 LINK_INTENTS = [
@@ -94,6 +95,7 @@ SYNONYMS = {
     r"\bclubs?\b|\baffinity\b|\bstudent organi[sz]ations?\b": "clubs and affinity groups list",
     r"\blanguages?\b|\bforeign language\b": "world languages Chinese Spanish French Japanese Latin Korean language courses",
     r"\bmakeup\b|\bmake[- ]up\b|\bretake\b": "make-up retake assessment policy",
+    r"\bfirst day of (school|classes)\b|\bwhen (did|does|do) (school|classes) (start|begin)\b|\bschool (started|starts|begins)\b": "First Day of School classes begin opening day",
     # nicknames, acronyms and the words the school's own documents use
     r"\bhoco\b|\bhomecoming\b": "HoCo homecoming spirit week dance",
     r"\bhonou?r (code|council|system|pledge)\b": "Academic Integrity plagiarism cheating honesty community norms",
@@ -208,16 +210,27 @@ def email_recency_boost(source_date, today: date | None = None) -> float:
     return 0.0 if age is None else EMAIL_RECENCY_MAX * 0.5 ** (age / EMAIL_HALF_LIFE_DAYS)
 
 
+def _shingles(body: str, k: int = 5) -> set:
+    w = body.split()
+    return {" ".join(w[i:i + k]) for i in range(max(0, len(w) - k + 1))}
+
+
 def dedupe_rows(rows: list[dict]) -> list[dict]:
-    """Drop lower-ranked rows whose text repeats a higher-ranked one (the same document indexed under two
-    URLs or titles). Compared on the normalised body: same first and last 200 characters and a similar length."""
-    seen, out = {}, []
+    """Drop lower-ranked rows whose text repeats a higher-ranked one (the same document indexed under two URLs or titles, even when the
+    copies were cut into chunks at different places). Exact: same first and last 200 characters and a similar length. Fuzzy: 70% of the
+    shorter row's 5-word shingles already appear in one kept row. Structured rows (calendar, links, facts) are never fuzzy-dropped."""
+    seen, out, kept = {}, [], []
     for r in rows:
         body = re.sub(r"[^a-z0-9]+", " ", r["content"].split("\n\n", 1)[-1].lower()).strip()
         key = (body[:200], body[-200:])
         if key in seen and 0.8 < (len(body) + 1) / (seen[key] + 1) < 1.25:
             continue
+        sh = _shingles(body)
+        src = (r.get("metadata") or {}).get("source", "")
+        if len(sh) >= 25 and src in OLD_COPY_SOURCES and any(len(sh & k) / min(len(sh), len(k)) >= 0.7 for k in kept if k):
+            continue
         seen[key] = len(body)
+        kept.append(sh if src in OLD_COPY_SOURCES else set())
         out.append(r)
     return out
 
@@ -449,6 +462,8 @@ class Retriever:
                 r["rerank"] -= CAL_PENALTY         # calendar is looked up structurally, not by similarity
             if m.get("source") in ("calendar_day", "school_day") and not DATE_HINT.search(query):
                 r["rerank"] -= 0.25                # a day record for a question that names no date is noise (it only matches a stray word)
+            if MONEY_Q.search(query) and re.search(r"\$\s?\d", r["content"]):
+                r["rerank"] += 0.20                # "how much is tuition / the fee": the chunk with the amounts, not the prose about affordability
             if m.get("source") == "school_clubs" and CLUB_Q.search(query):
                 r["rerank"] += 0.10                # the 2026-27 clubs workbook beats older club-catalog copies
             if rare:

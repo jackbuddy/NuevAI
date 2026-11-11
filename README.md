@@ -145,6 +145,14 @@ so re-runs only pay for questions whose prompt changed (the date line is ignored
 Output: a table by category / persona / phrasing / behavior, taxonomy counts, over-hedge, unnecessary-refusal and hallucination rates, every flagged hallucination token, launch-bar status, `data/eval/quality_<ts>.json`;
 `--write-baseline` also writes the compact `eval/baselines/baseline_<date>_<mode>.json`. The exit code is 1 below the launch bar (`--no-fail` to disable). Test traffic is sent as `test-quality-<n>` so analytics files it under "test".
 
+### Answer quality fixes (qnorm.py, refusal.py, rag.py, query_server.py; QUALITY_AUDIT.md "Fix log")
+- `qnorm.py` + `vocab_freq.json`: typo/slang repair and word rarity from the index vocabulary. Rebuild after big data changes: `python scripts/build_vocab.py` (read-only, ~6 requests). Without the file only the slang table applies.
+- `refusal.py`: the one refusal/redirect detector, imported by the server (analytics, cache policy) and `eval_quality.py`. The prompt's canonical "not in my data" opening is **"I don't have that"** (`refusal.canonical_refusal`).
+- Retrieval: keyword search (FTS) runs three ways (broad OR, rare words, rarest AND next word) with a retry; names/acronyms get protected slots; per-title caps and fuzzy copy dedupe; division (US/MS/LS) detection labels documents and ranks the asker's division first; context shows a query-centred window (<=1,300 chars of body) instead of the first 1,100 characters.
+- Server: refusals/hedged answers are never cached; non-primary-model answers only 5 min in memory (never L2); empty completions are retried (bigger budget, then next model, then the degraded answer); credentials are scrubbed from context and answers (`guard.scrub_credentials`).
+- `chat_answered` now carries `fallback` (shared detector), `refusal`, `canonical`, `redirect`, `hedged`, `rroute` (docs|calendar|entity|lunch), `div`, `chunks` [{id,t}] and `answer_head` (<=600 chars, emails/phones redacted); the SSE `done` event carries `route`, `model`, `limited`. Limited (refused/hedged) answers send no suggestions so the client keeps its own Browse Resources / What can I ask? chips; degraded answers send Try again / What can I ask? / calendar chips. Frontend TODO (not done here): record `via:'suggestion'` for chip clicks and read `done.limited`/`done.route`.
+- Tests: `python test_quality_fixes.py` (offline, fake LLM, no quota). Retrieval gate: `python eval_quality.py --mode retrieval` (run 2-3 times; the ANN search moves 1-4 borderline items).
+
 More: [pipeline/README.md](pipeline/README.md) (ingestion, metrics, environment variables).
 
 ### Canonical lists and data coverage (`knowledge/*.md`, `pipeline/canonical.py`, `pipeline/public_pages.py`, `scripts/flag_rows.py`)
