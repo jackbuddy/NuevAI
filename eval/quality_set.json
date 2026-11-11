@@ -1217,7 +1217,7 @@
   "dynamic": null,
   "verified": true,
   "source": "MS offerings list Coed Flag Football; no tackle football in any offering list",
-  "notes": "correct = no tackle football; nearest true thing: coed flag football (MS fall; also a US club)",
+  "notes": "correct = no tackle football; nearest true thing: coed flag football (MS fall; also a US club and a 2026-27 US team on the PE page). A calendar event (Pack the Field, Mavericks Spirit Day) mentions the flag football team.",
   "retr": [
    "Flag Football"
   ],
@@ -1228,7 +1228,7 @@
   "absent_checks": [
    "tackle football",
    "varsity football",
-   "football team"
+   "(?<!flag )football team"
   ]
  },
  {
@@ -2910,13 +2910,13 @@
   ],
   "forbid": [],
   "dynamic": null,
-  "verified": false,
-  "source": "public site Reflections news page (Oct 2024 byline: stale)",
-  "notes": "byline dated Oct 2024; the Upper School Division Head may have changed: marked unverified for currency",
+  "verified": true,
+  "source": "Nexus Upper School resource board (8/4/2026 dean letter list) and the public Leadership page (captured 2026-09-04)",
+  "notes": "",
   "retr": null,
-  "verification": "needs owner confirmation",
+  "verification": "auto: every check pattern found in the cited source chunks",
   "verify_checks": [
-   "Liza Raynal, Upper School Division Head"
+   "Liza Raynal , Upper School Division Head"
   ],
   "absent_checks": []
  },
@@ -4221,21 +4221,21 @@
   "phrasing": "clean",
   "history": [],
   "q": "How much is tuition?",
-  "behavior": "partial",
+  "behavior": "answer",
   "expect": [
-   "(financial assistance|financial aid)"
+   "(48,785|65,065)"
   ],
-  "forbid": [
-   "\\$\\s?\\d{2},\\d{3}(?!.*per child)"
-  ],
+  "forbid": [],
   "dynamic": null,
-  "verified": false,
-  "source": "Affording a Nueva Education page: only an illustrative financial-assistance table; no published tuition figure in the index",
-  "notes": "no tuition number is indexed: a correct response must NOT invent one; it should give what exists (financial assistance, platform) and point to admissions",
+  "verified": true,
+  "source": "Affording a Nueva Education page (public, read 2026-11-11): 2026-27 tuition table",
+  "notes": "tuition is now indexed (public page read 2026-11-11): PreK-4 $48,785, grades 5-12 $65,065 plus trips fees; 2027-28 tuition is not published yet",
   "retr": null,
-  "verification": "needs owner confirmation",
+  "verification": "auto: every check pattern found in the cited source chunks",
   "verify_checks": [
-   "Nueva Financial Assistance, Per Child"
+   "\\$48,785",
+   "\\$65,065",
+   "Tuition Rates 2026"
   ],
   "absent_checks": []
  },
@@ -6619,6 +6619,1059 @@
   "verification": "needs owner confirmation",
   "verify_checks": [
    "Spring: Boys Volleyball"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-01",
+  "category": "admissions_parent",
+  "persona": "prospective_family",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "How much is tuition for the upper school?",
+  "behavior": "answer",
+  "expect": [
+   "65,065"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Affording a Nueva Education page (public, read 2026-11-11)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Tuition\\s*&\\s*Fees",
+   "\\$65,065",
+   "9th.12th"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-02",
+  "category": "admissions_parent",
+  "persona": "prospective_family",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "What is the tuition for kindergarten?",
+  "behavior": "answer",
+  "expect": [
+   "48,785"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Affording a Nueva Education page (public, read 2026-11-11)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Kindergarten\\s*\\|\\s*\\$48,785"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-03",
+  "category": "admissions_parent",
+  "persona": "prospective_family",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "How much is the application fee?",
+  "behavior": "answer",
+  "expect": [
+   "\\$100"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Visit & Apply / Admissions FAQ pages (public, read 2026-11-11)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "nonrefundable application fee of \\$100"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-04",
+  "category": "admissions_parent",
+  "persona": "prospective_family",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "What is the application deadline for next year?",
+  "behavior": "answer",
+  "expect": [
+   "\\bJan[a-z]*\\.?\\s+5\\b"
+  ],
+  "forbid": [],
+  "dynamic": {
+   "as_of": "2026-11-11",
+   "valid_through": "2027-01-04",
+   "resolver": null,
+   "note": ""
+  },
+  "verified": true,
+  "source": "Visit & Apply / Admissions FAQ pages (public, read 2026-11-11)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "due January 5, 2027"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-05",
+  "category": "admissions_parent",
+  "persona": "prospective_family",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Do upper school applicants have to take the SSAT or ISEE?",
+  "behavior": "answer",
+  "expect": [
+   "\\b(no|not)\\b",
+   "(SSAT|ISEE|entrance test)"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Visit & Apply / Admissions FAQ pages (public, read 2026-11-11)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Entrance testing is not required and not accepted",
+   "does not require or accept the ISEE/SSAT"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-06",
+  "category": "admissions_parent",
+  "persona": "prospective_family",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "How many students does Nueva admit into 9th grade?",
+  "behavior": "answer",
+  "expect": [
+   "40\\s*(-|to|–)\\s*45"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Visit & Apply / Admissions FAQ pages (public, read 2026-11-11)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Grade 9: 40.45 openings"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-07",
+  "category": "admissions_parent",
+  "persona": "prospective_family",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "When will we find out about admissions and financial aid decisions?",
+  "behavior": "answer",
+  "expect": [
+   "\\bMar[a-z]*\\.?\\s+12\\b"
+  ],
+  "forbid": [],
+  "dynamic": {
+   "as_of": "2026-11-11",
+   "valid_through": "2027-03-11",
+   "resolver": null,
+   "note": ""
+  },
+  "verified": true,
+  "source": "Affording a Nueva Education page (public, read 2026-11-11)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Friday, March 12, 2027\\s+Admissions and Financial Assistance decisions released at 4 p\\.m\\."
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-08",
+  "category": "admissions_parent",
+  "persona": "prospective_family",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "How old does my child have to be to start kindergarten at Nueva?",
+  "behavior": "answer",
+  "expect": [
+   "\\b5\\b",
+   "September 1"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Visit & Apply / Admissions FAQ pages (public, read 2026-11-11)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "applying for kindergarten must be 5 years old by September 1, 2027"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-09",
+  "category": "admissions_parent",
+  "persona": "prospective_family",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Does Nueva give free tuition to families with lower incomes?",
+  "behavior": "answer",
+  "expect": [
+   "100\\s*%",
+   "150,000"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Affording a Nueva Education page (public, read 2026-11-11)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "100% financial assistance grants to households earning less than \\$150,000"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-10",
+  "category": "admissions_parent",
+  "persona": "prospective_family",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Is there a fee waiver for the application?",
+  "behavior": "answer",
+  "expect": [
+   "(yes|available)",
+   "waiver"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Visit & Apply / Admissions FAQ pages (public, read 2026-11-11)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "fee waivers are available"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-11",
+  "category": "athletics_teams",
+  "persona": "current_parent",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "What sports does Nueva offer in the winter?",
+  "behavior": "answer",
+  "expect": [
+   "basketball",
+   "soccer"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "US P.E. requirement and PE information page (2026-27 interscholastic offerings)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Basketball \\(Winter\\)",
+   "Soccer \\(Winter\\)"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-12",
+  "category": "athletics_teams",
+  "persona": "community_member",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Does Nueva have an ice hockey team?",
+  "behavior": "no_such_thing",
+  "expect": [
+   "\\b(no|not|doesn't|does not)\\b"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "US P.E. requirement and PE information page (2026-27 interscholastic offerings); no list names ice hockey (street hockey is only a Middle School PE class activity)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks; absence confirmed over the whole index",
+  "verify_checks": [
+   "Interscholastic Offerings for 2026"
+  ],
+  "absent_checks": [
+   "ice hockey",
+   "hockey (team|program|league)s?\\b(?<!field hockey program)"
+  ]
+ },
+ {
+  "id": "cov-13",
+  "category": "athletics_teams",
+  "persona": "prospective_family",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Does Nueva have a swim team?",
+  "behavior": "answer",
+  "expect": [
+   "swim",
+   "(spring|coed|girls|boys)"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "US P.E. requirement and PE information page (2026-27 interscholastic offerings); (an earlier production question 'when does nueva swim season start' had no answer)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Swimming & Diving \\(Spring\\)"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-14",
+  "category": "athletics_teams",
+  "persona": "ms_student",
+  "campus": "hillsborough",
+  "phrasing": "clean",
+  "history": [],
+  "q": "What sports can I play in middle school in the fall?",
+  "behavior": "answer",
+  "expect": [
+   "flag football",
+   "cross country",
+   "(swim|golf)"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Student & Family Handbook (nexus/google_doc chunks)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Fall: Coed Flag Football, Coed Cross Country, Coed Swim, Coed Golf"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-15",
+  "category": "athletics_teams",
+  "persona": "current_parent",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Does Nueva have a golf team?",
+  "behavior": "answer",
+  "expect": [
+   "golf"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "US P.E. requirement and PE information page (2026-27 interscholastic offerings) (the golf wording differs between sources: handbook 'Coed Golf', PE page girls fall and boys spring)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Boys.? Golf",
+   "Girls.? Golf"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-16",
+  "category": "athletics_teams",
+  "persona": "current_parent",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Where do the Nueva basketball teams play their home games?",
+  "behavior": "answer",
+  "expect": [
+   "(US Gym|gym)"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Upper School Athletics Handbook venue table",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Girls & Boys Basketball \\| Nueva US Gym \\| Nueva US Gym"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-17",
+  "category": "athletics_teams",
+  "persona": "community_member",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "What are Nueva's school colors and mascot?",
+  "behavior": "answer",
+  "expect": [
+   "blue",
+   "Maverick"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Upper School Athletics Handbook contact table",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "School Colors \\| Royal Blue and White",
+   "Team Mascot \\| Mavericks"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-18",
+  "category": "athletics_teams",
+  "persona": "current_parent",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "What forms does my athlete need before the first practice?",
+  "behavior": "answer",
+  "expect": [
+   "physical",
+   "(concussion|Magnus)"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Upper School Athletics Handbook",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "five required forms",
+   "Magnus Health"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-19",
+  "category": "staff_contacts",
+  "persona": "prospective_family",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Who is the head of school?",
+  "behavior": "answer",
+  "expect": [
+   "Lee Fertig"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "public Leadership page",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Lee Fertig Head of School"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-20",
+  "category": "staff_contacts",
+  "persona": "current_parent",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Who is the upper school division head?",
+  "behavior": "answer",
+  "expect": [
+   "Liza Raynal"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Nexus Upper School resource board contacts",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Liza Raynal , Upper School Division Head"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-21",
+  "category": "staff_contacts",
+  "persona": "ms_student",
+  "campus": "hillsborough",
+  "phrasing": "clean",
+  "history": [],
+  "q": "Who is the middle school head?",
+  "behavior": "answer",
+  "expect": [
+   "Tiegel"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Reflections page bylines + Leadership page (ktiegel@)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Karen Tiegel, Middle School Division Head"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-22",
+  "category": "staff_contacts",
+  "persona": "current_parent",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Who do I contact about tuition billing?",
+  "behavior": "answer",
+  "expect": [
+   "(BusinessOffice@nuevaschool\\.org|650-350-4530|Business Office)"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Contact Us page",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Business Office Brett Dyer, Director of Finance & Administration 650-350-4530 BusinessOffice@nuevaschool\\.org"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-23",
+  "category": "staff_contacts",
+  "persona": "us_student",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "What is the email for IT help?",
+  "behavior": "answer",
+  "expect": [
+   "techhelp@nuevaschool\\.org"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Nexus Upper School resource board contacts",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "techhelp@nuevaschool\\.org"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-24",
+  "category": "staff_contacts",
+  "persona": "current_parent",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "How do I reach the school nurse?",
+  "behavior": "answer",
+  "expect": [
+   "nurse@nuevaschool\\.org"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Student & Family Handbook (nexus/google_doc chunks)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "nurse@nuevaschool\\.org"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-25",
+  "category": "staff_contacts",
+  "persona": "prospective_family",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Who is the director of admissions?",
+  "behavior": "answer",
+  "expect": [
+   "Melanie Le[oó]n"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Contact Us page",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Melanie Le.n,? Director of Admissions"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-26",
+  "category": "staff_contacts",
+  "persona": "us_student",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Who is the 10th grade dean?",
+  "behavior": "answer",
+  "expect": [
+   "Dubreuil"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Nexus Upper School resource board contacts",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Jessie Dubreuil , 10th Grade Dean"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-27",
+  "category": "staff_contacts",
+  "persona": "us_student",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Who is the registrar?",
+  "behavior": "answer",
+  "expect": [
+   "Zermani"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Nexus Upper School resource board contacts",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Veronica Zermani , Registrar"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-28",
+  "category": "staff_contacts",
+  "persona": "us_student",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Who is the upper school counselor?",
+  "behavior": "answer",
+  "expect": [
+   "Jacobstein"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Nexus Upper School resource board contacts",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Aviva Jacobstein , Upper School Lead Counselor"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-29",
+  "category": "staff_contacts",
+  "persona": "current_parent",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "What email do I use for questions about the bus?",
+  "behavior": "answer",
+  "expect": [
+   "bus@nuevaschool\\.org"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Transportation page (public, read 2026-11-11)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "bus@nuevaschool\\.org"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-30",
+  "category": "campus_logistics",
+  "persona": "ms_student",
+  "campus": "hillsborough",
+  "phrasing": "clean",
+  "history": [],
+  "q": "What time does middle school start and end?",
+  "behavior": "answer",
+  "expect": [
+   "8:10",
+   "3:15"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Student & Family Handbook (nexus/google_doc chunks)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "The school day begins at 8:10 a\\.m\\. and ends at 3:15 p\\.m\\."
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-31",
+  "category": "campus_logistics",
+  "persona": "prospective_family",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Is there a bus between the two campuses?",
+  "behavior": "answer",
+  "expect": [
+   "(yes|daily route)",
+   "campus"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Transportation page (public, read 2026-11-11)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "daily route between campuses"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-32",
+  "category": "campus_logistics",
+  "persona": "current_parent",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "How many bus routes does Nueva run?",
+  "behavior": "answer",
+  "expect": [
+   "(six|6)",
+   "(four|4)"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Transportation page (public, read 2026-11-11)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "six routes serving Hillsborough and four serving San Mateo"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-33",
+  "category": "campus_logistics",
+  "persona": "us_student",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Do upper school students get a free Caltrain pass?",
+  "behavior": "answer",
+  "expect": [
+   "Go Pass",
+   "(no additional cost|free)"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Transportation page (public, read 2026-11-11)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Caltrain Go Passes are available at no additional cost to Upper School students"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-34",
+  "category": "courses_academics",
+  "persona": "us_student",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "How many years of math do I need to graduate?",
+  "behavior": "answer",
+  "expect": [
+   "\\b(3|three)\\b"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "2026-27 Course Catalog graduation requirements table",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Math\\s*\\|\\s*3 Years"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-35",
+  "category": "courses_academics",
+  "persona": "prospective_family",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "How many years of a foreign language are required?",
+  "behavior": "answer",
+  "expect": [
+   "\\b(3|three)\\b",
+   "language"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "2026-27 Course Catalog graduation requirements table",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "World Languages\\s*\\|\\s*3 Years",
+   "3 c\\s*onsecutive years of the same language"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-36",
+  "category": "courses_academics",
+  "persona": "prospective_family",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "What are the graduation requirements at Nueva?",
+  "behavior": "answer",
+  "expect": [
+   "English",
+   "(4 years|four years)",
+   "(History|Science|Math)"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "2026-27 Course Catalog graduation requirements table",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "English\\s*\\|\\s*4 Years",
+   "History\\s*\\|\\s*3 Years",
+   "Science\\s*\\|\\s*3 Years"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-37",
+  "category": "courses_academics",
+  "persona": "prospective_family",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "What departments does the upper school have?",
+  "behavior": "answer",
+  "expect": [
+   "Computer Science",
+   "Math",
+   "(English|History)"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "2026-27 Course Catalog outline record (department headings)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Computer Science",
+   "Economics"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-38",
+  "category": "clubs_activities",
+  "persona": "us_student",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "What clubs meet on Tuesdays at lunch?",
+  "behavior": "answer",
+  "expect": [
+   "(Film Club|Go Club|Food Science)"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "school_clubs outline record (Clubs Catalog 2026-27)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Film Club \\(Tuesday, Lunch\\)",
+   "Go Club \\(Tuesday, Lunch\\)"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-39",
+  "category": "clubs_activities",
+  "persona": "prospective_family",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "How many clubs does the upper school have?",
+  "behavior": "answer",
+  "expect": [
+   "119"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "school_clubs outline record (Clubs Catalog 2026-27)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "119 listed"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-40",
+  "category": "calendar_schedules",
+  "persona": "current_parent",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "What was the first day of school this year?",
+  "behavior": "past_event",
+  "expect": [
+   "\\bAug[a-z]*\\.?\\s+19\\b"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Year-at-a-Glance 2026-27 (Wed Aug 19)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "First Day of Classes"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-41",
+  "category": "day_types",
+  "persona": "us_student",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Was there school on Yom Kippur this year?",
+  "behavior": "past_event",
+  "expect": [
+   "(no|not)",
+   "(Sep(tember)? 21|Yom Kippur)"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "school_day rows from 'The Sheet - Master Schedule 2026-27'",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "September 21, 2026 - No classes \\(Yom Kippur\\)"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "cov-42",
+  "category": "events",
+  "persona": "us_student",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "When was the 9th grade retreat?",
+  "behavior": "past_event",
+  "expect": [
+   "\\bAug[a-z]*\\.?\\s+27\\b"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "school_day rows from 'The Sheet - Master Schedule 2026-27'",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "August 27, 2026 - No classes \\(Grade Level Retreats\\)"
   ],
   "absent_checks": []
  }

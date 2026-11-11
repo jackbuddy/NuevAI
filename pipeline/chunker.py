@@ -20,7 +20,7 @@ from pathlib import Path
 from . import config
 from .common import load_pages
 from .links import build as build_links, link_cards
-from . import facts, sheets, workbooks
+from . import canonical, facts, safety, sheets, workbooks
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))     # freshness.py lives at the repo root (shared with rag.py)
 import freshness      # noqa: E402
@@ -127,6 +127,7 @@ def clean_text(text: str) -> str:
     """Drop the BOM, separator rules and UI-chrome lines ("- Message", "- Add to Contacts") that
     carry no facts but dilute embeddings."""
     text = text.replace("\ufeff", "")
+    text, _ = safety.scrub(text)          # shared logins, meeting passcodes and personal cell numbers are never indexed
     return "\n".join(l for l in text.splitlines() if not config.BOILERPLATE_LINE.match(l.strip()))
 
 
@@ -222,7 +223,7 @@ def annotate_freshness(chunks: list[dict], pages: list[dict], today: date | None
             if url.startswith("workbook://"):
                 day = wb_days.get(url[len("workbook://"):])
             elif url.startswith("facts://"):
-                day = _day_of_file(facts.DIR / url[len("facts://"):])
+                day = m.get("as_of") or _day_of_file(facts.DIR / url[len("facts://"):])
             elif src in ("calendar", "calendar_day"):
                 day = cal_day
             elif src == "lunch":
@@ -268,7 +269,7 @@ def run(log=print) -> list[dict]:
                 continue
             seen_bodies.add(body_hash)
             chunks.append({
-                "chunk_id": f"{hashlib.sha1(page['url'].encode()).hexdigest()[:12]}-{n:04d}",
+                "chunk_id": f"{hashlib.sha1(page.get('id_seed', page['url']).encode()).hexdigest()[:12]}-{n:04d}",
                 "content": content, "source_file": page["url"],
                 "metadata": {"source_url": page["url"], "title": page["title"], "source": page["source"],
                              "content_hash": hashlib.sha1(content.encode()).hexdigest()},
@@ -289,7 +290,7 @@ def run(log=print) -> list[dict]:
                                                                       "kind": "outline", "content_hash": hashlib.sha1(content.encode()).hexdigest()}})
         for j, (trail, body) in enumerate(outline_chunks(page)):
             content = f"Title: {page['title']}\nSection: {trail} (outline)\nSource: {page['url']}\n\n{body}"
-            chunks.append({"chunk_id": f"{hashlib.sha1(page['url'].encode()).hexdigest()[:12]}-outline-{j:03d}",
+            chunks.append({"chunk_id": f"{hashlib.sha1(page.get('id_seed', page['url']).encode()).hexdigest()[:12]}-outline-{j:03d}",
                            "content": content, "source_file": page["url"],
                            "metadata": {"source_url": page["url"], "title": page["title"], "source": page["source"],
                                         "kind": "outline", "content_hash": hashlib.sha1(content.encode()).hexdigest()}})
@@ -310,6 +311,7 @@ def run(log=print) -> list[dict]:
         chunks.extend(json.loads(config.CALENDAR_FILE.read_text(encoding="utf-8")))
     if config.LUNCH_FILE.exists():                   # the cafe's monthly menus, parsed by pipeline/lunch.py (one structured record per campus per day)
         chunks.extend(json.loads(config.LUNCH_FILE.read_text(encoding="utf-8")))
+    chunks.extend(canonical.build_chunks(chunks, list(load_pages()), links, log))      # enumerated lists derived from the sources above
     unique, seen_ids = [], set()
     for c in chunks:                    # one row per id: Postgres rejects duplicates inside a single upsert
         if c["chunk_id"] not in seen_ids:

@@ -118,6 +118,30 @@ def extract_links(root, base_url: str):
     return links
 
 
+def unhide_panels(soup) -> int:
+    """Finalsite FAQ/accordion answers sit in collapsed panels marked aria-hidden, which NOISE_SELECTORS would drop: the crawled
+    page then shows only the questions ('- Are application fee waivers available?') and the answers never reach the index.
+    A collapsed panel is content, not chrome: clear the flag (and `hidden`) on tab panels and accordion bodies first."""
+    n = 0
+    for el in soup.select("[role=tabpanel], .fsPanel, [class*=fsAccordion], [class*=accordion]"):
+        for node in [el, *el.find_all(True)]:
+            if node.get("aria-hidden") == "true" and not node.find_parent(["nav", "header", "footer"]):
+                del node["aria-hidden"]
+                n += 1
+            if node.has_attr("hidden"):
+                del node["hidden"]
+    # keep each answer next to its question: the tab list holds the questions, the panels (found by aria-controls) the answers
+    for tab in soup.select("a[role=tab][aria-controls]"):
+        panel = soup.find(id=tab["aria-controls"])
+        q = tab.get_text(" ", strip=True)
+        if panel is not None and q and not panel.find("h4", string=q):
+            h = soup.new_tag("h4")
+            h.string = q
+            panel.insert(0, h)
+            n += 1
+    return n
+
+
 def extract_page(html: str, url: str):
     """Returns (title, markdown, links). Links are collected BEFORE noise removal
     so 'Book a tour' buttons living in headers or sidebars are not lost."""
@@ -125,6 +149,7 @@ def extract_page(html: str, url: str):
     title = (soup.title.get_text(strip=True) if soup.title else "") or url
     title = re.sub(r"\s*\|\s*The Nueva School$", "", title)
     links = extract_links(soup, url)
+    unhide_panels(soup)
     for sel in NOISE_SELECTORS:
         for n in soup.select(sel):
             n.decompose()

@@ -11,7 +11,7 @@ from collections import defaultdict
 from . import config
 from .common import load_pages
 
-TRACKING = re.compile(r"^(utm_|fbclid|gclid|mc_)", re.I)
+TRACKING = re.compile(r"^(utm_|fbclid|gclid|mc_|pwd$|passcode$|password$)", re.I)    # pwd=... on meeting links is a shared secret: never indexed
 BORING_TEXT = re.compile(r"^(click here|here|link|read more|learn more|more|view|open|\s*)$", re.I)
 
 

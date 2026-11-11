@@ -144,7 +144,7 @@ I("ath-02", "athletics_teams", "us_student", "clean", "What varsity sports does 
 I("ath-03", "athletics_teams", "us_student", "clean", "What sports can I play in the winter?", "answer", [r"basketball", r"soccer"], [r"Winter: Boys Basketball, Girls Basketball, Boys Soccer, Girls Soccer"], [r"Varsity offerings by season"], HB + " (US winter varsity)")
 I("ath-04", "athletics_teams", "us_student", "clean", "What fall sports are there at the upper school?", "answer", [r"volleyball", r"tennis", r"cross.?country"], [r"Fall: Girls Volleyball, Girls Tennis, Girls & Boys Cross-Country"], [r"Varsity offerings by season"], HB)
 I("ath-05", "athletics_teams", "community_member", "clean", "Does Nueva have a football team?", "no_such_thing", [r"flag football"], [r"Flag Football"], [r"Coed Flag Football"], "MS offerings list Coed Flag Football; no tackle football in any offering list",
-  absent=[r"tackle football", r"varsity football", r"football team"], notes="correct = no tackle football; nearest true thing: coed flag football (MS fall; also a US club)")
+  absent=[r"tackle football", r"varsity football", r"(?<!flag )football team"], notes="correct = no tackle football; nearest true thing: coed flag football (MS fall; also a US club and a 2026-27 US team on the PE page). A calendar event (Pack the Field, Mavericks Spirit Day) mentions the flag football team.")
 I("ath-06", "athletics_teams", "prospective_family", "clean", "Is there a baseball or softball team?", "no_such_thing", [r"(basketball|soccer|volleyball|tennis|golf|swim|track|cross)"], [r"Fall: Girls Volleyball"], [r"Varsity offerings by season"], HB + " offerings lists contain neither",
   absent=[r"baseball (team|program|season)", r"softball (team|program|season)"], notes="Athletics Director bio mentions he coached college baseball; softball is only an after-school PE activity. Neither is a team")
 I("ath-07", "athletics_teams", "us_student", "slang", "do we have wrestling or cheer", "no_such_thing", [r"(basketball|soccer|volleyball|tennis|golf|swim|track|cross)"], [r"Fall: Girls Volleyball"], [r"Varsity offerings by season"], HB, absent=[r"wrestling", r"cheerleading", r"cheer ?team", r"cheer squad"])
@@ -227,7 +227,7 @@ I("staff-07", "staff_contacts", "current_parent", "clean", "What is the front de
 I("staff-08", "staff_contacts", "current_parent", "clean", "What's the main phone number for the Hillsborough campus?", "answer", [r"650[-\s.]?350[-\s.]?4600"], [r"Main Office phone 650-350-4600"], [r"Campus locations and main phone numbers"], "knowledge/campus.md (school_facts)")
 I("staff-09", "staff_contacts", "current_parent", "clean", "How do I contact the school nurse?", "answer", [r"nurse@nuevaschool\.org"], [r"nurse@nuevaschool\.org"], [r"nurse@nuevaschool\.org"], HB)
 I("staff-10", "staff_contacts", "current_parent", "clean", "Who is the head of school?", "answer", [r"Lee Fertig"], [r"Lee Fertig, Head of School"], [r"Lee Fertig, Head of School"], "public site Reflections news page (signed 'Head of School' Aug 2025)", notes="source is a news byline from 2025: moderately fresh")
-I("staff-11", "staff_contacts", "current_parent", "clean", "Who is the Upper School division head?", "answer", [r"Liza Raynal"], [r"Liza Raynal, Upper School Division Head"], [r"Upper School Division Head"], "public site Reflections news page (Oct 2024 byline: stale)", notes="byline dated Oct 2024; the Upper School Division Head may have changed: marked unverified for currency", verified=False)
+I("staff-11", "staff_contacts", "current_parent", "clean", "Who is the Upper School division head?", "answer", [r"Liza Raynal"], [r"Liza Raynal , Upper School Division Head"], [r"Liza Raynal , Upper School Division Head"], "Nexus Upper School resource board (8/4/2026 dean letter list) and the public Leadership page (captured 2026-09-04)")
 I("staff-12", "staff_contacts", "us_student", "clean", "Who is the dean of students?", "answer", [r"Jackee Bruno"], [r"Dean of Students, Jackee Bruno"], [r"Dean of Students, Jackee Bruno"], "New Upper School Cell Phone Policy doc + Nexus 'US Dean of Students Letter - Jackee Bruno'")
 I("staff-13", "staff_contacts", "us_student", "clean", "Who is the head strength and conditioning coach?", "answer", [r"Hryekewicz"], [r"Nicholas Hryekewicz - Head Strength and Conditioning Coach"], [r"Nicholas Hryekewicz"], "Athletics staff page (nexus)")
 
@@ -290,8 +290,8 @@ I("adm-07", "admissions_parent", "prospective_family", "clean", "Which platform 
 I("adm-08", "admissions_parent", "prospective_family", "clean", "How do I apply to Nueva?", "answer", [r"Ravenna", r"(Family Information Form|application fee)"], [r"Ravenna", r"Family Information Form"], [r"Complete and submit the Family Information Form"], "link_registry + admissions pages")
 I("adm-09", "admissions_parent", "community_member", "clean", "How can I donate to Nueva?", "answer", [r"givecampus\.com"], [r"https://www.givecampus.com/campaigns/33909/donations/new"], [r"givecampus.com/campaigns/33909"], "link_registry payment link")
 I("adm-10", "admissions_parent", "current_parent", "clean", "Where can I buy Nueva spirit wear?", "answer", [r"nuevaschool\.org/nueva-store"], [r"https://www.nuevaschool.org/nueva-store"], [r"nuevaschool.org/nueva-store"], "link_registry store link")
-I("adm-11", "admissions_parent", "prospective_family", "clean", "How much is tuition?", "partial", [r"(financial assistance|financial aid)"], [r"Nueva Financial Assistance, Per Child"], [r"Nueva Financial Assistance, Per Child"], "Affording a Nueva Education page: only an illustrative financial-assistance table; no published tuition figure in the index",
-  notes="no tuition number is indexed: a correct response must NOT invent one; it should give what exists (financial assistance, platform) and point to admissions", verified=False, forbid=[r"\$\s?\d{2},\d{3}(?!.*per child)"])
+I("adm-11", "admissions_parent", "prospective_family", "clean", "How much is tuition?", "answer", [r"(48,785|65,065)"], [r"\$48,785", r"\$65,065", r"Tuition Rates 2026"], [r"Tuition Rates 2026"], "Affording a Nueva Education page (public, read 2026-11-11): 2026-27 tuition table",
+  notes="tuition is now indexed (public page read 2026-11-11): PreK-4 $48,785, grades 5-12 $65,065 plus trips fees; 2027-28 tuition is not published yet")
 I("adm-12", "admissions_parent", "prospective_family", "clean", "Are campus tours still offered this fall?", "partial", [r"(September through December|Sept)"], [r"Campus tours are offered from September through December"], [r"Campus tours are offered from September through December"], "nexus 'Middle School: Visit and Apply' (Hillsborough MS tours); Upper School page is marked 2025-26",
   notes="US tour season not confirmed for 2026-27 in the data")
 I("adm-13", "admissions_parent", "current_parent", "clean", "Does Nueva offer after-school care?", "answer", [r"(after.?care|extended day|homework club|enrichment|before and after)"], [r"Extended Day Program \(before and after school\) and Enrichment"], [r"Extended Day Program"], HB + " (Middle School special programs); Hillsborough programs", campus="hillsborough")
@@ -413,6 +413,57 @@ I("ath-20", "athletics_teams", "current_parent", "clean", "What league is girls 
 I("ath-21", "athletics_teams", "current_parent", "clean", "When does the spring athletics season start?", "partial", [r"(spring)"], [r"Spring: Boys Volleyball"], [r"Varsity offerings by season"], "only a stale 2024-25 Nexus resource board gives a date range (Jan 29 - early May); the Spring athletics meeting is Feb 1 2027 on the calendar", verified=False,
   notes="owner should confirm 2027 spring season start; the calendar has 'US Spring Sports Athlete/Parent Meeting' Feb 1 2027")
 
+# ---------------------------------------------------------------- coverage items (canonical lists added by the data-coverage pass, 2026-11-11)
+# Every fact below is verified against the ORIGINAL source chunks (public admissions pages, Nexus resource board, US P.E. page, handbooks,
+# course catalog), not against the curated records that were written from them.
+TUI = "Affording a Nueva Education page (public, read 2026-11-11)"
+ADM = "Visit & Apply / Admissions FAQ pages (public, read 2026-11-11)"
+PE = "US P.E. requirement and PE information page (2026-27 interscholastic offerings)"
+RB = "Nexus Upper School resource board contacts"
+TRN = "Transportation page (public, read 2026-11-11)"
+I("cov-01", "admissions_parent", "prospective_family", "clean", "How much is tuition for the upper school?", "answer", [r"65,065"], [r"Tuition\s*&\s*Fees", r"\$65,065", r"9th.12th"], [r"Tuition Rates 2026"], TUI)
+I("cov-02", "admissions_parent", "prospective_family", "clean", "What is the tuition for kindergarten?", "answer", [r"48,785"], [r"Kindergarten\s*\|\s*\$48,785"], [r"Tuition Rates 2026"], TUI)
+I("cov-03", "admissions_parent", "prospective_family", "clean", "How much is the application fee?", "answer", [r"\$100"], [r"nonrefundable application fee of \$100"], [r"nonrefundable application fee of \$100"], ADM)
+I("cov-04", "admissions_parent", "prospective_family", "clean", "What is the application deadline for next year?", "answer", [date("Jan", 5)], [r"due January 5, 2027"], [r"due January 5, 2027"], ADM, dynamic=dyn("2027-01-04"))
+I("cov-05", "admissions_parent", "prospective_family", "clean", "Do upper school applicants have to take the SSAT or ISEE?", "answer", [r"\b(no|not)\b", r"(SSAT|ISEE|entrance test)"], [r"Entrance testing is not required and not accepted", r"does not require or accept the ISEE/SSAT"], [r"Entrance testing is not required and not accepted"], ADM)
+I("cov-06", "admissions_parent", "prospective_family", "clean", "How many students does Nueva admit into 9th grade?", "answer", [r"40\s*(-|to|–)\s*45"], [r"Grade 9: 40.45 openings"], [r"Grade 9: 40.45 openings"], ADM)
+I("cov-07", "admissions_parent", "prospective_family", "clean", "When will we find out about admissions and financial aid decisions?", "answer", [date("Mar", 12)], [r"Friday, March 12, 2027\s+Admissions and Financial Assistance decisions released at 4 p\.m\."], [r"Affording a Nueva Education"], TUI, dynamic=dyn("2027-03-11"))
+I("cov-08", "admissions_parent", "prospective_family", "clean", "How old does my child have to be to start kindergarten at Nueva?", "answer", [r"\b5\b", r"September 1"], [r"applying for kindergarten must be 5 years old by September 1, 2027"], [r"must be 5 years old by September 1, 2027"], ADM)
+I("cov-09", "admissions_parent", "prospective_family", "clean", "Does Nueva give free tuition to families with lower incomes?", "answer", [r"100\s*%", r"150,000"], [r"100% financial assistance grants to households earning less than \$150,000"], [r"100% financial assistance grants"], TUI)
+I("cov-10", "admissions_parent", "prospective_family", "clean", "Is there a fee waiver for the application?", "answer", [r"(yes|available)", r"waiver"], [r"fee waivers are available"], [r"fee waivers are available"], ADM)
+I("cov-11", "athletics_teams", "current_parent", "clean", "What sports does Nueva offer in the winter?", "answer", [r"basketball", r"soccer"], [r"Basketball \(Winter\)", r"Soccer \(Winter\)"], [r"Interscholastic Offerings for 2026"], PE)
+I("cov-12", "athletics_teams", "community_member", "clean", "Does Nueva have an ice hockey team?", "no_such_thing", [r"\b(no|not|doesn't|does not)\b"], [r"Interscholastic Offerings for 2026"], [r"Interscholastic Offerings for 2026"], PE + "; no list names ice hockey (street hockey is only a Middle School PE class activity)", absent=[r"ice hockey", r"hockey (team|program|league)s?\b(?<!field hockey program)"])
+I("cov-13", "athletics_teams", "prospective_family", "clean", "Does Nueva have a swim team?", "answer", [r"swim", r"(spring|coed|girls|boys)"], [r"Swimming & Diving \(Spring\)"], [r"Interscholastic Offerings for 2026"], PE + "; (an earlier production question 'when does nueva swim season start' had no answer)")
+I("cov-14", "athletics_teams", "ms_student", "clean", "What sports can I play in middle school in the fall?", "answer", [r"flag football", r"cross country", r"(swim|golf)"], [r"Fall: Coed Flag Football, Coed Cross Country, Coed Swim, Coed Golf"], [r"Fall: Coed Flag Football, Coed Cross Country, Coed Swim, Coed Golf"], HB, campus="hillsborough")
+I("cov-15", "athletics_teams", "current_parent", "clean", "Does Nueva have a golf team?", "answer", [r"golf"], [r"Boys.? Golf", r"Girls.? Golf"], [r"Interscholastic Offerings for 2026"], PE + " (the golf wording differs between sources: handbook 'Coed Golf', PE page girls fall and boys spring)")
+I("cov-16", "athletics_teams", "current_parent", "clean", "Where do the Nueva basketball teams play their home games?", "answer", [r"(US Gym|gym)"], [r"Girls & Boys Basketball \| Nueva US Gym \| Nueva US Gym"], [r"Game and Practice Venues"], "Upper School Athletics Handbook venue table")
+I("cov-17", "athletics_teams", "community_member", "clean", "What are Nueva's school colors and mascot?", "answer", [r"blue", r"Maverick"], [r"School Colors \| Royal Blue and White", r"Team Mascot \| Mavericks"], [r"School Colors"], "Upper School Athletics Handbook contact table")
+I("cov-18", "athletics_teams", "current_parent", "clean", "What forms does my athlete need before the first practice?", "answer", [r"physical", r"(concussion|Magnus)"], [r"five required forms", r"Magnus Health"], [r"Athletic Clearance Paperwork"], "Upper School Athletics Handbook")
+I("cov-19", "staff_contacts", "prospective_family", "clean", "Who is the head of school?", "answer", [r"Lee Fertig"], [r"Lee Fertig Head of School"], [r"Lee Fertig Head of School"], "public Leadership page")
+I("cov-20", "staff_contacts", "current_parent", "clean", "Who is the upper school division head?", "answer", [r"Liza Raynal"], [r"Liza Raynal , Upper School Division Head"], [r"Liza Raynal , Upper School Division Head"], RB)
+I("cov-21", "staff_contacts", "ms_student", "clean", "Who is the middle school head?", "answer", [r"Tiegel"], [r"Karen Tiegel, Middle School Division Head"], [r"Karen Tiegel, Middle School Division Head"], "Reflections page bylines + Leadership page (ktiegel@)", campus="hillsborough")
+I("cov-22", "staff_contacts", "current_parent", "clean", "Who do I contact about tuition billing?", "answer", [r"(BusinessOffice@nuevaschool\.org|650-350-4530|Business Office)"], [r"Business Office Brett Dyer, Director of Finance & Administration 650-350-4530 BusinessOffice@nuevaschool\.org"], [r"Business Office Brett Dyer"], "Contact Us page")
+I("cov-23", "staff_contacts", "us_student", "clean", "What is the email for IT help?", "answer", [r"techhelp@nuevaschool\.org"], [r"techhelp@nuevaschool\.org"], [r"techhelp@nuevaschool\.org"], RB)
+I("cov-24", "staff_contacts", "current_parent", "clean", "How do I reach the school nurse?", "answer", [r"nurse@nuevaschool\.org"], [r"nurse@nuevaschool\.org"], [r"nurse@nuevaschool\.org"], HB)
+I("cov-25", "staff_contacts", "prospective_family", "clean", "Who is the director of admissions?", "answer", [r"Melanie Le[oó]n"], [r"Melanie Le.n,? Director of Admissions"], [r"Melanie Le.n,? Director of Admissions"], "Contact Us page")
+I("cov-26", "staff_contacts", "us_student", "clean", "Who is the 10th grade dean?", "answer", [r"Dubreuil"], [r"Jessie Dubreuil , 10th Grade Dean"], [r"Jessie Dubreuil , 10th Grade Dean"], RB)
+I("cov-27", "staff_contacts", "us_student", "clean", "Who is the registrar?", "answer", [r"Zermani"], [r"Veronica Zermani , Registrar"], [r"Veronica Zermani , Registrar"], RB)
+I("cov-28", "staff_contacts", "us_student", "clean", "Who is the upper school counselor?", "answer", [r"Jacobstein"], [r"Aviva Jacobstein , Upper School Lead Counselor"], [r"Aviva Jacobstein , Upper School Lead Counselor"], RB)
+I("cov-29", "staff_contacts", "current_parent", "clean", "What email do I use for questions about the bus?", "answer", [r"bus@nuevaschool\.org"], [r"bus@nuevaschool\.org"], [r"bus@nuevaschool\.org"], TRN)
+I("cov-30", "campus_logistics", "ms_student", "clean", "What time does middle school start and end?", "answer", [r"8:10", r"3:15"], [r"The school day begins at 8:10 a\.m\. and ends at 3:15 p\.m\."], [r"The school day begins at 8:10 a\.m\. and ends at 3:15 p\.m\."], HB, campus="hillsborough")
+I("cov-31", "campus_logistics", "prospective_family", "clean", "Is there a bus between the two campuses?", "answer", [r"(yes|daily route)", r"campus"], [r"daily route between campuses"], [r"daily route between campuses"], TRN)
+I("cov-32", "campus_logistics", "current_parent", "clean", "How many bus routes does Nueva run?", "answer", [r"(six|6)", r"(four|4)"], [r"six routes serving Hillsborough and four serving San Mateo"], [r"six routes serving Hillsborough and four serving San Mateo"], TRN)
+I("cov-33", "campus_logistics", "us_student", "clean", "Do upper school students get a free Caltrain pass?", "answer", [r"Go Pass", r"(no additional cost|free)"], [r"Caltrain Go Passes are available at no additional cost to Upper School students"], [r"Caltrain Go Passes are available at no additional cost"], TRN)
+I("cov-34", "courses_academics", "us_student", "clean", "How many years of math do I need to graduate?", "answer", [r"\b(3|three)\b"], [r"Math\s*\|\s*3 Years"], [r"Nueva Graduation Requirements"], "2026-27 Course Catalog graduation requirements table")
+I("cov-35", "courses_academics", "prospective_family", "clean", "How many years of a foreign language are required?", "answer", [r"\b(3|three)\b", r"language"], [r"World Languages\s*\|\s*3 Years", r"3 c\s*onsecutive years of the same language"], [r"Nueva Graduation Requirements"], "2026-27 Course Catalog graduation requirements table")
+I("cov-36", "courses_academics", "prospective_family", "clean", "What are the graduation requirements at Nueva?", "answer", [r"English", r"(4 years|four years)", r"(History|Science|Math)"], [r"English\s*\|\s*4 Years", r"History\s*\|\s*3 Years", r"Science\s*\|\s*3 Years"], [r"Nueva Graduation Requirements"], "2026-27 Course Catalog graduation requirements table")
+I("cov-37", "courses_academics", "prospective_family", "clean", "What departments does the upper school have?", "answer", [r"Computer Science", r"Math", r"(English|History)"], [r"Computer Science", r"Economics"], [r"Contents of 2026-27 Course Catalog"], "2026-27 Course Catalog outline record (department headings)")
+I("cov-38", "clubs_activities", "us_student", "clean", "What clubs meet on Tuesdays at lunch?", "answer", [r"(Film Club|Go Club|Food Science)"], [r"Film Club \(Tuesday, Lunch\)", r"Go Club \(Tuesday, Lunch\)"], [r"119 listed"], "school_clubs outline record (Clubs Catalog 2026-27)")
+I("cov-39", "clubs_activities", "prospective_family", "clean", "How many clubs does the upper school have?", "answer", [r"119"], [r"119 listed"], [r"119 listed"], "school_clubs outline record (Clubs Catalog 2026-27)")
+I("cov-40", "calendar_schedules", "current_parent", "clean", "What was the first day of school this year?", "past_event", [date("Aug", 19)], [r"First Day of Classes"], [r"First Day of Classes"], "Year-at-a-Glance 2026-27 (Wed Aug 19)")
+I("cov-41", "day_types", "us_student", "clean", "Was there school on Yom Kippur this year?", "past_event", [r"(no|not)", r"(Sep(tember)? 21|Yom Kippur)"], [r"September 21, 2026 - No classes \(Yom Kippur\)"], [r"September 21, 2026 - No classes"], DAY)
+I("cov-42", "events", "us_student", "clean", "When was the 9th grade retreat?", "past_event", [date("Aug", 27)], [r"August 27, 2026 - No classes \(Grade Level Retreats\)"], [r"August 27, 2026 - No classes"], DAY)
+
 PERSONA_OVERRIDE = {  # same questions, naturally asked by someone else (keeps persona coverage honest)
     "cal-04": "prospective_family", "cal-12": "current_parent", "cal-13": "current_parent", "cal-14": "current_parent", "cal-20": "current_parent",
     "ath-02": "prospective_family", "ath-03": "prospective_family", "ath-04": "current_parent", "ath-07": "current_parent", "ath-08": "prospective_family",
@@ -480,6 +531,9 @@ def main():
     a = ap.parse_args()
     chunks = load_chunks(a.chunks)
     texts = [norm(c["content"]) + "\n" + " ".join(str((c.get("metadata") or {}).get(k, "")) for k in ("event_date", "end_date")) for c in chunks]
+    # "absent" proves a thing is in no SOURCE: the curated records written from the sources (they state the negative, "Nueva does NOT offer hockey")
+    # are not sources, so they are left out of this one check
+    abs_texts = [t for t, c in zip(texts, chunks) if (c.get("metadata") or {}).get("source") not in ("school_facts", "school_canonical")]
     ids = set()
     out, unver = [], []
     for it in ITEMS:
@@ -500,7 +554,7 @@ def main():
                 problems.append(f"check not in source: {c[:70]}")
         for ab in it["_absent"]:
             rx = re.compile(ab, re.I)
-            n = sum(1 for t in texts if rx.search(t))
+            n = sum(1 for t in abs_texts if rx.search(t))
             if n:
                 problems.append(f"absent pattern found in {n} chunk(s): {ab[:50]}")
         manual = it["verified"]

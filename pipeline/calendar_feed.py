@@ -7,7 +7,7 @@ never from code. No login is involved. webcal:// is accepted and treated as http
 Each event becomes a retrievable chunk with an unambiguous date, and every day
 that has events also gets a digest chunk ("Schedule for Tuesday, October 28,
 2026: ...") so questions like "what's happening Oct 28" retrieve the whole day.
-Events from before CALENDAR_KEEP_PAST_DAYS ago are dropped, and the indexer
+Events from before the start of the current school year (window_floor) are dropped, and the indexer
 removes expired calendar chunks from Supabase automatically.
 """
 import hashlib
@@ -15,14 +15,28 @@ import json
 import os
 import re
 from collections import defaultdict
+import sys
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))     # freshness.py lives at the repo root
+import freshness      # noqa: E402
+from . import safety  # noqa: E402
 
 import requests
 
 from . import config
 
-KEEP_PAST_DAYS = 14
+KEEP_PAST_DAYS = 14          # minimum history; the real floor is window_floor() (the start of the school year)
 KEEP_FUTURE_DAYS = 430
+
+
+def window_floor(today: date) -> date:
+    """Oldest event day kept. The feed itself carries history (it starts in September for 2026-27), so events of the CURRENT school
+    year (from August 1) stay answerable as "that already happened on <date>"; never less than KEEP_PAST_DAYS. At the start of the
+    next school year the floor moves and the old year expires through the normal expired-calendar cleanup."""
+    start = date(freshness.current_start(today), 8, 1)
+    return min(today - timedelta(days=KEEP_PAST_DAYS), start)
 DIGEST_MAX_CHARS = 1500
 
 CATEGORY_RULES = [
@@ -163,7 +177,7 @@ def run(log=print) -> dict:
         return {"status": msg}
     events = parse_ics(fetch(url))
     today = date.today()
-    lo, hi = today - timedelta(days=KEEP_PAST_DAYS), today + timedelta(days=KEEP_FUTURE_DAYS)
+    lo, hi = window_floor(today), today + timedelta(days=KEEP_FUTURE_DAYS)
     kept, cancelled, recurring = [], 0, 0
     for e in events:
         if e.get("status", "").upper() == "CANCELLED":
@@ -173,6 +187,7 @@ def run(log=print) -> dict:
         d = describe(e)
         if d["end_date"] < lo or d["date"] > hi:
             continue
+        e = {**e, "description": safety.scrub(e.get("description", ""))[0], "location": safety.scrub(e.get("location", ""))[0]}   # meeting passcodes in invite links
         kept.append({**e, **{k: d[k] for k in ("when", "time", "date", "end_date")}})
     kept.sort(key=lambda e: (e["date"], e["start"] if isinstance(e["start"], datetime) else datetime.min))
     seen, unique = set(), []
