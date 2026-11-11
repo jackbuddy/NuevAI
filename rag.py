@@ -22,7 +22,7 @@ import qnorm
 import settings
 from cache import TTLCache
 from followup import apply_grade, rewrite_followup, valid_grade
-from intent import SPORTS as SPORTS_WORDS, CalendarIntent, LunchIntent, parse_intent, parse_lunch
+from intent import DATE_HINT, SPORTS as SPORTS_WORDS, CalendarIntent, LunchIntent, parse_intent, parse_lunch
 
 CANDIDATES = 32
 VECTOR_BUDGET_S = float(os.getenv("VECTOR_BUDGET_S", "14"))
@@ -78,7 +78,8 @@ SYNONYMS = {
     r"\bhomework\b": "homework assignments late work",
     r"\bgrad(e|es|ing)\b|\bgpa\b|\breport cards?\b": "grading grades assessment reporting",
     r"\bbus(es)?\b|\btransport\w*\b|\bshuttle\b": "transportation shuttle bus",
-    r"\blunch\b|\bfood\b|\bcafeteria\b|\bcafe\b": "lunch cafe meals dining",
+    r"^(?!.*\b(leave|leaving|off[- ]campus|open campus|closed campus|allowed|permitted)\b)(?s:.*)(?:\blunch\b|\bfood\b|\bcafeteria\b|\bcafe\b)": "lunch cafe meals dining",
+    r"\bleav(e|ing) (campus|school)\b|\boff[- ]campus\b|\b(open|closed)[- ]campus\b|\bgo off campus\b|\bsign(ed)? out\b": "closed-campus school grades 9 & 10 open campus leave campus during the school day policy",
     r"\bpark(ing)?\b|\bdrop[- ]?off\b|\bpick[- ]?up\b": "parking drop-off pick-up",
     r"\buniform\b|\bwear\b|\bclothes\b": "dress code",
     r"\binjur\w*\b|\bhurt\b|\btrainer\b": "sports medicine athletic training injury",
@@ -446,6 +447,8 @@ class Retriever:
                 r["rerank"] += OUTLINE_BOOST        # contents lists answer "list all ..." questions
             if m.get("source") in ("calendar", "calendar_day", "calendar_sheet"):
                 r["rerank"] -= CAL_PENALTY         # calendar is looked up structurally, not by similarity
+            if m.get("source") in ("calendar_day", "school_day") and not DATE_HINT.search(query):
+                r["rerank"] -= 0.25                # a day record for a question that names no date is noise (it only matches a stray word)
             if m.get("source") == "school_clubs" and CLUB_Q.search(query):
                 r["rerank"] += 0.10                # the 2026-27 clubs workbook beats older club-catalog copies
             if rare:
@@ -817,8 +820,9 @@ class Retriever:
         # protected keyword slot: the best row that contains ALL the question's rarest words (a name, an acronym: Priory, Guild, HoCo)
         # is always shown, even when long handbook chunks outscore it
         protect = []
-        if rare and len(rare) <= 3:
-            need = {rare[0]}
+        names = [t for t in rare if qnorm.df(t) <= 25]        # real names / acronyms only (a word in 58 chunks, like "freshmen", is not worth a protected slot)
+        if names and len(rare) <= 4:
+            need = {names[0]}
             for key in ("fts_pair", "fts_rare"):          # first the row that has the rarest word together with another question word, then the best rare-word row
                 for r in ranked:
                     m = r.get("metadata") or {}
