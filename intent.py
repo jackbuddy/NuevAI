@@ -10,6 +10,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
+ACRONYM_SKIP = {"US", "MS", "LS", "HS", "JV", "PE", "AM", "PM", "OK", "AI", "IT", "TV", "ID", "SM", "HB", "FAQ", "PDF", "USA", "ASAP", "RSVP", "PSAL", "WBAL", "BTSN", "CS", "ELA", "A", "B"}
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 MONTHS = {m.lower(): i for i, m in enumerate(_cal.month_name) if m}
 MONTHS.update({m.lower(): i for i, m in enumerate(_cal.month_abbr) if m})
@@ -52,12 +53,42 @@ class CalendarIntent:
     label: str = ""
     dayinfo: bool = False           # asking about A/B day type or which blocks meet
     holidays: list[str] = field(default_factory=list)   # named holidays in the question (thanksgiving, labor day...)
+    holiday_dates: list[date] = field(default_factory=list)   # this school year's date of each named holiday ("day after Thanksgiving" -> Nov 27)
 
     def short_range(self) -> bool:
         return (self.end - self.start).days <= 3
 
 
 HOLIDAY_RX = re.compile(r"\b(thanksgiving|christmas|labor day|memorial day|martin luther king|mlk|veterans day|indigenous|columbus|presidents.? day|juneteenth|new year|halloween|diwali|lunar new year|easter|good friday|winter break|spring break|independence day|winter solstice)\b", re.I)
+
+
+COMPETITION_BEFORE = re.compile(r"\b(amc|aime|sat|act|ap|psat|usaco|usamo|mathcounts|olympiad|exam|test|contest|competition)\s*#?\s*$")
+
+
+def _nth_weekday(year: int, month: int, weekday: int, n: int) -> date:
+    """n-th (1-based; -1 = last) given weekday of a month."""
+    if n > 0:
+        first = date(year, month, 1)
+        return first + timedelta(days=(weekday - first.weekday()) % 7 + 7 * (n - 1))
+    last = date(year, month, _cal.monthrange(year, month)[1])
+    return last - timedelta(days=(last.weekday() - weekday) % 7)
+
+
+# US holidays the school marks, by rule (month, weekday, n) or fixed (month, day): the date inside the current school year
+HOLIDAY_RULES = {"labor day": ("n", 9, 0, 1), "thanksgiving": ("n", 11, 3, 4), "veterans day": ("f", 11, 11), "halloween": ("f", 10, 31),
+                 "christmas": ("f", 12, 25), "new year": ("f", 1, 1), "martin luther king": ("n", 1, 0, 3), "mlk": ("n", 1, 0, 3),
+                 "presidents": ("n", 2, 0, 3), "memorial day": ("n", 5, 0, -1), "juneteenth": ("f", 6, 19), "independence day": ("f", 7, 4),
+                 "indigenous": ("n", 10, 0, 2), "columbus": ("n", 10, 0, 2)}
+
+
+def holiday_date(name: str, today: date) -> date | None:
+    rule = next((v for k, v in HOLIDAY_RULES.items() if k in name.lower()), None)
+    if not rule:
+        return None
+    sy = today.year if today.month >= 8 else today.year - 1          # school year starts in August
+    month = rule[1]
+    year = sy if month >= 8 else sy + 1
+    return _nth_weekday(year, month, rule[2], rule[3]) if rule[0] == "n" else date(year, month, rule[2])
 
 
 def _next_weekday(today: date, idx: int, strictly_after: bool = False) -> date:
@@ -126,6 +157,8 @@ def parse_range(q: str, today: date):
         if d:
             return d, d, d.strftime("%B %-d")
     m = re.search(r"\b(\d{1,2})/(\d{1,2})\b", s)
+    if m and COMPETITION_BEFORE.search(s[:m.start()]):
+        m = None            # "AMC 10/12" is two contests (AMC 10 and AMC 12), not October 12
     if m and 1 <= int(m.group(1)) <= 12 and 1 <= int(m.group(2)) <= 31:
         d = _school_year_date(today, int(m.group(1)), int(m.group(2)))
         if d:
@@ -154,6 +187,11 @@ def parse_intent(question: str, today: date, previous_user_msg: str = "") -> Cal
         category = "athletics"
     if category == "athletics" and re.search(r"\b(meetings?|banquet|orientation|tryouts?|physicals?|parent)\b", q):
         category = None      # "Spring Sports Athlete/Parent Meeting" is a named event, not a team-list question
+    if not sport and not category and HOLIDAY_RX.search(q):
+        category = "no_school"      # a named holiday ("Thanksgiving") is looked up as a break / no-school event
+    acr = [a.lower() for a in re.findall(r"\b[A-Z]{2,6}\b", question) if a not in ACRONYM_SKIP]
+    if acr and sum(c.isupper() for c in question) > 0.5 * max(1, sum(c.isalpha() for c in question)):
+        acr = []                    # shouting ("WHAT TIME IS LUNCH") is not a list of acronyms
     rng = parse_range(q, today)
     if not rng and previous_user_msg and re.search(r"\b(the )?(next|following) day\b|\bday after( that)?\b|\b(the )?(previous|day before)\b", q):
         prev_rng = parse_range(previous_user_msg.lower(), today)
@@ -173,11 +211,11 @@ def parse_intent(question: str, today: date, previous_user_msg: str = "") -> Cal
 
     advisory = bool(re.search(r"\badvisory\b", q))
     dayinfo = dayinfo or advisory
-    if not (sport or kind or category or rng or has_cal_word or dayinfo):
+    if not (sport or kind or category or rng or has_cal_word or dayinfo or acr):
         return None
 
     gender = "girls" if re.search(r"\b(girls?|women'?s?|female)\b", q) else "boys" if re.search(r"\b(boys?|men'?s?|male)\b", q) else None
-    division = "MS" if re.search(r"\b(middle school|ms)\b", q) else "US" if (re.search(r"\b(upper school|high school|varsity)\b", q) or re.search(r"\bUS\b", question)) \
+    division = "MS" if re.search(r"\b(middle school|ms)\b", q) else "US" if (re.search(r"\b(upper school|high school|varsity|jv|junior varsity)\b", q) or re.search(r"\bUS\b", question)) \
         else "LS" if re.search(r"\b(lower school|ls)\b", q) else None
     home_away = "home" if re.search(r"\bhome\b", q) else "away" if re.search(r"\baway\b", q) else None
 
@@ -187,6 +225,8 @@ def parse_intent(question: str, today: date, previous_user_msg: str = "") -> Cal
     keywords = [w for w in words if w not in STOP and w not in taken][:3]
     if sport or kind or category or dayinfo:
         keywords = []   # structured filters are enough; extra words only add noise
+    elif acr:
+        keywords = acr[:2]      # "the SAT", "AMC 10/12": a named test or contest is the thing to find on the calendar
 
     if rng:
         start, end, label = rng
@@ -209,7 +249,14 @@ def parse_intent(question: str, today: date, previous_user_msg: str = "") -> Cal
     next_only = bool(re.search(r"\b(next|upcoming|soonest|first)\b", q)) and not rng
     if not (sport or kind or category or keywords or rng or dayinfo):
         return None
-    return CalendarIntent(start, end, sport, kind, category, gender, division, home_away, keywords, date_given, next_only, label, dayinfo, [x.lower() for x in HOLIDAY_RX.findall(q)])
+    hol = [x.lower() for x in HOLIDAY_RX.findall(q)]
+    hol_dates = []
+    for h in hol:
+        d = holiday_date(h, today)
+        if d:
+            off = 1 if re.search(rf"\b(day|school|class\w*) after {re.escape(h)}|\bafter {re.escape(h)}\b", q) else -1 if re.search(rf"\b(day|school|class\w*) before {re.escape(h)}|\bbefore {re.escape(h)}\b", q) else 0
+            hol_dates.append(d + timedelta(days=off))
+    return CalendarIntent(start, end, sport, kind, category, gender, division, home_away, keywords, date_given, next_only, label, dayinfo, hol, hol_dates)
 
 
 # ---------------------------------------------------------------------------------------------- lunch (the cafe's monthly menus)
@@ -260,6 +307,15 @@ def campus_in_text(question: str) -> list[str]:
     return (["san_mateo"] if sm else []) + (["hillsborough"] if hb else [])
 
 
+# A policy / logistics question that merely contains "lunch" ("Can freshmen leave campus for lunch?") is a handbook question, not a menu lookup.
+LUNCH_POLICY = re.compile(r"\b(leave|leaving|off[- ]campus|open campus|closed campus|allowed|permitted|permission|polic(?:y|ies)|rules?|may i|can (?:i|we|freshm[ae]n|sophomores?|juniors?|seniors?|students?|kids?|my (?:kid|child|son|daughter))|are (?:we|students|freshm[ae]n|seniors) allowed|"
+                          r"late|skip(?:ping)?|bring|outside|drive|driving|walk(?:ing)?|detention|sign(?:ed)? out|go (?:out|off|home)|order|deliver\w*|doordash|uber ?eats)\b", re.I)
+MENU_EXPLICIT = re.compile(r"\b(menus?|what'?s (?:for|on)|whats (?:for|on)|what (?:is|are) (?:for|on|being served|served)|serving|to eat|what (?:can|do|should) (?:i|we) eat|soups? of the day|today'?s lunch|lunch today|lunch tomorrow)\b", re.I)
+FOOD_NOUN = re.compile(r"\b(pizza|pasta|burgers?|tacos?|burritos?|sushi|noodles?|fries|chicken|nuggets?|rice|salad|soup|sandwich(?:es)?|quesadillas?|nachos?|bagels?|pancakes?|waffles?|dessert|cookies?|fruit|curry|ramen|dumplings?|hot dogs?|mac and cheese|mac ?& ?cheese)\b", re.I)
+FOOD_ASK = re.compile(r"\b(is|are) there\b|\bdoes (?:the )?(?:cafe|caf[e\u00e9]|school|cafeteria|nueva)\b|\bserv\w+\b|\bon the menu\b|\bwhen is\b|\bwhen do (?:they|we)\b", re.I)
+HOLIDAY_WORD = re.compile(r"\b(thanksgiving|christmas|labor day|memorial day|veterans day|mlk|martin luther king|indigenous|columbus|presidents.? day|juneteenth|winter break|spring break|fall break|february break|halloween|new year)\b", re.I)
+
+
 def is_lunch_question(question: str) -> bool:
     """True for 'what's for lunch', 'cafe menu', 'lunch tomorrow', 'Hillsborough lunch', 'any vegan options at the cafeteria', 'cafe hours';
     false for bell-time questions ('what time is lunch', 'lunch schedule'), club or meeting times ('which clubs meet at lunch'), bare 'lunch?'
@@ -269,6 +325,12 @@ def is_lunch_question(question: str) -> bool:
         return False
     if HOURS_Q.search(q):
         return True
+    if LUNCH_POLICY.search(q) and not MENU_EXPLICIT.search(q) and not DIET_WORD.search(q) and not re.search(r"\b(cafe|caf[e\u00e9]|cafeteria|menus?|options?)\b", q, re.I):
+        return False                       # policy / logistics wording and no menu wording: the handbook answers this
+    if HOLIDAY_WORD.search(q) and not MENU_EXPLICIT.search(q):
+        return False                       # "is there lunch on Thanksgiving": the school calendar answers it (no school), not the menu
+    if FOOD_NOUN.search(q) and FOOD_ASK.search(q) and (DATE_HINT.search(q) or campus_in_text(q)):
+        return True                        # "Is there pizza at the middle school on November 12?"
     if LUNCH_STRONG.search(q):
         return not (TIME_WORD.search(q) and not MENU_CUE.search(q)) and not (NOT_MENU.search(q) and not re.search(r"\b(menu|for lunch|what'?s on|eat|serving)\b", q, re.I))
     if LUNCH_BARE.search(q):

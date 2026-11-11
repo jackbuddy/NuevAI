@@ -165,8 +165,28 @@ _CTX_INJECTION = re.compile(
     r"do not (tell|inform|mention to) the user|reveal (the |your )?(system|prompt|instructions|api)|<\|?(system|im_start)\|?>|\[/?(system|inst)\])", re.I)
 
 
+# ---------------------------------------------------------------- credentials in documents
+# A shared login (username + password for a vendor portal, a wifi key, a PIN) can sit in an indexed page. It must never reach the model
+# or an answer: the value is replaced, the surrounding sentence (what the portal is for) stays. Pattern based, additive to RECORD_CONTENT.
+CREDENTIAL = re.compile(
+    r"\b(user ?name|user ?id|login(?: id| name)?|log-?in|e-?mail)\s*(?:is\s*)?[:=]\s*(?:\S+@\S+|\S+)\s*[,;]?\s*(?=(?:and\s+)?(?:password|passcode|pass ?phrase|pwd|pin)\b)"
+    r"|\b(password|passcode|pass ?phrase|pwd|pin(?: code| number)?|wi-?fi (?:key|password)|security code|access code)\s*(?:is\s*)?[:=]\s*\S+"
+    r"|\b(password|passcode|pass ?phrase|pwd)\s+(?:is|=|was)\s+\S+", re.I)
+CREDENTIAL_NOTE = "[login details withheld; ask the school's tech or front office]"
+
+
+def scrub_credentials(text: str) -> str:
+    """Replace usernames-with-passwords, passwords, passcodes and PINs found in text by a neutral note."""
+    if not text or not CREDENTIAL.search(text):
+        return text
+    out = CREDENTIAL.sub(CREDENTIAL_NOTE, text)
+    return re.sub(r"(?:\[login details withheld[^\]]*\]\s*[,;]?\s*){2,}", CREDENTIAL_NOTE + " ", out)
+
+
 def scrub_context(text: str) -> str:
-    """Drop whole lines/sentences from retrieved text that try to instruct the model. Retrieved text is data, never commands."""
+    """Drop whole lines/sentences from retrieved text that try to instruct the model. Retrieved text is data, never commands.
+    Credentials (passwords, logins) are removed first."""
+    text = scrub_credentials(text)
     if not _CTX_INJECTION.search(text):
         return text
     text = re.sub(r"</?s>|<\|?/?(system|im_start|im_end|endoftext|assistant|user)\|?>|\[/?(system|inst)\]", ". ", text, flags=re.I)

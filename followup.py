@@ -51,21 +51,40 @@ def subject_of(prev: str) -> str:
     return s or prev.strip().rstrip("?.! ")
 
 
+FILLER = {"the", "team", "teams", "game", "games", "schedule", "one", "ones", "instead", "only", "what", "about", "how", "and", "also", "then", "for", "just", "level", "side", "version"}
+
+
 def _variant_swap(q: str, prev: str) -> str | None:
-    """'what about JV?' after 'when is the next varsity game' -> 'when is the next JV game'."""
-    ql = re.sub(r"[?.!]", "", q.lower()).strip()
-    ql = LEAD_FOLLOW.sub("", ql).strip()
-    ql = re.sub(r"^the\s+", "", ql)
-    ql = re.sub(r"\s+(?:team|game|games|schedule|one|ones|instead)$", "", ql).strip()
-    if ql not in VARIANT_WORDS:
+    """'what about JV?' after 'when is the next varsity game' -> 'when is the next JV game'. Several at once work too:
+    'and the varsity girls?' after a boys' JV question swaps both level and gender."""
+    ql = re.sub(r"[?.!,]", " ", q.lower())
+    ql = re.sub(r"\s+", " ", ql).strip()
+    found = []
+    for key in sorted(VARIANT_WORDS, key=len, reverse=True):          # longest first: 'junior varsity' before 'varsity'
+        if re.search(rf"\b{re.escape(key)}\b", ql):
+            found.append(key)
+            ql = re.sub(rf"\b{re.escape(key)}\b", " ", ql)
+    rest = [w for w in ql.split() if w not in FILLER]
+    if not found or rest:
         return None
-    new = VARIANT_WORDS[ql]
-    for grp in VARIANT_GROUPS:
-        if ql in grp:
-            for old in grp:
-                if old != ql and re.search(rf"\b{old}\b", prev, re.I):
-                    return re.sub(rf"\b{old}\b", new, prev, count=1, flags=re.I)
-    return f"{prev.rstrip('?. ')} ({new})"
+    out = prev
+    for ql_key in found:
+        new = VARIANT_WORDS[ql_key]
+        if re.search(rf"\b{re.escape(new)}\b", out, re.I):
+            continue                                                  # the previous question already has it
+        swapped = False
+        for grp in VARIANT_GROUPS:
+            if ql_key in grp:
+                for old_w in grp:
+                    if old_w != ql_key and re.search(rf"\b{old_w}\b", out, re.I):
+                        out = re.sub(rf"\b{old_w}\b", new, out, count=1, flags=re.I)
+                        swapped = True
+                        break
+            if swapped:
+                break
+        if not swapped:
+            out = f"{out.rstrip('?. ')} ({new})"
+    return out
 
 
 def _date_swap(q: str, prev: str) -> str | None:

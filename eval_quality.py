@@ -51,40 +51,12 @@ BAR = {"correct": 0.95, "hallucinated": 0, "unnecessary_refusal": 0.03}
 PRIMARY_MODEL = "openai/gpt-oss-120b"
 
 # ------------------------------------------------------------------------------------------------ hedge / refusal detector
-# REFUSAL: "I don't know" family (the data was apparently missing as far as the model could tell).
-REFUSAL = re.compile(
-    r"\bI (do not|don't|dont) (have|know|see)\b|\bI (could not|couldn't|can't|cannot|can not|am unable to|'m unable to|am not able to|'m not able to|wasn't able to) (find|locate|confirm|verify|say|tell|determine|see|share|access|provide)"
-    r"|\bnot (in|part of) (the|my) (information|data|context|documents|knowledge|calendar)\b|\b(isn't|is not|aren't|are not) (listed|available|specified|included|posted|published|provided|shown) (in|on|for|yet|anywhere|here)?"
-    r"|\b(doesn't|does not|don't|do not) (list|say|specify|include|mention|show|provide|give|have) (any|a|the|that|this|those|specific|an)?\b.{0,40}\b(information|details|info|schedule|date|time|number|dates|times|listing)"
-    r"|\bno (information|details|info|data|record|listing)\b|\bnot sure\b|\b(cannot|can't|can not) (be )?(confirmed|verified|determined)\b|\bI lack\b|\bunable to (find|locate|confirm|verify|provide)\b|\bwithout (more|further|specific) (information|details)\b"
-    r"|\bdon't have (access|that|this|any|the)\b|\bnot something I (have|know)\b|\bnot (currently )?(on|in) (the )?(school )?calendar\b|\b(nothing|none) (is |are )?(listed|scheduled|posted|on the)\b", re.I)
-# REDIRECT: sends the user elsewhere.
-REDIRECT = re.compile(
-    r"\b(check|checking|confirm|verify|ask|contact|call|email|reach out to|consult|refer to|see|visit|look at|look on|review|go to|get in touch with|speak with|talk to)\b[^.\n]{0,50}\b"
-    r"(office|front desk|athletic\w*|nexus|handbook|website|school site|coach|coaches|admissions|dean|counsel\w*|cafe|teacher|advisor|department|registrar|resource board|calendar tab|resources tab|school)\b"
-    r"|\bfor (the )?(latest|most up[- ]to[- ]date|current|official|exact|final|updated) (information|details|info|schedule|times?|dates?|updates?)\b|\bplease (check|confirm|verify|contact)\b|\byou may want to (check|contact|confirm)\b"
-    r"|\bconfirm (the )?(details|times?|dates?|schedule)\b|\bsubject to change\b|\bcan (change|vary)\b", re.I)
-# a closing pointer after a complete answer ("For more details, see the FAQ") is recorded but is not an over-hedge
-TAIL_POINTER = re.compile(r"\bfor (more|additional|further|full) (information|details|info|steps|instructions)\b", re.I)
-PRECISE_POINTER = re.compile(r"https?://\S+|\[[^\]]+\]\([^)]+\)|\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b|[\w.+-]+@[\w-]+\.[\w.-]+|\b(front desk|main office|athletics office|admissions office|business office|health office|nurse|dean of students|Nexus|resource board|technology resources|help desk|college counseling)\b", re.I)
-CONFIDENT_NO = re.compile(r"\b(no|not|doesn't|does not|don't|do not|isn't|is not|aren't|are not|there is no|there are no|never|none)\b", re.I)
+from refusal import REFUSAL, REDIRECT, TAIL_POINTER, PRECISE_POINTER, CONFIDENT_NO, LUNCH_NOTE_RX, hedge_info   # noqa: E402  (one source of truth, shared with the server)
 UPCOMING = re.compile(r"\b(upcoming|will (take place|be held|happen|be on|occur)|is scheduled for|are scheduled for|coming up|next (one )?(is|will))\b", re.I)
 PAST_MARK = re.compile(r"\b(was|were|already|took place|has (already )?(passed|happened|ended|taken place)|have (already )?(passed|happened)|past|ended|happened|earlier this)\b", re.I)
 DECLINE = re.compile(r"\b(can't|cannot|can not|won't|unable|not able|don't|do not|not (something|allowed|permitted)|decline|only (help|answer)|private|personal)\b", re.I)
 LIMIT_STATEMENT = re.compile(REFUSAL.pattern + r"|\b(not (listed|published|available|posted|included|specified|yet)|still being updated|draft|no (published|listed))\b", re.I)
 
-
-LUNCH_NOTE_RX = re.compile(r"The menu can change; check with the cafe for ingredients or allergens\.?", re.I)
-
-
-def hedge_info(answer: str) -> dict:
-    a = LUNCH_NOTE_RX.sub("", normalize(answer))      # the mandatory cafe note is product copy, not a hedge
-    first = re.split(r"(?<=[.!?])\s+", a.strip())[:2]
-    head = " ".join(first)
-    ref = [m.group(0) for m in REFUSAL.finditer(a)]
-    red = [m.group(0) for m in REDIRECT.finditer(a)]
-    return {"refusal": ref[:3], "redirect": red[:3], "refusal_in_head": bool(REFUSAL.search(head)), "n_refusal": len(ref), "n_redirect": len(red),
-            "precise_pointer": bool(PRECISE_POINTER.search(a)), "tail_pointer": bool(TAIL_POINTER.search(a)), "confident_no_head": bool(CONFIDENT_NO.search(head)) and not REFUSAL.search(head)}
 
 
 # ------------------------------------------------------------------------------------------------ groundedness
@@ -508,6 +480,12 @@ def llm_answer(env: Env, prep: dict, model: str, pacer: Pacer, log) -> dict:
             ans = c.choices[0].message.content or ""
             u = getattr(c, "usage", None)
             tok = (u.prompt_tokens + u.completion_tokens) if u else est
+            if not ans.strip():          # same as production (_generate): one retry with a larger budget before an empty answer is reported
+                pacer.add(tok)
+                c = qs.groq_client.with_options(timeout=60).chat.completions.create(messages=prep["msgs"], stream=False, **qs._llm_kwargs(model, True))
+                ans = c.choices[0].message.content or ""
+                u = getattr(c, "usage", None)
+                tok += (u.prompt_tokens + u.completion_tokens) if u else est
             pacer.add(tok)
             return {"answer": ans, "model": model, "tokens": tok, "pt": getattr(u, "prompt_tokens", None), "ct": getattr(u, "completion_tokens", None), "ms": int((time.time() - t0) * 1000)}
         except APIStatusError as e:
@@ -771,7 +749,7 @@ def main() -> int:
                         ans = backend_answer(a.backend, it, n)
                     else:
                         ans = llm_answer(env, prep, a.model, pacer, log)
-                    ans["answer"] = env.qs.with_lunch_note(ans["answer"], prep["result"])
+                    ans["answer"] = env.qs.guard.scrub_credentials(env.qs.with_lunch_note(ans["answer"], prep["result"]))
                     if env.qs.guard.leak_check(ans["answer"]):
                         ans["answer"] = env.qs.guard.LEAK_REPLY
                     if ans.get("tokens") or a.backend:
