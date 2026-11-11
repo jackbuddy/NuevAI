@@ -89,7 +89,7 @@ check("canonical: ids are unique per head", len({c["chunk_id"] for c in lk}) == 
 import inspect
 from pipeline import index
 src = inspect.getsource(index.run)
-check("index: additive_only never reaches a delete or a flag", "if additive_only:\n        patch, superseded, expired_cal, stale, legacy = [], [], [], [], []" in src)
+check("index: additive_only never reaches a delete or a flag", "if additive_only:\n        patch, superseded, expired_cal, stale, legacy, restore = [], [], [], [], [], []" in src)
 check("index: a freshness patch keeps review flags", "KEEP_FLAGS" in inspect.getsource(index.patch_metadata) and "superseded" in index.KEEP_FLAGS)
 
 print(f"\n{'all passed' if not FAILS else str(len(FAILS)) + ' FAILED: ' + ', '.join(FAILS)}")

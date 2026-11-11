@@ -102,6 +102,35 @@ def mark_superseded(sb, ids: list[str], log) -> int:
     return n
 
 
+def flagged_by_pipeline(sb) -> set:
+    """chunk_ids carrying metadata.superseded=true that were set by mark_superseded (no review flag: scripts/flag_rows.py always
+    adds flagged_at). If such a row is back in the current plan it was flagged by a run that did not produce it (e.g. CI without
+    some data) and must be restored."""
+    ids, start = set(), 0
+    while True:
+        r = sb.table(settings.CHUNKS_TABLE).select("chunk_id").eq("metadata->>superseded", "true").is_("metadata->>flagged_at", "null") \
+            .range(start, start + PAGE - 1).execute().data
+        ids.update(x["chunk_id"] for x in r)
+        if len(r) < PAGE:
+            return ids
+        start += PAGE
+
+
+def unflag_current(sb, ids: list[str], log) -> int:
+    """Clear superseded on rows the current plan produces again (metadata only; review flags with flagged_at are never touched)."""
+    n = 0
+    for i in range(0, len(ids), 100):
+        rows = sb.table(settings.CHUNKS_TABLE).select("chunk_id,metadata").in_("chunk_id", ids[i:i + 100]).execute().data or []
+        for r in rows:
+            m = dict(r["metadata"] or {})
+            if m.get("superseded") and "flagged_at" not in m:
+                m.pop("superseded", None)
+                sb.table(settings.CHUNKS_TABLE).update({"metadata": m}).eq("chunk_id", r["chunk_id"]).execute()
+                n += 1
+    log(f"  restored {n} rows wrongly flagged superseded (back in the current plan)")
+    return n
+
+
 def delete_ids(sb, ids, log):
     ids = [i for i in ids if not freshness.is_email_row(i)]          # email chunks are never pruned here, whatever the plan says
     for i in range(0, len(ids), 100):
@@ -169,9 +198,15 @@ def run(prune=False, prune_legacy=False, dry_run=False, log=print, keep_expired=
             patch.append(c)
     present = {c["metadata"].get("source") for c in chunks}        # only sources this run regenerated (CI has no workbooks)
     superseded = [i for i, (h, u, s) in have.items() if s in WORKBOOK_SOURCES and s in present and i not in new_ids]
+    restore = []
+    if not additive_only:                       # additive runs never change an existing row
+        try:
+            restore = sorted(i for i in flagged_by_pipeline(sb) if i in new_ids)
+        except Exception as e:                  # a missing capability must never block indexing
+            log(f"  (could not check for wrongly flagged rows: {type(e).__name__})")
     stats = {"table": settings.CHUNKS_TABLE, "total_chunks": len(chunks), "to_embed": len(todo), "unchanged": len(chunks) - len(todo),
              "stale_in_db": len(stale), "legacy_in_db": len(legacy), "expired_calendar": len(expired_cal),
-             "metadata_patch": len(patch), "orphans_to_flag": len(superseded), "additive_only": additive_only,
+             "metadata_patch": len(patch), "orphans_to_flag": len(superseded), "unflag_current": len(restore), "additive_only": additive_only,
              "changed_existing_skipped": len(changed_existing) if additive_only else 0,
              "lunch_rows_held_back_from_prune": sum(1 for i, (h, u, s) in have.items() if freshness.is_lunch_row(i, s) and i not in new_ids and not prunable_lunch(i, s, lunch_campuses))}
     log(f"index plan: {stats}")
@@ -179,7 +214,7 @@ def run(prune=False, prune_legacy=False, dry_run=False, log=print, keep_expired=
         return stats
 
     if additive_only:
-        patch, superseded, expired_cal, stale, legacy = [], [], [], [], []
+        patch, superseded, expired_cal, stale, legacy, restore = [], [], [], [], [], []
     batches = [todo[i:i + BATCH] for i in range(0, len(todo), BATCH)]
     done, t0 = 0, time.time()
     with ThreadPoolExecutor(max_workers=WORKERS) as pool:
@@ -191,6 +226,8 @@ def run(prune=False, prune_legacy=False, dry_run=False, log=print, keep_expired=
         with ThreadPoolExecutor(max_workers=WORKERS) as pool:
             list(pool.map(lambda c: patch_metadata(sb, c), patch))
         log(f"  patched freshness metadata on {len(patch)} existing rows")
+    if restore:
+        unflag_current(sb, restore, log)
     if superseded:
         mark_superseded(sb, superseded, log)
     if expired_cal and not keep_expired:
