@@ -1,0 +1,779 @@
+[
+ {
+  "run": "primary",
+  "id": "gm-19",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "ath-16",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "lun-01",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "club-09",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "nx-02",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "trap-04",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "ev-05",
+  "grader_initial": "unnecessary_refusal",
+  "grader_final": "unnecessary_refusal",
+  "human": "unnecessary_refusal"
+ },
+ {
+  "run": "primary",
+  "id": "mp-12",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "adm-06",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "adv-03",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "bell-08",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "cal-15",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "camp-04",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "crs-08",
+  "grader_initial": "hallucinated",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "day-10",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "pol-02",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "staff-08",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "gm-04",
+  "grader_initial": "hallucinated",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "ath-01",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "lun-03",
+  "grader_initial": "unnecessary_refusal",
+  "grader_final": "unnecessary_refusal",
+  "human": "unnecessary_refusal"
+ },
+ {
+  "run": "primary",
+  "id": "club-06",
+  "grader_initial": "hallucinated",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "nx-03",
+  "grader_initial": "partial",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "trap-12",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "ev-07",
+  "grader_initial": "partial",
+  "grader_final": "wrong",
+  "human": "partial"
+ },
+ {
+  "run": "primary",
+  "id": "mp-09",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "adm-10",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "adv-04",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "bell-05",
+  "grader_initial": "partial",
+  "grader_final": "partial",
+  "human": "partial"
+ },
+ {
+  "run": "primary",
+  "id": "cal-18",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "ms-01",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "crs-10",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "day-01",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "pol-07",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "staff-03",
+  "grader_initial": "partial",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "gm-13",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "ath-03",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "primary",
+  "id": "lun-02",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "cal-05",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "day-04",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "pol-07",
+  "grader_initial": "partial",
+  "grader_final": "partial",
+  "human": "partial"
+ },
+ {
+  "run": "gpt20b",
+  "id": "adm-13",
+  "grader_initial": "wrong",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "staff-08",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "camp-08",
+  "grader_initial": "wrong",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "crs-10",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "adv-05",
+  "grader_initial": "partial",
+  "grader_final": "partial",
+  "human": "partial"
+ },
+ {
+  "run": "gpt20b",
+  "id": "bell-07",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "gm-13",
+  "grader_initial": "wrong",
+  "grader_final": "wrong",
+  "human": "wrong"
+ },
+ {
+  "run": "gpt20b",
+  "id": "ath-06",
+  "grader_initial": "unnecessary_refusal",
+  "grader_final": "unnecessary_refusal",
+  "human": "unnecessary_refusal"
+ },
+ {
+  "run": "gpt20b",
+  "id": "club-13",
+  "grader_initial": "wrong",
+  "grader_final": "wrong",
+  "human": "wrong"
+ },
+ {
+  "run": "gpt20b",
+  "id": "ev-02",
+  "grader_initial": "unnecessary_refusal",
+  "grader_final": "unnecessary_refusal",
+  "human": "unnecessary_refusal"
+ },
+ {
+  "run": "gpt20b",
+  "id": "lun-08",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "mp-09",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "nx-07",
+  "grader_initial": "correct_overhedged",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "trap-04",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "cal-08",
+  "grader_initial": "partial",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "day-03",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "pol-02",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "adm-05",
+  "grader_initial": "partial",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "staff-01",
+  "grader_initial": "partial",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "camp-02",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "crs-04",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "adv-01",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "bell-03",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "gm-19",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "ath-14",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "club-01",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "ev-01",
+  "grader_initial": "partial",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "lun-09",
+  "grader_initial": "unnecessary_refusal",
+  "grader_final": "unnecessary_refusal",
+  "human": "unnecessary_refusal"
+ },
+ {
+  "run": "gpt20b",
+  "id": "mp-01",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "nx-01",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "trap-02",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "cal-01",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "gpt20b",
+  "id": "day-02",
+  "grader_initial": "unnecessary_refusal",
+  "grader_final": "unnecessary_refusal",
+  "human": "unnecessary_refusal"
+ },
+ {
+  "run": "gpt20b",
+  "id": "pol-03",
+  "grader_initial": "partial",
+  "grader_final": "wrong",
+  "human": "wrong"
+ },
+ {
+  "run": "gpt20b",
+  "id": "adm-03",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "cal-19",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "day-05",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "pol-09",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "adm-14",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "staff-08",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "camp-07",
+  "grader_initial": "wrong",
+  "grader_final": "wrong",
+  "human": "wrong"
+ },
+ {
+  "run": "qwen",
+  "id": "crs-08",
+  "grader_initial": "partial",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "adv-03",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "bell-06",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "gm-03",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "ath-11",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "club-03",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "ev-07",
+  "grader_initial": "correct",
+  "grader_final": "wrong",
+  "human": "partial"
+ },
+ {
+  "run": "qwen",
+  "id": "lun-03",
+  "grader_initial": "unnecessary_refusal",
+  "grader_final": "unnecessary_refusal",
+  "human": "unnecessary_refusal"
+ },
+ {
+  "run": "qwen",
+  "id": "mp-14",
+  "grader_initial": "hallucinated",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "nx-05",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "trap-07",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "cal-06",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "day-06",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "pol-07",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "adm-05",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "staff-10",
+  "grader_initial": "unnecessary_refusal",
+  "grader_final": "unnecessary_refusal",
+  "human": "unnecessary_refusal"
+ },
+ {
+  "run": "qwen",
+  "id": "camp-06",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "crs-01",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "adv-01",
+  "grader_initial": "correct",
+  "grader_final": "wrong",
+  "human": "hallucinated"
+ },
+ {
+  "run": "qwen",
+  "id": "bell-01",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "gm-04",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "ath-01",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "club-01",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "ms-08",
+  "grader_initial": "unnecessary_refusal",
+  "grader_final": "unnecessary_refusal",
+  "human": "unnecessary_refusal"
+ },
+ {
+  "run": "qwen",
+  "id": "lun-06",
+  "grader_initial": "unnecessary_refusal",
+  "grader_final": "unnecessary_refusal",
+  "human": "unnecessary_refusal"
+ },
+ {
+  "run": "qwen",
+  "id": "mp-09",
+  "grader_initial": "correct_overhedged",
+  "grader_final": "correct_overhedged",
+  "human": "correct_overhedged"
+ },
+ {
+  "run": "qwen",
+  "id": "nx-06",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "trap-08",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ },
+ {
+  "run": "qwen",
+  "id": "ms-02",
+  "grader_initial": "partial",
+  "grader_final": "partial",
+  "human": "partial"
+ },
+ {
+  "run": "qwen",
+  "id": "day-09",
+  "grader_initial": "correct",
+  "grader_final": "correct",
+  "human": "correct"
+ }
+]

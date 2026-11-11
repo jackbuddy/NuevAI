@@ -121,4 +121,47 @@ Baseline: `eval_baseline.json` records which number is measured (239/274 = 87.2%
 `python scripts/check_baseline.py --report <report.json> --write-baseline` and commit the file. A red nightly run means a
 regression or an exhausted Groq quota (the message says which); open the `golden-report` artifact for the failing questions.
 
+### Quality eval (`eval_quality.py`, `eval/quality_set.json`, QUALITY_AUDIT.md)
+A deterministic accuracy harness built for the launch bar: >= 95% correct on verifiable questions, 0 hallucinated facts, < 3% unnecessary refusals.
+`eval/quality_set.json` has 283 curated questions (persona, campus, phrasing, behavior, expected facts, forbidden strings, source); `verified` items (278)
+were mechanically checked against the live index by `python eval/build_quality_set.py` (it rewrites the file; add or change questions there, never by hand).
+Unverified items are listed in `eval/UNVERIFIED.md` and skipped unless `--all`.
+
+```bash
+python eval_quality.py --mode retrieval                      # FREE, ~2 min: is the expected fact in the context the model would see? (also grades the no-LLM lunch/canned answers)
+python eval_quality.py --mode llm --sample 40 --seed 1       # real answers via Groq, same prompt as production (query_server._prepare), cached by prompt hash
+python eval_quality.py --mode llm --category lunch --token-budget 40000
+python eval_quality.py --mode llm --ids ath-05,gm-02         # specific questions
+python eval_quality.py --mode llm --only-failed data/eval/quality_<ts>.json
+python eval_quality.py --mode llm --model openai/gpt-oss-20b # alternate model: results are labelled NON-PRIMARY
+python eval_quality.py --self-test                           # grader unit tests, no network
+python eval/diagnose_retrieval.py data/eval/quality_<ts>.json   # for each retrieval miss: where the answer chunk was lost
+```
+Labels (one per answer): `correct`, `correct_overhedged` (right but hedges or redirects needlessly), `unnecessary_refusal` ("I don't have that" while the data covers it),
+`partial`, `wrong`, `hallucinated` (a date, time, phone, email, URL, room, score, amount, number or name that appears in neither the retrieved context, the question/history nor the index).
+Not graded and never counted as passes: `ungraded_quota`, `stale_dynamic` (a date-dependent question past its `valid_through`), `error`. Dynamic items (day type, lunch, "next game") are re-derived from the live index at run time.
+Cost control: Groq's free tier is ~200k tokens/day per model and 8k/min, shared with the live site; one answer is ~3.1k tokens. Answers are cached in `data/eval/cache` keyed by sha256(system prompt + context + question + history + model),
+so re-runs only pay for questions whose prompt changed (the date line is ignored for non-dynamic questions). `--token-budget` stops cleanly and the rest are reported as `ungraded_quota`; `--tpm` paces under the per-minute cap.
+Output: a table by category / persona / phrasing / behavior, taxonomy counts, over-hedge, unnecessary-refusal and hallucination rates, every flagged hallucination token, launch-bar status, `data/eval/quality_<ts>.json`;
+`--write-baseline` also writes the compact `eval/baselines/baseline_<date>_<mode>.json`. The exit code is 1 below the launch bar (`--no-fail` to disable). Test traffic is sent as `test-quality-<n>` so analytics files it under "test".
+
+### Answer quality fixes (qnorm.py, refusal.py, rag.py, query_server.py; QUALITY_AUDIT.md "Fix log")
+- `qnorm.py` + `vocab_freq.json`: typo/slang repair and word rarity from the index vocabulary. Rebuild after big data changes: `python scripts/build_vocab.py` (read-only, ~6 requests). Without the file only the slang table applies.
+- `refusal.py`: the one refusal/redirect detector, imported by the server (analytics, cache policy) and `eval_quality.py`. The prompt's canonical "not in my data" opening is **"I don't have that"** (`refusal.canonical_refusal`).
+- Retrieval: keyword search (FTS) runs three ways (broad OR, rare words, rarest AND next word) with a retry; names/acronyms get protected slots; per-title caps and fuzzy copy dedupe; division (US/MS/LS) detection labels documents and ranks the asker's division first; context shows a query-centred window (<=1,300 chars of body) instead of the first 1,100 characters.
+- Server: refusals/hedged answers are never cached; non-primary-model answers only 5 min in memory (never L2); empty completions are retried (bigger budget, then next model, then the degraded answer); credentials are scrubbed from context and answers (`guard.scrub_credentials`).
+- `chat_answered` now carries `fallback` (shared detector), `refusal`, `canonical`, `redirect`, `hedged`, `rroute` (docs|calendar|entity|lunch), `div`, `chunks` [{id,t}] and `answer_head` (<=600 chars, emails/phones redacted); the SSE `done` event carries `route`, `model`, `limited`. Limited (refused/hedged) answers send no suggestions so the client keeps its own Browse Resources / What can I ask? chips; degraded answers send Try again / What can I ask? / calendar chips. Frontend TODO (not done here): record `via:'suggestion'` for chip clicks and read `done.limited`/`done.route`.
+- Tests: `python test_quality_fixes.py` (offline, fake LLM, no quota). Retrieval gate: `python eval_quality.py --mode retrieval` (run 2-3 times; the ANN search moves 1-4 borderline items).
+
 More: [pipeline/README.md](pipeline/README.md) (ingestion, metrics, environment variables).
+
+### Canonical lists and data coverage (`knowledge/*.md`, `pipeline/canonical.py`, `pipeline/public_pages.py`, `scripts/flag_rows.py`)
+Questions like "what sports does Nueva offer?", "who do I contact for X?", "how much is tuition?", "what clubs meet on Tuesdays?" are answered from enumerated, dated lists, not from whichever page the search happens to surface.
+* **Curated, source-quoted lists** live in `knowledge/*.md` (`athletics_sports`, `leadership_and_contacts`, `admissions`, `academics`, `calendar_essentials`, `places_and_transport`; each `## heading` is one record). Each file starts with `Last updated: YYYY-MM-DD`; each section states its source, the date of that source and the school year, and ends with `<!-- verify: title~<page title> :: token ; token | url~<url part> :: token -->` naming the stored source page and the exact strings that must appear in it. `python scripts/check_facts.py` (and audit group `canon.verify`) re-proves every fact offline against `data/pipeline/pages`. Add a fact only with a source and a verify line; sections over ~1,150 characters are split at bullets automatically (records stay under the 1,600-character chunk limit).
+* **Derived lists** are built on every `chunk` run by `pipeline/canonical.py` (source `school_canonical`, not hand typed): clubs directory by meeting day (from the Clubs Catalog workbook), departments and courses (from the 2026-27 Course Catalog), Upper School no-class days and breaks (from The Sheet), teams that have a schedule (from the calendar feed and team sheets), forms/booking/payment/portal/document link directories (from the link registry). They refresh whenever their sources do.
+* **Public pages**: `python run_pipeline.py --stages public_pages` re-reads the 11 URLs in `config.PUBLIC_PAGES` (admissions, FAQ, tuition, transportation) with one polite GET each (project user agent, robots.txt, 5 s delay, 20 h HTML cache in `data/pipeline/public_html/`). The crawler now keeps collapsed FAQ/accordion answers with their question (they used to be dropped as hidden chrome). These pages get their own chunk ids (`id_seed` = url + `#public`), so the older capture of the same URL is never overwritten.
+* **Calendar history**: `calendar_feed.window_floor()` keeps every event since August 1 of the current school year (the feed holds history from September), so "that already happened on <date>" is answerable. The daily refresh still removes rows that fall out of the window or were edited.
+* **Never indexed**: `pipeline/safety.py` cuts shared logins, passwords, meeting passcodes, `?pwd=` URL parameters and personal cell numbers out of every page, calendar description and link before chunking (policy wording such as "never share your password" is untouched). Tested in `test_data_coverage.py`.
+* **Additive indexing**: `python run_pipeline.py --stages chunk,index --additive-only --keep-expired --only-source school_facts,school_canonical,public_site --dry-run`, then without `--dry-run`. `--additive-only` inserts rows whose chunk_id is new and does nothing else (no rewrite of a changed row, no patch, no flag, no delete); always pair it with `--only-source` so a stale local file for another source cannot add rows. Plain runs (the daily CI job) behave as before.
+* **Hygiene**: `python scripts/flag_rows.py` (dry run) / `--apply` flags rows `metadata.superseded=true` with `flag_reason` and `flagged_at` (credentials/personal numbers, lower-ranked duplicate copies of the handbooks and catalogs, earlier captures of refreshed public pages); retrieval ignores them and a freshness patch keeps the flag. `--sql` prints the review and delete SQL for the owner (nothing is executed). `python scripts/audit_data.py` groups `canon.*` check all of it.
+* **Quality set**: the `cov-*` items in `eval/build_quality_set.py` cover this data and are verified against the original source chunks. The `absent` checks of no-such-thing items ignore the curated records (they state the negative on purpose).

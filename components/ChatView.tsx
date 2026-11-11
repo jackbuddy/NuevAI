@@ -1,10 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, CalendarDays, Check, ChevronDown, Copy, History, Lightbulb, Link2, MapPin, RotateCw, Info, ShieldCheck, Square, SquarePen, ThumbsDown, ThumbsUp, Trophy, UtensilsCrossed, Users, Zap } from 'lucide-react';
+import { ArrowDown, ArrowUp, CalendarDays, Check, ChevronDown, Copy, History, Lightbulb, Link2, MapPin, RotateCw, Info, ShieldCheck, Square, SquarePen, Trophy, UtensilsCrossed, Users, Zap } from 'lucide-react';
 import { Markdown } from './Markdown';
 import { Logo } from './Logo';
 import { track } from '@/lib/analytics';
+import { AnswerFeedback, type FbPatch } from './AnswerFeedback';
+import { fallbackProps, fallbackWhy } from '@/lib/feedback-logic';
+import { clearLastAnswer, noteLastAnswer } from '@/lib/lastanswer';
 import { Message, Role, Campus, loadCampus, loadRole, saveCampus, saveGrade, saveRole, streamChat, uid } from '@/lib/chat';
 import { nowLA } from '@/lib/calendar';
 import { Preferences } from './Preferences';
@@ -66,6 +69,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar, onOpenReso
   msgsRef.current = messages;
   const scrollRef = useRef<HTMLDivElement>(null);
   const stick = useRef(true);                       // follow the answer only while the reader is at the bottom
+  const lastTop = useRef(0);
   const [away, setAway] = useState(false);          // reader scrolled up: offer a jump back
   const [announce, setAnnounce] = useState('');     // screen-reader status, not the streaming text itself
   const composing = useRef(false);
@@ -107,10 +111,22 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar, onOpenReso
     const el = scrollRef.current;
     if (!el) return;
     const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-    stick.current = near;
-    setAway((a) => (a === !near ? a : !near));
+    // only a scroll UP stops the auto-follow: content that grows under a programmatic scroll (action row, rating panel) must not look like the reader leaving
+    const up = el.scrollTop < lastTop.current - 2;
+    lastTop.current = el.scrollTop;
+    if (near) { stick.current = true; setAway(false); }
+    else if (up) { stick.current = false; setAway(true); }
   };
   useEffect(() => { if (stick.current) toBottom(false); }, [messages, toBottom]);
+  // content can grow after the messages change (action row, rating panel, suggestions): keep following while the reader is at the bottom
+  const hasMessages = messages.length > 0;
+  useEffect(() => {
+    const inner = scrollRef.current?.firstElementChild;
+    if (!inner || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => { if (stick.current) toBottom(false); });
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, [hasMessages, toBottom]);
   // desktop: ready to type. Touch screens: do not pop the keyboard up over the page on load.
   useEffect(() => { if (typeof matchMedia === 'function' && matchMedia('(pointer: fine)').matches && messages.length === 0) taRef.current?.focus(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -120,6 +136,13 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar, onOpenReso
     t.style.height = 'auto';
     t.style.height = Math.min(t.scrollHeight, 160) + 'px';
   }, [input]);
+
+  // remember the answer on screen (so "Report a problem" can say which one) and log fallback-style replies once, with their text
+  const logAnswer = (a: Message) => {
+    noteLastAnswer({ id: a.id, query: a.query ?? '', answer: a.content });
+    const why = fallbackWhy(a);
+    if (why) track('answer_fallback', fallbackProps(a, why));
+  };
 
   const send = useCallback(async (text: string, via: 'typed' | 'starter' | 'ask' | 'retry' | 'idea' | 'recent' = 'typed') => {
     const q = text.trim();
@@ -142,13 +165,15 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar, onOpenReso
     const ac = new AbortController();
     abortRef.current = ac;
     const patch = (fn: (m: Message) => Message) => setMessages((p) => p.map((m) => (m.id === aId ? fn(m) : m)));
+    let acc = '';
+    let srcs: Message['sources'] = [];
     try {
       for (let attempt = 0; ; attempt++) {
         try {
           await streamChat(q, history, {
-            onMeta: (m) => patch((x) => ({ ...x, sources: m.sources, cached: m.cached })),
-            onDelta: (t) => { if (!first) { first = performance.now() - t0; setWaking(false); } patch((x) => ({ ...x, content: x.content + t })); },
-            onDone: (d) => { done = d; setAnnounce('Answer ready'); patch((x) => ({ ...x, streaming: false, cached: d.cached, degraded: !!d.degraded, suggestions: d.suggestions ?? [], ms: Math.round(first), totalMs: Math.round(performance.now() - t0) })); },
+            onMeta: (m) => { srcs = m.sources; patch((x) => ({ ...x, sources: m.sources, cached: m.cached })); },
+            onDelta: (t) => { if (!first) { first = performance.now() - t0; setWaking(false); } acc += t; patch((x) => ({ ...x, content: x.content + t })); },
+            onDone: (d) => { done = d; setAnnounce('Answer ready'); logAnswer({ id: aId, role: 'assistant', content: acc, query: q, degraded: !!d.degraded, cached: d.cached, sources: srcs, ms: Math.round(first) }); patch((x) => ({ ...x, streaming: false, cached: d.cached, degraded: !!d.degraded, suggestions: d.suggestions ?? [], ms: Math.round(first), totalMs: Math.round(performance.now() - t0) })); },
           }, ac.signal, null, campusRef.current);
           break;
         } catch (err: any) {
@@ -190,7 +215,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar, onOpenReso
   useEffect(() => { if (pendingAsk) { send(pendingAsk, 'ask'); onAskConsumed(); } }, [pendingAsk, send, onAskConsumed]);
 
   const retry = (m: Message) => { if (m.query) { setMessages((p) => p.filter((x) => x.id !== m.id).slice(0, -1)); setTimeout(() => send(m.query!, 'retry'), 0); } };
-  const clear = () => { abortRef.current?.abort(); setMessages([]); track('chat_cleared'); };
+  const clear = () => { abortRef.current?.abort(); setMessages([]); clearLastAnswer(); track('chat_cleared'); };
   const chooseRole = (r: Role | null) => { setRole(r); saveRole(r); track('pref_set', { role: r ?? 'none' }); if (r) endOnboarding('pref'); };
   const chooseCampus = (c: Campus | null) => { setCampus(c); saveCampus(c); track('pref_set', { campus: c ?? 'none' }); if (c) endOnboarding('pref'); };
   const empty = messages.length === 0;
@@ -333,7 +358,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar, onOpenReso
             <div role="log" aria-label="Conversation" className="mx-auto w-full max-w-3xl space-y-7 px-4 pb-6 pt-8 md:px-6">
               {messages.map((m, i) => (
                 <div key={m.id}>
-                  <Bubble m={m} waking={waking && !!m.streaming && !m.content} onRetry={() => retry(m)} onOpenCalendar={onOpenCalendar} onHome={clear} />
+                  <Bubble m={m} onPatch={(p) => setMessages((all) => all.map((x) => (x.id === m.id ? { ...x, ...p } : x)))} waking={waking && !!m.streaming && !m.content} onRetry={() => retry(m)} onOpenCalendar={onOpenCalendar} onHome={clear} />
                   {i === messages.length - 1 && !busy && !m.error && m.suggestions && m.suggestions.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-2 pl-[38px]">
                       {/* while the campus hint is offering the same choice, do not show it twice */}
@@ -343,6 +368,15 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar, onOpenReso
                           {s.label}
                         </button>
                       ))}
+                    </div>
+                  )}
+                  {/* a reply that hedged or redirected and came with no follow-ups: offer the two ways out that always work */}
+                  {i === messages.length - 1 && !busy && !m.error && !m.degraded && !(m.suggestions && m.suggestions.length > 0) && fallbackWhy(m) && (
+                    <div className="mt-3 flex flex-wrap gap-2 pl-[38px]">
+                      <button onClick={() => { track('suggestion_click', { label: 'Browse Resources', from: 'fallback' }); onOpenResources(); }}
+                              className="surface-2 tap-h rounded-full border border-transparent px-3.5 py-1.5 text-[13px] font-medium text-brand-800 transition hover:border-[var(--line)] hover:bg-white hover:shadow-soft">Browse Resources</button>
+                      <button onClick={() => { track('suggestion_click', { label: 'What can I ask?', from: 'fallback' }); openIdeas('fallback'); }}
+                              className="surface-2 tap-h rounded-full border border-transparent px-3.5 py-1.5 text-[13px] font-medium text-brand-800 transition hover:border-[var(--line)] hover:bg-white hover:shadow-soft">What can I ask?</button>
                     </div>
                   )}
                   {i === messages.length - 1 && !busy && hint && hint.msgId === m.id && <Hint id={hint.id} onAct={actHint} onCampus={hintCampus} onDismiss={dismissHint} />}
@@ -371,10 +405,9 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar, onOpenReso
   );
 }
 
-function Bubble({ m, waking, onRetry, onOpenCalendar, onHome }: { m: Message; waking: boolean; onRetry: () => void; onOpenCalendar: () => void; onHome: () => void }) {
+function Bubble({ m, onPatch, waking, onRetry, onOpenCalendar, onHome }: { m: Message; onPatch: (p: FbPatch) => void; waking: boolean; onRetry: () => void; onOpenCalendar: () => void; onHome: () => void }) {
   const [copied, setCopied] = useState(false);
   const [showSrc, setShowSrc] = useState(false);
-  const [fb, setFb] = useState<'up' | 'down' | undefined>(m.feedback);
   const prov = provenance(m.sources);
   const problem = !m.streaming && m.role === 'assistant' && (!!m.error || (!!m.degraded && !!m.content));
   useEffect(() => { if (problem) track('hint_shown', { id: 'fallback' }); }, [problem]);
@@ -425,8 +458,6 @@ function Bubble({ m, waking, onRetry, onOpenCalendar, onHome }: { m: Message; wa
         {!m.streaming && !m.error && m.content && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <IconBtn label={copied ? 'Copied' : 'Copy'} onClick={() => { navigator.clipboard?.writeText(m.content); setCopied(true); track('copy_answer'); setTimeout(() => setCopied(false), 1500); }}>{copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}</IconBtn>
-            <IconBtn label="Helpful" active={fb === 'up'} onClick={() => { setFb('up'); track('feedback', { value: 'up', query: m.query?.slice(0, 200), cached: !!m.cached }); }}><ThumbsUp className="h-3.5 w-3.5" /></IconBtn>
-            <IconBtn label="Not helpful" active={fb === 'down'} onClick={() => { setFb('down'); track('feedback', { value: 'down', query: m.query?.slice(0, 200), cached: !!m.cached }); }}><ThumbsDown className="h-3.5 w-3.5" /></IconBtn>
             {m.cached && <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-1 text-[11px] font-semibold text-brand-700"><Zap className="h-3 w-3" />Instant</span>}
             {!m.cached && m.ms != null && <span className="ink-2 text-[11px]">{(m.ms / 1000).toFixed(1)}s</span>}
             {m.sources && m.sources.length > 0 && (
@@ -447,6 +478,7 @@ function Bubble({ m, waking, onRetry, onOpenCalendar, onHome }: { m: Message; wa
             ))}
           </ul>
         )}
+        {!m.streaming && !m.error && m.content && !m.stopped && <AnswerFeedback m={m} onPatch={onPatch} />}
       </div>
     </div>
   );

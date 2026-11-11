@@ -1,0 +1,85 @@
+{
+ "mode": "retrieval",
+ "retrievable": 183,
+ "eligible": 222,
+ "retrievable_rate": 0.8243243243243243,
+ "by_category": {
+  "calendar_schedules": {
+   "ok": 25,
+   "n": 27
+  },
+  "day_types": {
+   "ok": 9,
+   "n": 12
+  },
+  "bell_schedule": {
+   "ok": 9,
+   "n": 9
+  },
+  "athletics_teams": {
+   "ok": 15,
+   "n": 19
+  },
+  "athletics_games": {
+   "ok": 18,
+   "n": 23
+  },
+  "clubs_activities": {
+   "ok": 16,
+   "n": 17
+  },
+  "staff_contacts": {
+   "ok": 12,
+   "n": 13
+  },
+  "policies_handbook": {
+   "ok": 13,
+   "n": 15
+  },
+  "lunch": {
+   "ok": 6,
+   "n": 9
+  },
+  "events": {
+   "ok": 7,
+   "n": 12
+  },
+  "admissions_parent": {
+   "ok": 11,
+   "n": 13
+  },
+  "campus_logistics": {
+   "ok": 7,
+   "n": 9
+  },
+  "courses_academics": {
+   "ok": 11,
+   "n": 12
+  },
+  "advisory": {
+   "ok": 5,
+   "n": 5
+  },
+  "nexus_other": {
+   "ok": 5,
+   "n": 7
+  },
+  "traps": {
+   "ok": 1,
+   "n": 4
+  },
+  "multi_part_follow_up": {
+   "ok": 13,
+   "n": 16
+  }
+ },
+ "not_graded": {},
+ "launch_bar": {
+  "pass": false,
+  "retrievable_ge_95": false
+ },
+ "date": "2026-11-11",
+ "tokens_spent": 0,
+ "measured": true,
+ "items_run": 234
+}

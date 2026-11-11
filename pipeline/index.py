@@ -24,6 +24,7 @@ import freshness         # noqa: E402
 import settings          # noqa: E402
 
 PAGE = 1000
+KEEP_FLAGS = ("superseded", "flag_reason", "flagged_at")
 BATCH = embedder.MAX_BATCH
 WORKERS = 8
 
@@ -67,7 +68,12 @@ def patch_metadata(sb, chunk: dict) -> None:
     """Write new metadata onto an existing row without touching its text or embedding (additive, no delete)."""
     for attempt in range(4):
         try:
-            sb.table(settings.CHUNKS_TABLE).update({"metadata": chunk["metadata"]}).eq("chunk_id", chunk["chunk_id"]).execute()
+            meta = dict(chunk["metadata"])
+            cur = (sb.table(settings.CHUNKS_TABLE).select("metadata").eq("chunk_id", chunk["chunk_id"]).limit(1).execute().data or [{}])[0].get("metadata") or {}
+            for k in KEEP_FLAGS:           # a review flag (scripts/flag_rows.py) set by a person or tool must survive a freshness patch
+                if k in cur:
+                    meta[k] = cur[k]
+            sb.table(settings.CHUNKS_TABLE).update({"metadata": meta}).eq("chunk_id", chunk["chunk_id"]).execute()
             return
         except Exception:
             if attempt == 3:
@@ -93,6 +99,35 @@ def mark_superseded(sb, ids: list[str], log) -> int:
                 sb.table(settings.CHUNKS_TABLE).update({"metadata": {**m, "superseded": True}}).eq("chunk_id", r["chunk_id"]).execute()
                 n += 1
     log(f"  flagged {n} superseded rows (metadata.superseded=true; not deleted)")
+    return n
+
+
+def flagged_by_pipeline(sb) -> set:
+    """chunk_ids carrying metadata.superseded=true that were set by mark_superseded (no review flag: scripts/flag_rows.py always
+    adds flagged_at). If such a row is back in the current plan it was flagged by a run that did not produce it (e.g. CI without
+    some data) and must be restored."""
+    ids, start = set(), 0
+    while True:
+        r = sb.table(settings.CHUNKS_TABLE).select("chunk_id").eq("metadata->>superseded", "true").is_("metadata->>flagged_at", "null") \
+            .range(start, start + PAGE - 1).execute().data
+        ids.update(x["chunk_id"] for x in r)
+        if len(r) < PAGE:
+            return ids
+        start += PAGE
+
+
+def unflag_current(sb, ids: list[str], log) -> int:
+    """Clear superseded on rows the current plan produces again (metadata only; review flags with flagged_at are never touched)."""
+    n = 0
+    for i in range(0, len(ids), 100):
+        rows = sb.table(settings.CHUNKS_TABLE).select("chunk_id,metadata").in_("chunk_id", ids[i:i + 100]).execute().data or []
+        for r in rows:
+            m = dict(r["metadata"] or {})
+            if m.get("superseded") and "flagged_at" not in m:
+                m.pop("superseded", None)
+                sb.table(settings.CHUNKS_TABLE).update({"metadata": m}).eq("chunk_id", r["chunk_id"]).execute()
+                n += 1
+    log(f"  restored {n} rows wrongly flagged superseded (back in the current plan)")
     return n
 
 
@@ -124,20 +159,26 @@ def prunable_lunch(i: str, source, lunch_campuses: set) -> bool:
     return freshness.lunch_campus(i) in lunch_campuses
 
 
-def run(prune=False, prune_legacy=False, dry_run=False, log=print, keep_expired=False, only_source: str | None = None) -> dict:
+def run(prune=False, prune_legacy=False, dry_run=False, log=print, keep_expired=False, only_source: str | None = None, additive_only=False) -> dict:
     """only_source (e.g. "lunch") restricts the whole plan (embed, patch, flag, prune) to rows of that source, so one stage can be indexed
-    without touching anything else."""
+    without touching anything else (a comma-separated list is accepted: "school_facts,school_canonical").
+    additive_only INSERTS rows whose chunk_id is not in the table and does nothing else: no rewrite of a changed row, no metadata patch,
+    no superseded flag, no expired-calendar delete, no prune. It is how new knowledge goes into the live table that the site reads."""
     chunks = json.loads(config.CHUNKS_FILE.read_text(encoding="utf-8"))
     chunks = list({c["chunk_id"]: c for c in chunks}.values())          # one row per id
     if only_source:
-        chunks = [c for c in chunks if c["metadata"].get("source") == only_source]
+        wanted = {x.strip() for x in only_source.split(",") if x.strip()}
+        chunks = [c for c in chunks if c["metadata"].get("source") in wanted]
     sb = client()
     have = existing(sb)
     if only_source:
-        have = {i: v for i, v in have.items() if v[2] == only_source}
+        have = {i: v for i, v in have.items() if v[2] in wanted}
     new_ids = {c["chunk_id"] for c in chunks}
     lunch_campuses = {c["metadata"].get("campus") for c in chunks if c["metadata"].get("source") == "lunch"}
     todo = [c for c in chunks if have.get(c["chunk_id"], (None,))[0] != c["metadata"]["content_hash"]]
+    changed_existing = [c for c in todo if c["chunk_id"] in have]      # same id, new text: a rewrite, which additive_only refuses
+    if additive_only:
+        todo = [c for c in todo if c["chunk_id"] not in have]
     stale = [i for i, (h, u, s) in have.items() if u and i not in new_ids
              and (not freshness.is_lunch_row(i, s) or prunable_lunch(i, s, lunch_campuses))]       # written by this pipeline
     legacy = [i for i, (h, u, s) in have.items() if not u and not freshness.is_lunch_row(i, s)]       # old pipeline
@@ -157,14 +198,23 @@ def run(prune=False, prune_legacy=False, dry_run=False, log=print, keep_expired=
             patch.append(c)
     present = {c["metadata"].get("source") for c in chunks}        # only sources this run regenerated (CI has no workbooks)
     superseded = [i for i, (h, u, s) in have.items() if s in WORKBOOK_SOURCES and s in present and i not in new_ids]
+    restore = []
+    if not additive_only:                       # additive runs never change an existing row
+        try:
+            restore = sorted(i for i in flagged_by_pipeline(sb) if i in new_ids)
+        except Exception as e:                  # a missing capability must never block indexing
+            log(f"  (could not check for wrongly flagged rows: {type(e).__name__})")
     stats = {"table": settings.CHUNKS_TABLE, "total_chunks": len(chunks), "to_embed": len(todo), "unchanged": len(chunks) - len(todo),
              "stale_in_db": len(stale), "legacy_in_db": len(legacy), "expired_calendar": len(expired_cal),
-             "metadata_patch": len(patch), "orphans_to_flag": len(superseded),
+             "metadata_patch": len(patch), "orphans_to_flag": len(superseded), "unflag_current": len(restore), "additive_only": additive_only,
+             "changed_existing_skipped": len(changed_existing) if additive_only else 0,
              "lunch_rows_held_back_from_prune": sum(1 for i, (h, u, s) in have.items() if freshness.is_lunch_row(i, s) and i not in new_ids and not prunable_lunch(i, s, lunch_campuses))}
     log(f"index plan: {stats}")
     if dry_run:
         return stats
 
+    if additive_only:
+        patch, superseded, expired_cal, stale, legacy, restore = [], [], [], [], [], []
     batches = [todo[i:i + BATCH] for i in range(0, len(todo), BATCH)]
     done, t0 = 0, time.time()
     with ThreadPoolExecutor(max_workers=WORKERS) as pool:
@@ -176,6 +226,8 @@ def run(prune=False, prune_legacy=False, dry_run=False, log=print, keep_expired=
         with ThreadPoolExecutor(max_workers=WORKERS) as pool:
             list(pool.map(lambda c: patch_metadata(sb, c), patch))
         log(f"  patched freshness metadata on {len(patch)} existing rows")
+    if restore:
+        unflag_current(sb, restore, log)
     if superseded:
         mark_superseded(sb, superseded, log)
     if expired_cal and not keep_expired:

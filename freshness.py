@@ -15,7 +15,7 @@ import os
 import re
 from datetime import date, datetime, timedelta
 
-CURRENT_BY_CONSTRUCTION = {"school_day", "school_courses", "school_clubs", "school_advisory", "school_facts",
+CURRENT_BY_CONSTRUCTION = {"school_day", "school_courses", "school_clubs", "school_advisory", "school_facts", "school_canonical",
                            "calendar", "calendar_day", "calendar_sheet", "link_registry", "email", "lunch"}
 
 YEAR_RANGE = re.compile(r"(?<!\d)(20\d{2})\s*[-–—/]\s*(?:20)?(\d{2})(?![\d:])")

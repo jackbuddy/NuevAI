@@ -18,15 +18,19 @@ import embedder
 import freshness
 import guard
 import lunch_lookup
+import qnorm
 import settings
 from cache import TTLCache
 from followup import apply_grade, rewrite_followup, valid_grade
-from intent import CalendarIntent, LunchIntent, parse_intent, parse_lunch
+from intent import DATE_HINT, SPORTS as SPORTS_WORDS, CalendarIntent, LunchIntent, parse_intent, parse_lunch
 
 CANDIDATES = 32
 VECTOR_BUDGET_S = float(os.getenv("VECTOR_BUDGET_S", "14"))
 FTS_ENABLED = os.getenv("FTS_ENABLED", "1") != "0"
 FTS_CANDIDATES = 12
+FTS_RARE_CANDIDATES = 10
+RARE_BOOST, DIV_BONUS, DIV_PENALTY_EXPLICIT, DIV_PENALTY_DEFAULT = 0.25, 0.08, 0.30, 0.10   # rerank knobs: rare-word match, audience division
+TITLE_CAP, FAMILY_CAP = 2, 3        # max rows from one document title / from the handbook family in the final top-k
 VECTOR_THRESHOLD = 0.0      # gte-small cosine scores sit high (unrelated ~0.75), so rank, do not threshold
 W_VECTOR, W_LEXICAL = 0.3, 0.7
 OUTLINE_BOOST, CAL_PENALTY, HEAD_BOOST, LEN_EXP = 0.2, 0.2, 1.0, 0.4   # rerank knobs (tuned by sweep_rerank.py)
@@ -40,11 +44,17 @@ def norm_words(s: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", s.lower().replace("&", " and ").replace("+", " and "))).strip()
 
 
-LIST_WORDS = re.compile(r"\b(list|all|every|which|what (courses?|classes|electives?|sports|clubs|departments?)|offered|options|available)\b", re.I)
+LINK_GENERIC = set("book booking schedule reserve register registration sign up tour visit appointment event link use form submit fill out".split())
+LIST_WORDS = re.compile(r"\b(list|all|every|which|what (courses?|classes|electives?|sports|clubs|departments?)|offered|options|available|are there (any|some)|is there (any|a) (list|club))\b", re.I)
+MONEY_Q = re.compile(r"\bhow much\b|\bcosts?\b|\bprices?\b|\bfees?\b|\btuition\b|\bhow expensive\b", re.I)
+CLUB_Q = re.compile(r"\bclubs?\b|\baffinity\b", re.I)
 
 LINK_INTENTS = [
     ("booking", re.compile(r"\b(book|booking|schedule|reserve|register|registration|sign[- ]?up|rsvp|tour|visit|open house|info(rmation)? session|admissions event)\b", re.I)),
     ("payment", re.compile(r"\b(donat\w*|giv(e|ing)|gift|pay|payment|tuition|store|buy|merch\w*|spirit ?wear)\b", re.I)),
+    # "How do I apply / what is the application fee": the admissions booking/payment cards (Ravenna) are the answer
+    ("booking", re.compile(r"\b(apply|applying|application|applications|admissions?|enrol\w*)\b(?!.*\b(college|colleges|university|universities|common app)\b)", re.I)),
+    ("payment", re.compile(r"\bapplication fee\b|\bfee to apply\b|\bapply(?:ing)? fee\b", re.I)),
 ]
 
 BELL_Q = re.compile(r"\bbl(o|a)c?ks?\b|\bblocks?\b|\bbell\b|\blunch\b|\bperiods?\b|\bschool day\b|\b(when|what time) (does|do|is) (school|class\w*|the day|the school day) (start|end|begin|over|out|finish)|\bclasses (per|a|each) day\b|\bhow (long|many)\b.*\b(class|classes|block|blocks|lessons?)\b|\bprime\b|\b[ab]['\u2019] ?day\b|\bstart of school\b|\bend of (the )?(school )?day\b|\bschool (start|end)s?\b", re.I)
@@ -64,12 +74,13 @@ SYNONYMS = {
     r"\blate\b|\bleft early\b": "tardy tardies attendance",
     r"\babsent\b|\bmiss(ing)? school\b|\bsick\b": "absence absences attendance illness",
     r"\bphones?\b(?!\s+numbers?)|\bairpods?\b|\bearbuds?\b": "cell phone policy devices",
-    r"\bai\b|\bchatgpt\b|\bgpt\b": "artificial intelligence generative AI academic integrity",
+    r"^(?!.*\bclubs?\b)(?s:.*)(?:\bai\b|\bchatgpt\b|\bgpt\b)": "artificial intelligence generative AI academic integrity",
     r"\bcheat(ing)?\b|\bcopy(ing)?\b": "plagiarism academic integrity honor",
     r"\bhomework\b": "homework assignments late work",
     r"\bgrad(e|es|ing)\b|\bgpa\b|\breport cards?\b": "grading grades assessment reporting",
     r"\bbus(es)?\b|\btransport\w*\b|\bshuttle\b": "transportation shuttle bus",
-    r"\blunch\b|\bfood\b|\bcafeteria\b|\bcafe\b": "lunch cafe meals dining",
+    r"^(?!.*\b(leave|leaving|off[- ]campus|open campus|closed campus|allowed|permitted)\b)(?s:.*)(?:\blunch\b|\bfood\b|\bcafeteria\b|\bcafe\b)": "lunch cafe meals dining",
+    r"\bleav(e|ing) (campus|school)\b|\boff[- ]campus\b|\b(open|closed)[- ]campus\b|\bgo off campus\b|\bsign(ed)? out\b": "closed-campus school grades 9 & 10 open campus leave campus during the school day policy",
     r"\bpark(ing)?\b|\bdrop[- ]?off\b|\bpick[- ]?up\b": "parking drop-off pick-up",
     r"\buniform\b|\bwear\b|\bclothes\b": "dress code",
     r"\binjur\w*\b|\bhurt\b|\btrainer\b": "sports medicine athletic training injury",
@@ -84,6 +95,21 @@ SYNONYMS = {
     r"\bclubs?\b|\baffinity\b|\bstudent organi[sz]ations?\b": "clubs and affinity groups list",
     r"\blanguages?\b|\bforeign language\b": "world languages Chinese Spanish French Japanese Latin Korean language courses",
     r"\bmakeup\b|\bmake[- ]up\b|\bretake\b": "make-up retake assessment policy",
+    r"\bfirst day of (school|classes)\b|\bwhen (did|does|do) (school|classes) (start|begin)\b|\bschool (started|starts|begins)\b": "First Day of School classes begin opening day",
+    # nicknames, acronyms and the words the school's own documents use
+    r"\bhoco\b|\bhomecoming\b": "HoCo homecoming spirit week dance",
+    r"\bhonou?r (code|council|system|pledge)\b": "Academic Integrity plagiarism cheating honesty community norms",
+    r"(?-i:\bAP\b)|\bap (classes|courses|exams?|tests?)\b|\badvanced placement\b": "AP exams advanced placement courses not designed to prepare students for AP exams",
+    r"(?-i:\bSAT\b|\bACT\b|\bPSAT\b)|\bsat (test|exam|date|dates|score|scores)\b|\bstandardi[sz]ed test\w*": "SAT ACT PSAT test date standardized testing",
+    r"\bapplication fees?\b|\bfee to apply\b|\bhow (do|can) i apply\b|\bapply(ing)? (to|for|at) nueva\b|\badmissions?\b": "admissions apply Ravenna application fee family information form visit and apply",
+    r"\bhead of school\b|\bprincipal\b|\bdivision heads?\b|\bwho (runs|leads) (nueva|the school)\b|\bwho is in charge\b|\b(upper|middle|lower) school (head|director)\b": "Head of School Division Head leadership team",
+    r"\bparking\b|\bpark (on|at|in)\b|\bpark my car\b|\bdrive to school\b|\bdriving to school\b": "parking request form Gr. 11 & 12 driving to campus",
+    r"\breport\w*\b.{0,25}\babsen\w+|\babsen\w+.{0,25}\breport\w*|\bcall(ing)? in sick\b|\bout sick\b|\bsick (day|note)\b": "attendance reporting form absence reporting US Attendance Reporting Form",
+    r"(?-i:\bPE\b)|\bphys(ical)? ed\w*\b|\bgym class\b": "physical education PE requirement athletics",
+    r"\bjv\b|\bjunior varsity\b": "junior varsity JV varsity levels",
+    r"\bpre-?participation\b|\bsports physical\b|\bpaperwork\b.{0,40}\b(team|sport|athlet\w*)\b|\b(team|sport|athlet\w*)\b.{0,40}\b(paperwork|forms?|physical)\b": "pre-participation physical athletics forms clearance",
+    r"\b(is|are) there\b.{0,40}\b(team|teams|sports?|varsity|jv|baseball|softball|football|hockey|wrestling|cheer\w*|lacrosse|rugby|basketball|b-?ball)\b|\b(do|does) (we|nueva|the school|you)( even)? (have|offer)\b.{0,40}\b(team|teams|sport|sports|baseball|softball|football|hockey|wrestling|cheer\w*|lacrosse|rugby|golf|swim\w*|track|tennis|volleyball|badminton|fencing)\b|\bwhat sports\b|\bsports (offered|available|does nueva)\b": "varsity offerings by season athletics teams no-cut limited-roster teams Fall Winter Spring",
+    r"\bbus\b|\bbuses\b|\bshuttle\b|\bkidzjet\b|\bcaltrain\b": "transportation bus shuttle Kidzjet routes timetable ridership",
 }
 
 
@@ -92,13 +118,17 @@ DOMAIN_WORDS = ["labor", "thanksgiving", "memorial", "veterans", "juneteenth", "
                 "softball", "lacrosse", "badminton", "swimming", "wrestling", "tutorial", "advisory", "chemistry", "calculus"]
 
 
+KNOWN_TERMS = frozenset(set(SPORTS_WORDS) | set(DOMAIN_WORDS) | {"meche", "baseball", "softball", "lacrosse", "hockey", "cheer", "cheerleading", "football", "rugby", "pickleball", "fencing", "archery"})
+
+
 def fix_typos(q: str) -> str:
-    """Correct one-letter slips in the few event/sport words the calendar and course lookups key on
-    ('labr day' -> 'labor day'). Tokens that are not close to a domain word are left alone."""
-    import difflib
+    """Slang/typo repair from the index vocabulary (qnorm.py: 'tommrow' -> 'tomorrow', 'skool' -> 'school', 'b ball' -> 'basketball'),
+    then one-letter slips in the few event/sport words the calendar and course lookups key on ('labr day' -> 'labor day').
+    Tokens that are not close to a known word are left alone."""
+    q = qnorm.fix_typos(q, KNOWN_TERMS)
     def fix(m):
         w = m.group(0)
-        if len(w) < 4 or w.lower() in DOMAIN_WORDS:
+        if len(w) < 4 or w.lower() in DOMAIN_WORDS or qnorm.known(w):
             return w
         near = difflib.get_close_matches(w.lower(), DOMAIN_WORDS, n=1, cutoff=0.82)
         return near[0] if near else w
@@ -106,7 +136,7 @@ def fix_typos(q: str) -> str:
 
 
 def expand_query(q: str) -> str:
-    extra = [w for rx, w in SYNONYMS.items() if re.search(rx, q, re.I)]
+    extra = [w for rx, w in SYNONYMS.items() if w and re.search(rx, q, re.I)]
     return f"{q} ({' '.join(extra)})" if extra else q
 
 
@@ -121,6 +151,11 @@ TOKEN = re.compile(r"[a-z0-9]+(?:[.'-][a-z0-9]+)*")
 
 def tokens(text: str) -> list[str]:
     return [t for t in TOKEN.findall(text.lower()) if t not in STOP and len(t) > 1]
+
+
+def stokens(text: str) -> list[str]:
+    """tokens() with a light stemmer: used where plurals and tenses must match (rerank, context window)."""
+    return [qnorm.stem(t) for t in tokens(text)]
 
 
 COURSE_NOISE = set("teach teaches teacher teachers taught class classes course courses room rooms block blocks instructor offered section sections period periods fall spring semester year mr mrs ms dr".split())
@@ -175,16 +210,27 @@ def email_recency_boost(source_date, today: date | None = None) -> float:
     return 0.0 if age is None else EMAIL_RECENCY_MAX * 0.5 ** (age / EMAIL_HALF_LIFE_DAYS)
 
 
+def _shingles(body: str, k: int = 5) -> set:
+    w = body.split()
+    return {" ".join(w[i:i + k]) for i in range(max(0, len(w) - k + 1))}
+
+
 def dedupe_rows(rows: list[dict]) -> list[dict]:
-    """Drop lower-ranked rows whose text repeats a higher-ranked one (the same document indexed under two
-    URLs or titles). Compared on the normalised body: same first and last 200 characters and a similar length."""
-    seen, out = {}, []
+    """Drop lower-ranked rows whose text repeats a higher-ranked one (the same document indexed under two URLs or titles, even when the
+    copies were cut into chunks at different places). Exact: same first and last 200 characters and a similar length. Fuzzy: 70% of the
+    shorter row's 5-word shingles already appear in one kept row. Structured rows (calendar, links, facts) are never fuzzy-dropped."""
+    seen, out, kept = {}, [], []
     for r in rows:
         body = re.sub(r"[^a-z0-9]+", " ", r["content"].split("\n\n", 1)[-1].lower()).strip()
         key = (body[:200], body[-200:])
         if key in seen and 0.8 < (len(body) + 1) / (seen[key] + 1) < 1.25:
             continue
+        sh = _shingles(body)
+        src = (r.get("metadata") or {}).get("source", "")
+        if len(sh) >= 25 and src in OLD_COPY_SOURCES and any(len(sh & k) / min(len(sh), len(k)) >= 0.7 for k in kept if k):
+            continue
         seen[key] = len(body)
+        kept.append(sh if src in OLD_COPY_SOURCES else set())
         out.append(r)
     return out
 
@@ -199,12 +245,113 @@ def merge_fts_rows(rows: list[dict], fts: list[dict]) -> list[dict]:
     return rows
 
 
+
+# ---------------------------------------------------------------------------------------------- audience division (US / MS / LS)
+DIV_RX = {"LS": r"lower school", "MS": r"middle school", "US": r"upper school|high school"}
+DIV_NAME = {"US": "Upper School", "MS": "Middle School", "LS": "Lower School"}
+_Q_LS = re.compile(r"\b(lower school|kindergarten|pre-?k|(?:1st|2nd|3rd|4th|5th|first|second|third|fourth|fifth) grade|(?:1st|2nd|3rd|4th|5th)[- ]graders?)\b|(?-i:\bLS\b)", re.I)
+_Q_MS = re.compile(r"\b(middle school|(?:6th|7th|8th|sixth|seventh|eighth) grade|(?:6th|7th|8th)[- ]graders?|hillsborough)\b|(?-i:\bMS\b)", re.I)
+_Q_US = re.compile(r"\b(upper school|high school|highschool|(?:9th|10th|11th|12th|ninth|tenth|eleventh|twelfth) grade|(?:9th|10th|11th|12th)[- ]graders?|freshm[ae]n|sophomores?|juniors?|seniors?|varsity|san mateo|college counseling|advisory \d+\.\d+)\b|(?-i:\bUS\b)", re.I)
+
+
+def query_division(query: str, campus: str | None = None, grade: int | None = None) -> tuple[str, bool]:
+    """-> (division 'US'|'MS'|'LS', explicit). Explicit when the question names a division, grade level or campus; otherwise the saved
+    campus/grade, else the Upper School (most likely asker), flagged not explicit."""
+    hits = [d for d, rx in (("LS", _Q_LS), ("MS", _Q_MS), ("US", _Q_US)) if rx.search(query)]
+    if len(hits) == 1:
+        return hits[0], True
+    if hits:
+        return ("US" if "US" in hits else hits[0]), False        # mentions several divisions: compare, so no single audience
+    if grade:
+        return "US", False
+    if campus == "hillsborough":
+        return "MS", False
+    return "US", False
+
+
+def row_division(r: dict) -> str | None:
+    """The division a document row is written for (from its title / section path, else from what the text itself says), or None."""
+    m = r.get("metadata") or {}
+    head = (m.get("title") or "") + " " + " ".join(re.findall(r"^Section: (.*)$", (r.get("content") or "")[:700], re.M))
+    found = [d for d, rx in DIV_RX.items() if re.search(rx, head, re.I)]
+    if len(found) == 1:
+        return found[0]
+    if found:
+        return None
+    body = r.get("content") or ""
+    counts = {d: len(re.findall(rx, body, re.I)) for d, rx in DIV_RX.items()}
+    top = [d for d, c in counts.items() if c]
+    return top[0] if len(top) == 1 else None
+
+
+def _title_group(r: dict) -> str:
+    t = re.sub(r"\s+", " ", ((r.get("metadata") or {}).get("title") or "")).strip().lower()
+    return "handbook" if "handbook" in t else t[:60]
+
+
+def cap_per_title(rows: list[dict], limit: int, title_cap: int = TITLE_CAP, family_cap: int = FAMILY_CAP) -> list[dict]:
+    """Keep the ranking order but allow at most `title_cap` rows per document title and `family_cap` rows from the handbook (which is
+    indexed under several titles), so duplicate copies and one long document cannot fill the whole context."""
+    out, n = [], {}
+    top = max((r.get("rerank", 0.0) for r in rows), default=0.0)
+    for r in rows:
+        g = _title_group(r)
+        cap = family_cap if g == "handbook" else title_cap
+        strong = top > 0 and r.get("rerank", 0.0) >= 0.85 * top      # a row that is nearly as relevant as the best one is never dropped for being a 3rd/4th of its title
+        if n.get(g, 0) >= cap and not strong and (r.get("metadata") or {}).get("source") not in ("link_registry", "school_facts"):
+            continue
+        n[g] = n.get(g, 0) + 1
+        out.append(r)
+        if len(out) >= limit:
+            break
+    return out
+
+
+BODY_MAX = 1300         # characters of a document body shown to the model (chunks are at most 1,600; the median is under 900)
+
+
+def window(content: str, q_terms: set[str], body_max: int = BODY_MAX) -> str:
+    """The header lines (Title / Section / Source) plus the part of the body that matters: the whole body when it fits, otherwise a
+    slice of the original text made of whole sentences / lines / list items around the best matches for the question, instead of
+    blindly cutting at a fixed length. Long run-on lists (a clubs outline) are split at commas so a match deep inside one still shows."""
+    head, sep, body = content.partition("\n\n")
+    if not sep:
+        head, body = "", content
+    if len(body) <= body_max:
+        return content
+    cuts = [0] + [m.end() for m in re.finditer(r"(?<=[.!?:;])\s+|\n+|,\s+|\s+-\s+", body)] + [len(body)]
+    spans = [(a, b) for a, b in zip(cuts, cuts[1:]) if b > a]
+    q_terms = {qnorm.stem(t) for t in q_terms}
+    scores = [sum(qnorm.idf(t) for t in set(stokens(body[a:b])) & q_terms) for a, b in spans]
+    best = max(range(len(spans)), key=lambda i: scores[i]) if any(scores) else 0
+    lo = hi = best
+    while True:                          # grow around the best piece, alternating after / before, within the budget
+        grew = False
+        for nxt in (hi + 1, lo - 1):
+            if 0 <= nxt < len(spans):
+                a = spans[min(lo, nxt)][0]
+                b = spans[max(hi, nxt)][1]
+                if b - a <= body_max:
+                    lo, hi = min(lo, nxt), max(hi, nxt)
+                    grew = True
+        if not grew:
+            break
+    if lo <= 1:                          # the match is near the start: keep the start
+        lo = 0
+        while hi + 1 < len(spans) and spans[hi + 1][1] - spans[0][0] <= body_max:
+            hi += 1
+    text = body[spans[lo][0]:spans[hi][1]].strip()
+    text = ("... " if lo > 0 else "") + text[:body_max + 60] + (" ..." if hi < len(spans) - 1 else "")
+    return (head + "\n\n" if head else "") + text
+
+
 class Retriever:
     def __init__(self, get_supabase):
         self.sb = get_supabase
         self.embed_cache = TTLCache(max_items=2000, ttl=24 * 3600)
         self.calendar_cache = TTLCache(max_items=256, ttl=600)
         self._fts_off = False
+        self._fts_pause_until = 0.0
 
     # ---- pieces -----------------------------------------------------------
     def embed(self, text: str) -> list[float]:
@@ -217,41 +364,82 @@ class Retriever:
         return vec
 
     def vector_search(self, qvec: list[float]) -> list[dict]:
-        r = self.sb().rpc(settings.MATCH_RPC, {"query_embedding": qvec, "match_threshold": VECTOR_THRESHOLD,
-                                               "match_count": CANDIDATES}).execute()
-        return r.data or []
+        for attempt in (0, 1):          # a connection the server closed between requests works on the second try
+            try:
+                r = self.sb().rpc(settings.MATCH_RPC, {"query_embedding": qvec, "match_threshold": VECTOR_THRESHOLD,
+                                                       "match_count": CANDIDATES}).execute()
+                return r.data or []
+            except Exception as e:
+                if attempt or "disconnect" not in f"{type(e).__name__} {e}".lower() and "closed" not in str(e).lower() and "reset" not in str(e).lower():
+                    raise
+        return []
 
-    def fts_search(self, query: str) -> list[dict]:
+    def fts_search(self, query: str, rare: list[str] | None = None) -> list[dict]:
         """Keyword candidates from Postgres full-text search (RPC search_chunks_fts, see supabase/fts.sql). They catch
-        rare words (names, room numbers, event titles) that embeddings blur. Silently disabled if the RPC is missing."""
-        if not FTS_ENABLED or self._fts_off:
+        rare words (names, room numbers, event titles) that embeddings blur. Two passes: the broad OR query, and a second
+        one on only the question's rarest words (names / acronyms such as Priory, Guild, HoCo, AMC), so a proper noun is not
+        outvoted by the common words in the question. Silently disabled if the RPC is missing."""
+        if not FTS_ENABLED or self._fts_off or time.time() < self._fts_pause_until:
             return []
         terms = [t for t in dict.fromkeys(re.findall(r"[a-z0-9]{3,}", query.lower())) if t not in STOP][:12]
         if not terms:
             return []
-        try:
-            r = self.sb().rpc("search_chunks_fts", {"query_text": " | ".join(terms), "match_count": FTS_CANDIDATES}).execute()
-            return r.data or []
-        except Exception as e:
-            self._fts_off = True            # function not installed (or DB error): fall back to vector-only, do not retry per request
-            print(f"fts disabled: {str(e)[:120]}", flush=True)
-            return []
+        out: dict[str, dict] = {}
 
-    def rerank(self, query: str, rows: list[dict], today: date | None = None) -> list[dict]:
+        def call(query_text: str, n: int):
+            for attempt in (0, 1):          # one retry: a reused connection that the server closed ("Server disconnected") works on the second try
+                try:
+                    return self.sb().rpc("search_chunks_fts", {"query_text": query_text, "match_count": n}).execute()
+                except Exception as e:
+                    if attempt or re.search(r"does not exist|could not find the function|PGRST202|42883", str(e), re.I):
+                        raise
+            return None
+        try:
+            r = call(" | ".join(terms), FTS_CANDIDATES)
+            for row in r.data or []:
+                out[row["chunk_id"]] = row
+            rare = [t for t in (rare or []) if re.fullmatch(r"[a-z0-9]{3,}", t)]
+            if rare:
+                r2 = call(" | ".join(rare), FTS_RARE_CANDIDATES)
+                for row in r2.data or []:
+                    row = out.setdefault(row["chunk_id"], row)
+                    row["fts_rare"] = True
+                # the rarest word AND the next most distinctive word: a long email that mentions "Priory" once among many other
+                # words is not in the top hits for "priory" alone, but it is the only chunk with "priory" and "tennis" together
+                pair = [t for t in qnorm.rare_terms(query, STOP, max_df=600, limit=4) if re.fullmatch(r"[a-z0-9]{3,}", t)]
+                if len(pair) >= 2:
+                    r3 = call(f"{pair[0]} & ({' | '.join(pair[1:])})", FTS_RARE_CANDIDATES)
+                    for row in r3.data or []:
+                        row = out.setdefault(row["chunk_id"], row)
+                        row["fts_rare"] = row["fts_pair"] = True
+            return list(out.values())
+        except Exception as e:
+            msg = str(e)
+            if re.search(r"does not exist|could not find the function|PGRST202|42883", msg, re.I):
+                self._fts_off = True        # the function is not installed: vector-only for the life of the process
+            else:
+                self._fts_pause_until = time.time() + 30      # a timeout or hiccup pauses keyword search for 30 s instead of switching it off for good
+            print(f"fts unavailable: {msg[:120]}", flush=True)
+            return list(out.values())
+
+    def rerank(self, query: str, rows: list[dict], today: date | None = None, division: tuple[str, bool] | None = None,
+               rare: list[str] | None = None) -> list[dict]:
         """Hybrid score = vector similarity + lexical overlap (idf-weighted, title/section boosted), both min-max
         normalised over the candidates. Cheap, no model, and it fixes exact-wording misses that embeddings blur."""
         if len(rows) < 2:
             return rows
-        q = set(tokens(query))
+        q = set(stokens(query))
         docs = []
         for r in rows:
             m = r.get("metadata") or {}
             head = f"{m.get('title', '')} {r['content'].split(chr(10) + chr(10), 1)[0]}"
-            body = tokens(r["content"][:1800])
-            docs.append((body, set(tokens(head))))
+            body = stokens(r["content"][:1800])
+            docs.append((body, set(stokens(head))))
         n = len(rows)
         df = {t: sum(1 for body, _ in docs if t in set(body)) for t in q}
-        idf = {t: math.log(1 + n / (1 + df[t])) for t in q}
+        # local idf (rarity among these candidates) blended with global idf (rarity in the whole index, qnorm.vocab) so a word that is
+        # common across the school's documents but happens to be rare among 40 candidates does not dominate
+        idf = {t: 0.5 * math.log(1 + n / (1 + df[t])) + (0.5 * qnorm.idf(t) / 2.5 if qnorm.vocab() else 0.5 * math.log(1 + n / (1 + df[t]))) for t in q}
         lex = []
         for body, head in docs:
             tf = {}
@@ -272,6 +460,20 @@ class Retriever:
                 r["rerank"] += OUTLINE_BOOST        # contents lists answer "list all ..." questions
             if m.get("source") in ("calendar", "calendar_day", "calendar_sheet"):
                 r["rerank"] -= CAL_PENALTY         # calendar is looked up structurally, not by similarity
+            if m.get("source") in ("calendar_day", "school_day") and not DATE_HINT.search(query):
+                r["rerank"] -= 0.25                # a day record for a question that names no date is noise (it only matches a stray word)
+            if MONEY_Q.search(query) and re.search(r"\$\s?\d", r["content"]):
+                r["rerank"] += 0.20                # "how much is tuition / the fee": the chunk with the amounts, not the prose about affordability
+            if m.get("source") == "school_clubs" and CLUB_Q.search(query):
+                r["rerank"] += 0.10                # the 2026-27 clubs workbook beats older club-catalog copies
+            if rare:
+                words = set(stokens(f"{m.get('title', '')} {r['content']}"))
+                r["rerank"] += RARE_BOOST * sum(1 for t in rare if qnorm.stem(t) in words) / len(rare)     # the question's names/acronyms decide ties
+            if division:
+                rd = row_division(r)
+                if rd:
+                    r["division"] = rd
+                    r["rerank"] += DIV_BONUS if rd == division[0] else -(DIV_PENALTY_EXPLICIT if division[1] else DIV_PENALTY_DEFAULT)
             if freshness.is_email_row(r.get("chunk_id", ""), None, m):
                 r["rerank"] += email_recency_boost(m.get("source_date"), today)     # newest email wins; emails are never "stale"
             elif freshness.meta_of(r)["stale"]:
@@ -296,7 +498,7 @@ class Retriever:
 
     def calendar_events(self, intent: CalendarIntent) -> list[dict]:
         key = (intent.start, intent.end, intent.sport, intent.kind, intent.category, intent.gender,
-               intent.division, intent.home_away, tuple(intent.keywords), tuple(intent.holidays))
+               intent.division, intent.home_away, tuple(intent.keywords), tuple(intent.holidays), tuple(intent.holiday_dates))
         cached = self.calendar_cache.get(key)
         if cached is not None:
             return cached
@@ -338,6 +540,11 @@ class Retriever:
                 q = None
         if q is not None:
             rows = q.limit(300).execute().data or []
+        if intent.holiday_dates and not digest:
+            have = {r["chunk_id"] for r in rows}
+            extra = self.sb().table(settings.CHUNKS_TABLE).select("chunk_id,content,metadata").in_("metadata->>source", ["calendar_day", "school_day"]) \
+                .in_("metadata->>event_date", [d.isoformat() for d in intent.holiday_dates]).limit(10).execute().data or []
+            rows += [r for r in extra if r["chunk_id"] not in have]
         if intent.holidays and not digest and intent.category == "no_school":
             # a named holiday (Thanksgiving) is often its own event rather than part of the "no school" category
             have = {r["chunk_id"] for r in rows}
@@ -349,7 +556,24 @@ class Retriever:
         self.calendar_cache.set(key, rows)
         return rows
 
-    def link_cards(self, query: str) -> list[dict]:
+    def keyword_events(self, terms: list[str], today: date) -> list[dict]:
+        """Calendar rows whose title contains a name the question carries ('Nueva Rocks the Guild', 'Priory', 'Fika') when the question has
+        no date or sport signal for the structured lookup. A handful of exact hits is shown as the calendar block."""
+        key = ("kw", tuple(terms), today.isoformat())
+        hit = self.calendar_cache.get(key)
+        if hit is not None:
+            return hit
+        rows: list[dict] = []
+        for t in terms[:2]:
+            r = self.sb().table(settings.CHUNKS_TABLE).select("chunk_id,content,metadata").in_("metadata->>source", ["calendar", "calendar_sheet"]) \
+                .ilike("metadata->>summary", f"%{t}%").gte("metadata->>end_date", (today - timedelta(days=30)).isoformat()).limit(40).execute().data or []
+            rows += [x for x in r if x["chunk_id"] not in {y["chunk_id"] for y in rows}]
+        rows = [r for r in rows if len(rows) <= 12]           # a word that matches dozens of rows is not a name
+        rows.sort(key=lambda r: ((r["metadata"] or {}).get("event_date", ""), (r["metadata"] or {}).get("start_time") or ""))
+        self.calendar_cache.set(key, rows, ttl=600)
+        return rows
+
+    def link_cards(self, query: str, expanded: str = "") -> list[dict]:
         """'How do I book a tour / donate?' -> the booking / payment link cards, looked up by category
         (the right card says 'Ravenna' or 'Give now', which looks nothing like the question to a vector search)."""
         cats = [c for c, rx in LINK_INTENTS if rx.search(query)]
@@ -364,11 +588,17 @@ class Retriever:
                     .eq("metadata->>link_category", c).limit(8).execute().data or []
                 self.calendar_cache.set(key, hit, ttl=3600)
             rows += hit
+        # cards the question's own words point at (a non-pinned card about the application fee) stay next to the pinned booking / payment cards
+        qtok = {t for t in tokens(expanded or query) if qnorm.df(t) <= 300 and t not in LINK_GENERIC}
+        def overlap(r):
+            return len(qtok & set(tokens(r["content"])))
         pinned = [r for r in rows if (r.get("metadata") or {}).get("pinned")]
         if pinned:
-            rows = pinned
+            rows = pinned + [r for r in rows if r not in pinned and overlap(r) >= 2]
+        rows.sort(key=lambda r: (-overlap(r), not (r.get("metadata") or {}).get("pinned")))
+        applying = bool(re.search(r"\b(appl\w+|admissions?|application fee|ravenna)\b", query, re.I))
         rows = [r for r in rows if not re.search(r"login|sign-?in", (r.get("metadata") or {}).get("url", ""), re.I)
-                or re.search(r"login|sign[- ]?in", query, re.I)]
+                or re.search(r"login|sign[- ]?in", query, re.I) or (applying and overlap(r) >= 2)]
         for r in rows:
             r["similarity"] = 1.0
         return rows
@@ -508,6 +738,8 @@ class Retriever:
         # short follow-ups ("what about tomorrow?") borrow the previous question for search
         search_q = expand_query(resolved if followed else f"{prev_user} {query}" if prev_user and len(query.split()) <= 6 else query)
         intent = (parse_intent(resolved, today, prev_user) if followed else None) or parse_intent(query, today, prev_user)
+        division = query_division(resolved, campus, valid_grade(grade))
+        rare = qnorm.rare_terms(resolved, STOP)
         timings = {}
         dep_errors = []         # analytics only: which dependency failed and how (never shown to the visitor)
 
@@ -524,10 +756,19 @@ class Retriever:
             timings["vector_ms"] = round((time.time() - t) * 1000)
             return rows
 
+        # names the question carries in capitals ("Nueva Rocks the Guild", "Priory", "HoCo") that no date/sport signal covers
+        orig_words = re.findall(r"[A-Za-z][A-Za-z0-9']+", resolved)
+        kw_terms = [w.lower() for i, w in enumerate(orig_words) if i > 0 and not w.islower() and w.lower() in set(rare)][:2]
+
         def cal_task():
-            if not intent:
-                return []
+            nonlocal intent
             t = time.time()
+            if not intent:
+                rows = self.keyword_events(kw_terms, today) if kw_terms else []
+                if rows:
+                    intent = CalendarIntent(today, today + timedelta(days=365), keywords=list(kw_terms), label="events matching " + " / ".join(kw_terms))
+                    timings["calendar_ms"] = round((time.time() - t) * 1000)
+                return rows
             rows = self.calendar_events(intent)
             timings["calendar_ms"] = round((time.time() - t) * 1000)
             return rows
@@ -547,7 +788,7 @@ class Retriever:
         except Exception as e:
             print(f"pinned lookup failed: {e}", flush=True)
         self.sb()      # create the client once, before worker threads import it concurrently
-        f_vec, f_cal, f_links, f_fts = _pool.submit(vec_task), _pool.submit(cal_task), _pool.submit(self.link_cards, resolved), _pool.submit(self.fts_search, search_q)
+        f_vec, f_cal, f_links, f_fts = _pool.submit(vec_task), _pool.submit(cal_task), _pool.submit(self.link_cards, resolved, search_q), _pool.submit(self.fts_search, search_q, rare)
         vec_rows, degraded = [], False
         try:
             vec_rows = f_vec.result(timeout=VECTOR_BUDGET_S)
@@ -584,14 +825,33 @@ class Retriever:
         current = [r for r in rows if (r.get("metadata") or {}).get("indexed_at") or (r.get("metadata") or {}).get("source") not in OLD_COPY_SOURCES]
         if len(current) >= 3:
             rows = current
-        # calendar chunks come from the structured lookup, not from similarity
-        rows = [r for r in rows if (r.get("metadata") or {}).get("source") not in ("calendar", "calendar_day", "school_day")] if events else rows
+        # calendar chunks come mostly from the structured lookup; a vector-found calendar / day row that the structured lookup did not
+        # return (a second date in the same question, "when do classes resume") is kept, but never twice
+        event_ids = {e["chunk_id"] for e in events}
+        rows = [r for r in rows if r["chunk_id"] not in event_ids]
 
         t = time.time()
-        ranked = dedupe_rows(self.rerank(search_q, rows, today))
+        ranked = dedupe_rows(self.rerank(search_q, rows, today, division, rare))
+        # protected keyword slot: the best row that contains ALL the question's rarest words (a name, an acronym: Priory, Guild, HoCo)
+        # is always shown, even when long handbook chunks outscore it
+        protect = []
+        names = [t for t in rare if qnorm.df(t) <= 25]        # real names / acronyms only (a word in 58 chunks, like "freshmen", is not worth a protected slot)
+        if names and len(rare) <= 4:
+            need = {names[0]}
+            for key in ("fts_pair", "fts_rare"):          # first the row that has the rarest word together with another question word, then the best rare-word row
+                for r in ranked:
+                    m = r.get("metadata") or {}
+                    if r.get(key) and r not in protect and need <= set(tokens(f"{m.get('title', '')} {r['content']}")):
+                        protect.append(r)
+                        break
         timings["rerank_ms"] = round((time.time() - t) * 1000)
         link_rows = link_rows[:3]
-        docs = (link_rows + [d for d in ranked if d["chunk_id"] not in {l["chunk_id"] for l in link_rows}])[:top_k + len(link_rows)]
+        link_ids = {l["chunk_id"] for l in link_rows}
+        ranked = [d for d in ranked if d["chunk_id"] not in link_ids]
+        if protect:
+            pids = {p_["chunk_id"] for p_ in protect}
+            ranked = protect + [d for d in ranked if d["chunk_id"] not in pids]
+        docs = link_rows + cap_per_title(ranked, top_k)
         timings["retrieve_ms"] = round((time.time() - t0) * 1000)
         ent_ids = {e["chunk_id"] for e in ents}
         if intent and intent.label == "the next two weeks" and any(p["chunk_id"] == "advisory-lines" for p in pinned):
@@ -601,17 +861,19 @@ class Retriever:
             events, intent = [], None      # "Biology Research Teams 2" is a course, not a sports-team question: no team overview
         pin_ids = {p["chunk_id"] for p in pinned}
         docs = [d for d in docs if d["chunk_id"] not in ent_ids | pin_ids]
-        return {"pinned": pinned, "docs": docs, "events": events, "intent": intent, "timings": timings, "candidates": len(rows), "entities": ents, "degraded": degraded, "resolved": standalone, "dep_errors": dep_errors}
+        return {"pinned": pinned, "docs": docs, "events": events, "intent": intent, "timings": timings, "candidates": len(rows), "entities": ents, "degraded": degraded, "resolved": standalone, "dep_errors": dep_errors,
+                "division": division, "rare": rare}
 
 
-def fmt_event(r: dict) -> str:
+def fmt_event(r: dict, detail: bool = False) -> str:
     m = r.get("metadata") or {}
     if m.get("source") in ("calendar_day", "school_day"):
         return r["content"].split("\n\n", 1)[-1]
     when = m.get("when", m.get("event_date", ""))
     time_s = "all day" if m.get("all_day") else m.get("time", "")
     loc = f" @ {m['location']}" if m.get("location") else ""
-    return f"- {when}, {time_s}: {m.get('summary', '')}{loc}"
+    desc = re.sub(r"\s+", " ", m.get("description") or "").strip()[:260] if detail else ""
+    return f"- {when}, {time_s}: {m.get('summary', '')}{loc}" + (f" - Details: {desc}" if desc else "")
 
 
 def team_overview(events: list[dict]) -> str:
@@ -650,7 +912,33 @@ def practice_overview(events: list[dict]) -> str:
     return "PRACTICE SCHEDULE (one line per team; times can differ by day):\n" + "\n".join(lines[:30])
 
 
-def build_context(result: dict, max_events: int = 14) -> tuple[str, list[dict]]:
+def select_events(events: list[dict], intent, query: str, max_events: int = 14) -> list[dict]:
+    """Which calendar rows to show when there are more than fit: the ones whose summary matches the question's words come first
+    (the 7th-grade Shakespeare performance is not the first of 31 arts events by date), then the earliest dates; shown in date order.
+    'Next game' questions skip rows that are not games (First Day of Practice, tryouts) before taking the first few."""
+    if intent and intent.next_only and intent.kind == "game":
+        games = [e for e in events if (e.get("metadata") or {}).get("kind") == "game"] or events
+        return games[:3]
+    if len(events) <= max_events:
+        return events
+    q = set(tokens(query)) | {k.lower() for k in (intent.keywords if intent else [])}
+    q -= {"performance", "performances", "event", "events", "school", "nueva", "grade"} if len(q) > 2 else set()
+
+    def score(e):
+        m = e.get("metadata") or {}
+        words = set(tokens(f"{m.get('summary', '')} {m.get('description', '') or ''} {m.get('location', '') or ''}"))
+        return sum(qnorm.idf(t) for t in q & words)
+    scored = [(score(e), i, e) for i, e in enumerate(events)]
+    top = sorted((x for x in scored if x[0] > 0), key=lambda x: (-x[0], x[1]))[:max_events]
+    chosen = {id(x[2]) for x in top}
+    for _, i, e in scored:                      # fill the rest in date order
+        if len(chosen) >= max_events:
+            break
+        chosen.add(id(e))
+    return [e for e in events if id(e) in chosen]
+
+
+def build_context(result: dict, max_events: int = 14, query: str = "") -> tuple[str, list[dict]]:
     """-> (context string for the model, sources list for the UI)"""
     if result.get("lunch"):
         return guard.scrub_context(lunch_context(result["lunch"])), lunch_sources(result["lunch"])
@@ -665,11 +953,11 @@ def build_context(result: dict, max_events: int = 14) -> tuple[str, list[dict]]:
         shown = []
         sources.append({"chunk_id": "calendar-practices", "title": "Practice schedule", "type": "calendar"})
     elif events:
-        shown = events[:3] if (intent and intent.next_only and intent.kind == "game") else events[:max_events]
+        shown = select_events(events, intent, query or result.get("resolved") or "", max_events)
         more = f"\n(+{len(events) - len(shown)} more matching events not shown)" if len(events) > len(shown) else ""
         label = f"{intent.label}" if intent else ""
         parts.append(f"SCHOOL CALENDAR ({label}, sorted by date; today is accurate to this list):\n"
-                     + "\n".join(fmt_event(e) for e in shown) + more)
+                     + "\n".join(fmt_event(e, detail=len(shown) <= 4) for e in shown) + more)
         for e in shown[:5]:
             m = e.get("metadata") or {}
             sources.append({"chunk_id": e["chunk_id"], "title": m.get("summary") or m.get("title"), "type": "calendar"})
@@ -687,6 +975,8 @@ def build_context(result: dict, max_events: int = 14) -> tuple[str, list[dict]]:
             parts.append("KEY FACTS (confirmed by the school; authoritative):")
         parts.append(p["content"].split("\n\n", 1)[-1][:1800])
         sources.append({"chunk_id": p["chunk_id"], "title": pm.get("title"), "type": pm.get("source", "doc")})
+    q_terms = set(tokens(query or result.get("resolved") or "")) | set(result.get("rare") or [])
+    div = result.get("division")
     for d in result["docs"]:
         m = d.get("metadata") or {}
         f = freshness.meta_of(d)
@@ -699,9 +989,17 @@ def build_context(result: dict, max_events: int = 14) -> tuple[str, list[dict]]:
             tag = f"[OUTDATED: {why}; use only if nothing current answers, and say it may have changed]\n"
         elif f["source_date"]:
             tag = f"[as of {f['source_date']}]\n"
-        parts.append(tag + d["content"][:1100])          # keeps prompts small: the LLM plan is token-rate limited
+        rd = d.get("division") or row_division(d)
+        if rd and m.get("source") not in ("calendar", "calendar_day", "school_day", "link_registry"):
+            tag = f"[{DIV_NAME[rd]} document] " + tag          # labelled so the model answers for the right division
+        parts.append(tag + window(d["content"], q_terms))      # a window around the answer, not a blind cut: the LLM plan is token-rate limited
         sources.append({"chunk_id": d["chunk_id"], "title": m.get("title"), "url": m.get("source_url") if str(m.get("source_url", "")).startswith("http") else None,
                         "similarity": round(d.get("similarity", 0), 3), "type": m.get("source", "doc")})
+    present = {d.get("division") or row_division(d) for d in result["docs"]} - {None}
+    if div and parts and (present - {div[0]}):
+        label, explicit = DIV_NAME[div[0]], div[1]
+        parts.insert(0, f"AUDIENCE: the question is about the {label}" + ("." if explicit else
+                     " (assumed: the asker did not say which division). Answer for the " + label + "; if a document written for another division says something different, add one short sentence naming that difference."))
     # retrieved text is data, never instructions: drop lines that try to command the model
     return guard.scrub_context("\n\n---\n\n".join(parts)), sources
 
