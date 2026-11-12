@@ -25,6 +25,7 @@ What is checked (each line of output is a group of checks):
                 year on every record, sports offerings vs the teams that have schedules (and the not-offered list vs both), clubs and courses
                 directories vs their workbook/catalog, no-class days vs the master schedule, contacts (business addresses only), and index
                 hygiene (no unflagged credential, duplicate copy or missing refreshed public page)
+  share.*       rows written by the Drive ingest (chunk_id "share-..."): metadata sanity, no file links, privacy
   email.*       rows written by the email ingest (chunk_id "email-..."): metadata sanity (source_type, dates, hashes, no raw sender address)
                 and no non-staff email address or phone number in the text. They are kept out of every other group (they are not part of
                 the pipeline's plan, so they are never orphans or "missing freshness")
@@ -200,8 +201,9 @@ class Sources:
             self.local_chunks = []
         # rows of forwarded emails are audited by audit_email only; the pipeline-vs-index groups must not see them (they are not in its plan)
         self.email_db = [r for r in (self.db or []) if freshness.is_email_row(r["chunk_id"], None, r.get("metadata"))]
+        self.share_db = [r for r in (self.db or []) if freshness.is_share_row(r["chunk_id"], None, r.get("metadata"))]
         if self.db is not None:
-            self.db = [r for r in self.db if not freshness.is_email_row(r["chunk_id"], None, r.get("metadata"))]
+            self.db = [r for r in self.db if not freshness.is_ingested_row(r["chunk_id"], None, r.get("metadata"))]
         self.db_all = self.db
         if self.db is not None:                 # rows flagged by scripts/flag_rows.py are ignored by retrieval, so the content groups ignore them too
             self.db = [r for r in self.db if not (r["metadata"] or {}).get("flagged_at")]
@@ -1444,12 +1446,12 @@ def audit_email(A: Audit, S: Sources):
     for r in rows:
         m, cid = r["metadata"] or {}, r["chunk_id"]
         A.check(g, all(m.get(k) not in (None, "") for k in needed), f"{cid}: missing metadata {[k for k in needed if m.get(k) in (None, '')]}")
-        A.check(g, m.get("source_type") == "email" and m.get("source") == "email", f"{cid}: source/source_type are not 'email'")
-        A.check(g, bool(re.fullmatch(r"email-[0-9a-f]{16}-\d{3}", cid)) and cid.startswith(f"email-{m.get('content_key')}-"), f"{cid}: chunk_id does not match its content_key")
+        A.check(g, m.get("source_type") == "email" and m.get("source") in ("email", "calendar_sheet"), f"{cid}: source/source_type are not 'email'")
+        A.check(g, bool(re.fullmatch(r"email-[0-9a-f]{16}-(?:\d{3}|e[0-9a-f]{8}\d*)", cid)) and cid.startswith(f"email-{m.get('content_key')}-"), f"{cid}: chunk_id does not match its content_key")
         d = str(m.get("source_date", ""))
         A.check(g, bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", d)) and d <= (S.today + timedelta(days=1)).isoformat(), f"{cid}: bad or future source_date {d!r}")
         A.check(g, m.get("stale") is False, f"{cid}: an email must never be flagged stale")
-        A.check(g, not m.get("superseded"), f"{cid}: email rows are never flagged superseded")
+        A.check(g, not m.get("superseded") or bool(m.get("superseded_by")), f"{cid}: an email row is only ever superseded by a newer email of the same thread (superseded_by)")
         A.check(g, bool(re.fullmatch(r"[0-9a-f]{16}", str(m.get("message_id_hash", "")))), f"{cid}: message_id_hash is not a 16-hex hash")
         A.check(g, "@" not in str(m.get("sender_domain", "")), f"{cid}: sender_domain holds an address, not a domain")
         meta_text = json.dumps(m)
@@ -1462,6 +1464,32 @@ def audit_email(A: Audit, S: Sources):
         A.check(g, not bad, f"{r['chunk_id']}: contains {len(bad)} non-staff email address(es) or phone number(s) (re-ingest or remove it with scripts/email_remove.py)")
         why = guard.student_data_reason(r["content"])
         A.check(g, why is None, f"{r['chunk_id']}: looks like student-level data ({why}); remove it with scripts/email_remove.py")
+
+
+def audit_share(A: Audit, S: Sources):
+    """Rows written by the Drive ingest (chunk_id "share-<file hash>-..."): metadata sanity, no file ids or owner addresses, privacy of the text."""
+    import guard
+    g = "share.rows"
+    if S.db is None:
+        return A.skip(g, f"database not read ({S.db_err or 'offline'})")
+    rows = S.share_db
+    A.info(g, f"{len(rows)} shared-file chunks from {len({(r['metadata'] or {}).get('share_file_hash') for r in rows})} files")
+    needed = ("source", "source_type", "title", "source_url", "source_date", "indexed_at", "school_year", "share_file_hash", "modified_time", "category")
+    for r in rows:
+        m, cid = r["metadata"] or {}, r["chunk_id"]
+        A.check(g, all(m.get(k) not in (None, "") for k in needed), f"{cid}: missing metadata {[k for k in needed if m.get(k) in (None, '')]}")
+        A.check(g, m.get("source_type") in ("sheet", "doc") and m.get("source") in ("share_sheet", "share_doc", "calendar_sheet"), f"{cid}: bad source/source_type")
+        A.check(g, bool(re.fullmatch(r"share-[0-9a-f]{12}-[a-z0-9-]+", cid)) and cid.startswith(f"share-{m.get('share_file_hash')}-"), f"{cid}: chunk_id does not match its file hash")
+        A.check(g, str(m.get("source_url", "")).startswith("share://"), f"{cid}: source_url must not be a link to the private file")
+        A.check(g, m.get("stale") is False, f"{cid}: a shared-file row must not be stale")
+        A.check(g, not guard.find_contacts(json.dumps(m)), f"{cid}: metadata contains a private contact detail")
+        A.check(g, "Source: shared Google" in r["content"] or m.get("source") == "calendar_sheet", f"{cid}: content lacks its 'Source: shared Google Sheet/Doc' header")
+    g = "share.privacy"
+    for r in rows:
+        bad = guard.find_contacts(r["content"])
+        A.check(g, not bad, f"{r['chunk_id']}: contains {len(bad)} non-staff email address(es) or phone number(s) (remove with scripts/share_remove.py)")
+        why = guard.student_data_reason(r["content"])
+        A.check(g, why is None, f"{r['chunk_id']}: looks like student-level data ({why}); remove it with scripts/share_remove.py")
 
 
 def audit_lunch(A: Audit, S: Sources):
@@ -1564,7 +1592,7 @@ def main() -> int:
     if S.db is None and not args.offline:
         print(f"note: database not read ({S.db_err}); database groups are skipped\n")
     for name, fn in (("days", audit_days), ("bell", audit_bell), ("courses", audit_courses), ("clubs", audit_clubs),
-                     ("teams", audit_teams), ("ical", audit_ical), ("fresh", audit_fresh), ("index", audit_orphans), ("email", audit_email), ("lunch", audit_lunch), ("canon", audit_canon)):
+                     ("teams", audit_teams), ("ical", audit_ical), ("fresh", audit_fresh), ("index", audit_orphans), ("email", audit_email), ("share", audit_share), ("lunch", audit_lunch), ("canon", audit_canon)):
         try:
             fn(A, S)
         except Exception as e:

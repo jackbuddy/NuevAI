@@ -44,7 +44,7 @@ def existing(sb) -> dict:
         r = sb.table(settings.CHUNKS_TABLE).select("chunk_id,h:metadata->>content_hash,u:metadata->>source_url,s:metadata->>source") \
             .range(start, start + PAGE - 1).execute().data
         for x in r:
-            if not freshness.is_email_row(x["chunk_id"], x.get("s")):      # forwarded emails (pipeline/email_ingest.py) are not part of this pipeline's plan
+            if not freshness.is_ingested_row(x["chunk_id"], x.get("s")):      # forwarded emails and shared Drive files (email_ingest.py / share_ingest.py) are not part of this pipeline's plan
                 rows[x["chunk_id"]] = (x.get("h"), x.get("u"), x.get("s"))
         if len(r) < PAGE:
             return rows
@@ -89,7 +89,7 @@ def mark_superseded(sb, ids: list[str], log) -> int:
     with metadata.superseded = true instead of deleting them: retrieval ignores such rows, nothing is lost, and a later
     --prune can remove them. Returns how many rows were newly flagged."""
     n = 0
-    ids = [i for i in ids if not freshness.is_email_row(i)]
+    ids = [i for i in ids if not freshness.is_ingested_row(i)]
     for i in range(0, len(ids), 100):
         batch = ids[i:i + 100]
         rows = sb.table(settings.CHUNKS_TABLE).select("chunk_id,metadata").in_("chunk_id", batch).execute().data or []
@@ -132,7 +132,7 @@ def unflag_current(sb, ids: list[str], log) -> int:
 
 
 def delete_ids(sb, ids, log):
-    ids = [i for i in ids if not freshness.is_email_row(i)]          # email chunks are never pruned here, whatever the plan says
+    ids = [i for i in ids if not freshness.is_ingested_row(i)]          # email and shared-file chunks are never pruned here, whatever the plan says
     for i in range(0, len(ids), 100):
         sb.table(settings.CHUNKS_TABLE).delete().in_("chunk_id", ids[i:i + 100]).execute()
     log(f"  deleted {len(ids)} rows")

@@ -9,9 +9,14 @@ inbox over IMAP every 30 minutes and, for every unread message:
                    become metadata) and removed; quoted replies, signatures, footers and tracking links are stripped
   3. privacy       messages that look like student-level data are NOT indexed (needs_review); non-staff email addresses and phone
                    numbers are redacted; instruction-like lines are scrubbed (guard.py)
-  4. indexing      chunks `email-<content hash>-<n>` in document_chunks_v2, embedded like every other chunk, with the date it was sent.
-                   Nothing expires and nothing is deleted: retrieval prefers the newest source and older emails stay as context.
-  5. review log    one row per message in `email_ingest_log` (no bodies, no addresses); the message is then marked \\Seen
+  4. schedule      practice times ('Practice: Tue/Thu 4:00-5:30 PM at <place>') and game lists are extracted into a short summary placed on top of
+                   the cleaned text, and dated games / bounded practice runs become structured event records (calendar_sheet, same schema as the
+                   team-sheet events) with ids `email-<content hash>-e<hash>`
+  5. indexing      chunks `email-<content hash>-<n>` in document_chunks_v2, embedded like every other chunk, with the date it was sent.
+                   An UPDATED announcement (same normalized subject + same original sender = the thread key) flags the older version superseded
+                   (retrieval ignores it, nothing is deleted); a re-forward of identical text stays a no-op.
+                   Nothing expires: retrieval prefers the newest source and older emails stay as context.
+  6. review log    one row per message in `email_ingest_log` (no bodies, no addresses); the message is then marked \\Seen
 
 Attachments are ignored for now (the count is logged). Secrets and addresses come only from the environment and are never printed.
 """
@@ -22,7 +27,7 @@ import os
 import re
 import sys
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from email import policy
 from email.message import Message
 from email.utils import parseaddr, parsedate_to_datetime
@@ -35,6 +40,7 @@ import guard       # noqa: E402
 import settings    # noqa: E402
 
 from . import chunker, config   # noqa: E402
+from . import schedule_text as st   # noqa: E402
 
 LOG_TABLE = "email_ingest_log"
 MAX_BODY_CHARS = 20_000
@@ -97,6 +103,9 @@ def check_sender(msg: Message, cfg: Config) -> tuple[str, str, str, str]:
     dom = domain_of(addr)
     if addr == normalize_addr(cfg.user):
         return "ignore", "message from the ingest mailbox itself", addr, dom
+    local = addr.rsplit("@", 1)[0]
+    if dom in ("google.com", "docs.google.com", "accounts.google.com") and (local.endswith("noreply") or local.startswith(("drive-shares", "no-reply"))):
+        return "ignore", "Google Drive/Docs notification (shared files are read by the Drive step)", addr, dom
     if addr not in cfg.allowed:
         return "rejected_sender", "sender is not on the allowlist", addr, dom
     return "ok", "", addr, dom
@@ -154,6 +163,12 @@ TRACKING_HOST = re.compile(
     r"bytebroadcast\.com|blackbaudhosting\.com/open|myschoolapp\.com/track)$", re.I)
 TRACKING_PATH = re.compile(r"/(?:track|tracking|click|open|wf/click|wf/open|pixel|beacon|unsubscribe|optout|opt-out|preferences)(?:/|\?|$)|[?&](?:unsubscribe|optout)=", re.I)
 TRACKING_PARAM = re.compile(r"^(?:utm_\w+|fbclid|gclid|mc_(?:cid|eid)|mkt_tok|_hsenc|_hsmi|hsctatracking|igshid|ref_?src|s_cid|vero_\w+|trk\w*)$", re.I)
+CLUTTER_LINE = re.compile(
+    r"^\s*\[(?:image|cid|inline image)[^\]]*\]\s*$|^\s*<image\d*\.\w+>\s*$|^\s*(?:attachments?|attached files?)\s*:.*$|^\s*preview attachment\b.*$|"
+    r"^\s*(?:open in drive|request access|view (?:in|on) (?:google )?(?:docs|drive|sheets)|shared with you|open|view)\s*$|^\s*(?:caution|warning)\s*:\s*this (?:e-?mail|message) .*$|"
+    r"^\s*\[?external(?: e-?mail| sender)?\]?\s*[:\-].*$|^\s*(?:docs|drive|calendar|meet|forms|sheets)\.google\.com\s*$|"
+    r"^\s*google (?:docs|sheets|drive|forms|slides|calendar)\s*$|^\s*(?:to|cc|bcc|reply-to)\s*:.*(?:@|<).*$|"
+    r"^\s*(?:reply|reply all|forward)(?:\s*\|\s*(?:reply|reply all|forward))*\s*$|^\s*sent from (?:gmail mobile|yahoo mail[\w ]*)\.?\s*$", re.I)
 URL = re.compile(r"https?://[^\s<>()\[\]\"']+[^\s<>()\[\]\"'.,;:!?]")
 
 
@@ -338,6 +353,7 @@ class Cleaned:
     sent: date | None
     from_name: str = ""
     from_domain: str = ""
+    from_key: str = ""          # hash of the ORIGINAL sender's address (never the address itself): part of the thread key
     forwarded: bool = False
     scrubbed: bool = False
 
@@ -368,7 +384,14 @@ def clean_body(raw_text: str, outer_subject: str = "", outer_date: date | None =
     lines = _cut_signature(lines)
     text = "\n".join(l.rstrip() for l in lines)
     text = clean_links(text)
-    kept = [l for l in text.split("\n") if not FOOTER_LINE.search(l)]
+    kept, prev = [], None
+    for l in text.split("\n"):
+        if FOOTER_LINE.search(l) or CLUTTER_LINE.match(l):
+            continue
+        if l.strip() and prev is not None and l.strip() == prev:          # a link preview repeats its title/URL on the next line
+            continue
+        kept.append(l)
+        prev = l.strip() if l.strip() else None
     text = re.sub(r"\n{3,}", "\n\n", "\n".join(kept)).strip()
     sender_name, sender_addr = parseaddr(headers.get("from", "")) if forwarded else ("", "")
     sender_addr = sender_addr.lower()
@@ -376,7 +399,7 @@ def clean_body(raw_text: str, outer_subject: str = "", outer_date: date | None =
     sent = parse_date(headers.get("date") or headers.get("sent") or "") if forwarded else None
     return Cleaned(text=text, subject=strip_subject(headers.get("subject") or outer_subject) or strip_subject(outer_subject),
                    sent=sent or outer_date, from_name=re.sub(r"\s+", " ", sender_name).strip()[:80] if staff else "",
-                   from_domain=domain_of(sender_addr), forwarded=forwarded)
+                   from_domain=domain_of(sender_addr), from_key=hash_id(sender_addr) if sender_addr else "", forwarded=forwarded)
 
 
 # ============================================================================================ message -> text
@@ -437,6 +460,8 @@ class Result:
     attachments_skipped: int = 0
     received_at: str | None = None
     source_date: str = ""
+    thread_key: str = ""
+    systemic: bool = False          # an error in storage/embedding (not in one message): the run must fail
 
     @property
     def chunk_count(self) -> int:
@@ -452,7 +477,8 @@ def _norm(s: str) -> str:
 
 
 def build_chunks(title: str, text: str, sent: date, content_key: str, message_id_hash: str, sender_domain: str,
-                 from_name: str = "", from_domain: str = "", attachments: int = 0, now: datetime | None = None) -> list[dict]:
+                 from_name: str = "", from_domain: str = "", attachments: int = 0, now: datetime | None = None,
+                 thread_key: str = "", ctx: dict | None = None, events: list | None = None) -> list[dict]:
     """Chunk with the pipeline's own conventions (heading trail, packed to CHUNK_TARGET_CHARS) and the freshness metadata."""
     label = f"school email, {freshness.day_label(sent.isoformat())}"
     pieces = []
@@ -477,12 +503,28 @@ def build_chunks(title: str, text: str, sent: date, content_key: str, message_id
         meta = {"source": "email", "source_type": "email", "source_url": f"email://{content_key}", "title": title,
                 "sender_domain": sender_domain, "message_id_hash": message_id_hash, "content_key": content_key,
                 "content_hash": hashlib.sha1(content.encode()).hexdigest(), "attachments_skipped": attachments, **fresh}
+        if thread_key:
+            meta["thread_key"] = thread_key
+        if ctx:
+            meta.update({k: v for k, v in (("category", ctx["category"]), ("team", ctx["team"]), ("sport", ctx["sport"]), ("gender", ctx["gender"]),
+                                           ("level", ctx["level"]), ("division", ctx["division"]), ("season", ctx["season"])) if v})
         if from_name:
             meta["original_from_name"] = from_name          # staff display name only (never an address)
         if from_domain:
             meta["original_from_domain"] = from_domain
         out.append({"chunk_id": f"{freshness.EMAIL_ID_PREFIX}{content_key}-{n:03d}", "content": content,
                     "source_file": f"email://{content_key}", "metadata": meta})
+    if events and ctx:                      # dated games / bounded practice runs: same record schema as the team-sheet events
+        used: set[str] = set()
+        win = ((now or datetime.now()).date() - timedelta(days=45), (now or datetime.now()).date() + timedelta(days=430))
+        ev_meta = {"source_type": "email", "sender_domain": sender_domain, "message_id_hash": message_id_hash, "content_key": content_key,
+                   "attachments_skipped": attachments, **fresh}
+        if thread_key:
+            ev_meta["thread_key"] = thread_key
+        for e in events:
+            if win[0] <= e["date"] <= win[1]:
+                out.append(st.event_chunk(e, ctx, id_prefix=f"{freshness.EMAIL_ID_PREFIX}{content_key}-e", source_url=f"email://{content_key}",
+                                          source_label=label, extra_meta=ev_meta, used_ids=used))
     return out
 
 
@@ -535,12 +577,21 @@ def analyze(raw: bytes, cfg: Config, now: datetime | None = None) -> Result:
     sent = c.sent or outer_date or (now or datetime.now()).date()
     if sent > (now or datetime.now()).date():
         sent = (now or datetime.now()).date()
+    slots, games = st.find_practice_slots(text, sent), st.find_games(text, sent, subject)
+    summary = st.schedule_summary(slots, games)
+    if summary:
+        text = summary + "\n\n" + text          # the clean 'Practice: Tue/Thu 4:00-5:30 PM at <place>' lines go on top of the cleaned text
+    ctx = st.derive_context(title, "", text[:500], sent)
+    ctx["title"] = title
     key = hash_id(_norm(title) + "\n" + _norm(text))
-    chunks = build_chunks(title, text, sent, key, mid, dom, c.from_name, c.from_domain, skipped, now)
+    thread = hash_id("thread|" + _norm(strip_subject(title)) + "|" + (c.from_key or hash_id(addr)))
+    chunks = build_chunks(title, text, sent, key, mid, dom, c.from_name, c.from_domain, skipped, now, thread_key=thread, ctx=ctx,
+                          events=games + st.practice_events(slots))
     notes = [n for n in (f"{redacted} contact detail(s) redacted" if redacted else "", "instruction-like lines scrubbed" if scrubbed else "",
-                         "forwarded block parsed" if c.forwarded else "no forward block, used the message itself") if n]
+                         "forwarded block parsed" if c.forwarded else "no forward block, used the message itself",
+                         f"schedule found: {len(slots)} practice slot(s), {len(games)} game(s)" if summary else "") if n]
     return Result("indexed", "; ".join(notes), subject=title[:120], content_key=key, chunks=chunks, attachments_skipped=skipped,
-                  sender_domain=dom, message_id_hash=mid, received_at=received, source_date=sent.isoformat())
+                  sender_domain=dom, message_id_hash=mid, received_at=received, source_date=sent.isoformat(), thread_key=thread)
 
 
 # ============================================================================================ storage
@@ -572,6 +623,25 @@ class SupabaseStore:
     def upsert(self, chunks: list[dict]) -> None:
         for i in range(0, len(chunks), 4):
             self._embed_upsert(self.sb, chunks[i:i + 4])
+
+    def thread_rows(self, thread_key: str) -> list[dict]:
+        """Every email row of one thread (same normalized subject + original sender): [{chunk_id, metadata}]."""
+        if not thread_key:
+            return []
+        r = self.sb.table(settings.CHUNKS_TABLE).select("chunk_id,metadata").eq("metadata->>thread_key", thread_key) \
+            .like("chunk_id", freshness.EMAIL_ID_PREFIX + "%").execute()
+        return r.data or []
+
+    def flag_superseded(self, rows: list[dict], by_key: str) -> int:
+        """Mark email rows superseded by a newer version of the same thread (metadata only: retrieval ignores them, nothing is deleted)."""
+        n = 0
+        for r in rows:
+            m = r.get("metadata") or {}
+            if r["chunk_id"].startswith(freshness.EMAIL_ID_PREFIX) and not m.get("superseded"):
+                self.sb.table(settings.CHUNKS_TABLE).update({"metadata": {**m, "superseded": True, "superseded_by": by_key,
+                                                                          "superseded_reason": "newer email in the same thread"}}).eq("chunk_id", r["chunk_id"]).execute()
+                n += 1
+        return n
 
     def delete_replaced(self, ids: list[str]) -> int:
         """Remove chunks of THIS email that a re-processing replaced (never anything but email-* rows)."""
@@ -621,7 +691,29 @@ def index_result(r: Result, store) -> Result:
     removed = store.delete_replaced(list(dict.fromkeys(stale)))
     if removed:
         r.reason = (r.reason + "; " if r.reason else "") + f"replaced {removed} older chunk(s) of this message"
+    older = _supersede_thread(r, store)
+    if older:
+        r.reason = (r.reason + "; " if r.reason else "") + older
     return r
+
+
+def _supersede_thread(r: Result, store) -> str:
+    """An updated announcement replaces the older one: rows of the same thread (normalized subject + original sender) from an EARLIER or equal
+    sent date and a different content key are flagged superseded. If the thread already holds a LATER version, this (older) message is the
+    one flagged. Same text re-forwarded never gets here (it is a duplicate)."""
+    if not r.thread_key or not r.content_key:
+        return ""
+    rows = [x for x in store.thread_rows(r.thread_key) if (x.get("metadata") or {}).get("content_key") != r.content_key]
+    if not rows:
+        return ""
+    later = [x for x in rows if str((x.get("metadata") or {}).get("source_date", "")) > r.source_date and not (x.get("metadata") or {}).get("superseded")]
+    if later:
+        mine = [x for x in store.thread_rows(r.thread_key) if (x.get("metadata") or {}).get("content_key") == r.content_key]
+        store.flag_superseded(mine, (later[0].get("metadata") or {}).get("content_key", ""))
+        return "a later version of this thread exists: this one is kept as superseded"
+    older = [x for x in rows if str((x.get("metadata") or {}).get("source_date", "")) <= r.source_date]
+    n = store.flag_superseded(older, r.content_key)
+    return f"superseded {len({(x.get('metadata') or {}).get('content_key') for x in older})} older version(s) of this thread" if n else ""
 
 
 # ============================================================================================ run loop
@@ -653,7 +745,7 @@ def handle(raw: bytes, cfg: Config, store, dry_run: bool, now: datetime | None =
     try:
         return index_result(r, store)          # identical content is a duplicate, changed content replaces this message's chunks
     except Exception as e:
-        r.status, r.chunks, r.reason = "error", [], f"{type(e).__name__} while indexing"
+        r.status, r.chunks, r.reason, r.systemic = "error", [], f"{type(e).__name__} while indexing", True
         return r
 
 
@@ -698,7 +790,8 @@ def run(cfg: Config, store, dry_run: bool = False, limit: int = 50, out=print, s
                 store.log(r)
                 if prior_errors + 1 >= MAX_ERROR_ATTEMPTS:         # give up after a few runs so one bad message does not fail every 30 minutes
                     mark_processed(M, uid)
-                errors += 1
+                if r.systemic:                                     # storage/embedding is down: red run. A malformed message is logged and skipped.
+                    errors += 1
                 continue
             if r.status != "ignore":
                 store.log(r)

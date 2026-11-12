@@ -266,3 +266,7 @@ See QUALITY_AUDIT.md sections 9-10 and README "Answer quality fixes". New module
 Server contract additions: SSE done {route, model, limited}; chat_answered {fallback (now the shared detector), refusal, canonical, redirect, hedged, rroute, div, chunks, answer_head}. Frontend TODO: read done.limited; log via:'suggestion' for chip clicks; a 'resources' suggestion action if wanted (the server cannot send one today).
 Owner/data action: 46 of 50 school_facts rows are superseded=true in the live index (they hold the quick answers); fix, then re-run `python eval_quality.py --mode retrieval`; run `--mode llm --sample 40` on a fresh Groq day (about 4.2k tokens per answer now).
 Tests: python test_quality_fixes.py (offline). The persona is 9.9k characters: trim before launch if quota is tight.
+
+UPDATE 12 Nov 2026 (branch worktree-agent-a3788e0e3cd90b1cf, not merged): auto-ingestion from nuevai.updates@gmail.com. Emails (existing IMAP step, now with schedule summaries/events and thread supersede) AND Google Sheets/Docs shared with the account
+(new step in email-ingest.yml; OAuth refresh token secrets GOOGLE_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN; manifest in Supabase share_ingest_manifest; chunk ids share-<hash>-; exempt from prune). See README "Auto-ingestion", NEEDS_USER.md,
+test_share_ingest.py. Owner must set the Google consent screen to "In production" or the token expires after 7 days.
