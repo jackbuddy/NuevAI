@@ -126,7 +126,12 @@ LINK_CARD_CATEGORIES = {"booking", "form", "payment", "calendar", "document", "p
 # kind "workbook": the whole workbook is downloaded as .xlsx and parsed by pipeline/workbooks.py.
 LIVE_SHEETS = [
     {"kind": "team_schedule", "id": "1J5_IJlocnZMbREgyWXgDnqT5h6JQLEz-Ku0l3uxMkuA",
-     "tabs": {"Varsity Schedule 26-27": "US Boys Basketball Varsity", "JV Schedule 26-27": "US Boys Basketball JV"}},
+     "tabs": {"Varsity Schedule 26-27": "US Boys Basketball Varsity", "JV Schedule 26-27": "US Boys Basketball JV",
+              "Practice Schedule": "US Boys Basketball practice schedule grid"}},
+    {"kind": "team_schedule", "id": "14_ws80JlV0riF3ejO-bNjANCvZtwwAQ3shG-GC0BztE",
+     "tabs": {"Season Schedule 26-27": "US Girls Basketball", "Practice Schedule": "US Girls Basketball practice schedule grid"}},
+    {"kind": "team_schedule", "id": "1xGpYttrtbyu8h3SWryYQH4ILj5VeL3oT_y36TYnYNEI",
+     "tabs": {"2026-27 Varsity VB Schedule": "US Girls Volleyball", "2026-27 JV VB Schedule": "US Girls Volleyball JV"}},
     {"kind": "workbook", "id": "1GpJrrLKDJEl5bW83cfa7FRGmgxr4yiNlU0C5JFXyMGY", "name": "Course Offerings by Block (live)"},
 ]
 
@@ -134,6 +139,6 @@ LIVE_SHEETS = [
 SUPERSEDED_TITLE = re.compile(r"25\s*[\u2013-]\s*26.{0,40}(clubs?|catalog)|(clubs?|catalog).{0,40}25\s*[\u2013-]\s*26", re.I)
 
 # Pages that are navigation/login shells or people directories (contact cards): never worth embedding.
-NOISE_TITLE = re.compile(r"^(login\b|student\s*:\s*directory$)", re.I)
+NOISE_TITLE = re.compile(r"^(login\b|student\s*:\s*directory$)|\(source data\)$|practice schedule grid$", re.I)
 # Lines that are UI chrome from copied web pages, not content.
 BOILERPLATE_LINE = re.compile(r"^[-*\s]*(message|add to contacts|contact card|skip to (main )?content|share|print|back to top)\s*$|^[_\-=\u2500]{4,}$", re.I)

@@ -164,9 +164,9 @@ I("ath-17", "athletics_teams", "current_parent", "clean", "What paperwork is nee
 I("ath-18", "athletics_teams", "us_student", "slang", "is there varsity b-ball for girls", "answer", [r"girls", r"basketball", r"varsity"], [r"US Girls Basketball", r"Girls Basketball"], [r"US Girls Basketball - Game"], SHEET + " + handbook winter varsity list (Girls Basketball)")
 
 # ---------------------------------------------------------------- athletics_games
-I("gm-01", "athletics_games", "us_student", "clean", "When is the first US varsity boys basketball game?", "answer", [date("Nov", 17), r"CSD Fremont", r"7(:00)?\s*(PM|p\.m\.)?"], [r"2026-11-17|November 17, 2026", r"US Boys Basketball Varsity - Game CSD Fremont - Home", r"Time: 7:00 PM"], [r"US Boys Basketball Varsity - Game CSD Fremont - Home"], SHEET + " (Varsity tab)",
-  dynamic=dyn("2026-11-16"))
-I("gm-02", "athletics_games", "us_student", "abbreviation", "US boys basketball game shedule", "ambiguous", [r"Varsity", r"JV", r"CSD Fremont", date("Nov", 17)], [r"US Boys Basketball JV - Game CSD Fremont", r"US Boys Basketball Varsity - Game CSD Fremont"], [r"US Boys Basketball (JV|Varsity) - Game CSD Fremont"], SHEET,
+I("gm-01", "athletics_games", "us_student", "clean", "When is the first US varsity boys basketball game?", "answer", [date("Nov", 18), r"CSD Fremont", r"7(:00)?\s*(PM|p\.m\.)?"], [r"2026-11-18|November 18, 2026", r"US Boys Basketball Varsity - Game CSD Fremont - Home", r"Time: 7:00 PM"], [r"US Boys Basketball Varsity - Game CSD Fremont - Home"], SHEET + " (Varsity tab, main table: moved to Wed Nov 18; the athletics calendar page still lists Nov 17)",
+  dynamic=dyn("2026-11-17"), notes="sources disagree by a day (sheet Nov 18, calendar page Nov 17): the answer should give Nov 18 from the team sheet and may mention the calendar page's Nov 17")
+I("gm-02", "athletics_games", "us_student", "abbreviation", "US boys basketball game shedule", "ambiguous", [r"Varsity", r"JV", r"CSD Fremont", [date("Nov", 17), date("Nov", 18)]], [r"US Boys Basketball JV - Game CSD Fremont", r"US Boys Basketball Varsity - Game CSD Fremont"], [r"US Boys Basketball (JV|Varsity) - Game CSD Fremont"], SHEET,
   dynamic=dyn("2026-11-16"), notes="ambiguous (varsity vs JV): useful answer gives upcoming games and offers/answers both levels, not a refusal")
 I("gm-03", "athletics_games", "us_student", "clean", "Who do the varsity boys play on December 8?", "answer", [r"Pinewood"], [r"US Boys Basketball Varsity - Game Pinewood - Away", r"December 8, 2026"], [r"US Boys Basketball Varsity - Game Pinewood - Away"], SHEET, dynamic=dyn("2026-12-07"))
 I("gm-04", "athletics_games", "us_student", "clean", "When is the first girls basketball game?", "answer", [date("Nov", 16), r"CSD Fremont"], [r"US Girls Basketball - Game CSD Fremont - Home", r"November 16, 2026", r"6:00 PM"], [r"US Girls Basketball - Game CSD Fremont - Home"], SHEET, dynamic=dyn("2026-11-15"))
@@ -186,14 +186,14 @@ I("gm-14", "athletics_games", "ms_student", "clean", "Where is the MS girls socc
   dynamic=dyn("2026-11-11"), notes="trap: wrong date in the question (Dec 12); the Harker game is Nov 12. A good answer corrects the date or says no game that day", forbid=[r"Dec(ember)? 12[^.]{0,50}(Harker)[^.]{0,30}(at|will)"], verified=None)
 I("gm-15", "athletics_games", "current_parent", "ambiguous", "When is the next basketball game?", "ambiguous", [r"(boys|girls|MS|middle school|varsity|JV)", r"(Woodside Priory|CSD Fremont|Sacred Heart|Nov(ember)? 1[2-7])"], [r"MS \(7th/8th - VA\) Boys' Basketball\s+- Game Woodside Priory - Home"], [r"Woodside Priory - Home"], CAL,
   dynamic=dyn("2026-11-11", {"type": "next_event", "match": "Basketball", "kind": "game"}), notes="ambiguous across US boys/girls, JV/varsity, MS; a good answer gives the soonest and names which team")
-I("gm-16", "athletics_games", "current_parent", "clean", "Where is the boys varsity game on November 17 being played?", "partial", [r"home", r"(CSD Fremont)"], [r"US Boys Basketball Varsity - Game CSD Fremont - Home"], [r"US Boys Basketball Varsity - Game CSD Fremont - Home"], SHEET + " (location column is empty)",
-  dynamic=dyn("2026-11-16"), notes="source gives only 'Home' (no gym address): partial = say it is a home game and that the venue is not listed", forbid=[r"\d{2,5} [A-Z][a-z]+ (Avenue|Ave|Street|St|Blvd|Road|Rd)"])
+I("gm-16", "athletics_games", "current_parent", "clean", "Where is the boys varsity game on November 18 being played?", "answer", [r"home", r"(CSD Fremont)", r"(US Gym|gym|San Mateo)"], [r"US Boys Basketball Varsity - Game CSD Fremont - Home", r"Location: Nueva US Gym \(San Mateo\)"], [r"US Boys Basketball Varsity - Game CSD Fremont - Home"], SHEET + " + Upper School Athletics Handbook home venue (Nueva US Gym)",
+  dynamic=dyn("2026-11-17"), notes="home games now carry the handbook venue (Nueva US Gym, San Mateo); no street address is given", forbid=[r"\d{2,5} [A-Z][a-z]+ (Avenue|Ave|Street|St|Blvd|Road|Rd)"])
 I("gm-17", "athletics_games", "us_student", "clean", "When does girls basketball play Design Tech?", "answer", [date("Nov", 19), date("Dec", 16)], [r"US Girls Basketball - Game Design Tech - Home", r"2026-11-19", r"2026-12-16"], [r"Girls Basketball - Game Design Tech"], SHEET, dynamic=dyn("2026-11-18"))
 I("gm-18", "athletics_games", "us_student", "follow_up", "What about JV?", "answer", [r"JV", r"CSD Fremont", r"5:30"], [r"US Boys Basketball JV - Game CSD Fremont - Home"], [r"US Boys Basketball JV - Game CSD Fremont - Home"], SHEET,
   history=hist("When is the first varsity boys basketball game?", "The first US varsity boys basketball game is Tue, Nov 17 at 7:00 PM, at home against CSD Fremont."), dynamic=dyn("2026-11-16"))
 I("gm-19", "athletics_games", "us_student", "follow_up", "and the girls?", "answer", [r"Nov(ember)? 16", r"CSD Fremont", r"6"], [r"US Girls Basketball - Game CSD Fremont - Home"], [r"US Girls Basketball - Game CSD Fremont - Home"], SHEET,
   history=hist("When is the first boys basketball game this season?", "The first US varsity boys basketball game is Tue, Nov 17 at 7:00 PM, at home against CSD Fremont."), dynamic=dyn("2026-11-15"))
-I("gm-20", "athletics_games", "current_parent", "clean", "Did the girls volleyball team beat Summit Shasta?", "partial", [r"Summit Shasta", r"(sweep|swept|beat|won)"], [r"sweep Summit Shasta"], [r"sweep Summit Shasta"], "school email Nov 6 2026 (ONE-STOP SHOPPING)", notes="the email says the team swept Summit Shasta; exact scores are not in the data")
+I("gm-20", "athletics_games", "current_parent", "clean", "Did the girls volleyball team beat Summit Shasta?", "answer", [r"Summit Shasta", r"(sweep|swept|beat|won|W 3|3-0|3-2)"], [r"US Girls Volleyball - Game Summit Shasta - Home", r"Result \(MaxPreps \(third-party\)\): W 3-0"], [r"US Girls Volleyball - Game Summit Shasta"], "team schedule + MaxPreps results (third-party); school email Nov 6 2026 says the team swept Summit Shasta", notes="Nueva beat Summit Shasta 3-0 at home on Oct 20 and 3-2 away in the CCS quarterfinal on Nov 3, and lost 1-3 away on Oct 1 (scores third-party, MaxPreps); the Nov 6 email says the team swept Summit Shasta")
 
 # ---------------------------------------------------------------- clubs_activities
 I("club-01", "clubs_activities", "us_student", "clean", "When does Chess Club meet?", "answer", [r"Wednesday", r"after school", r"340"], [r"Chess Club", r"Meets: Wednesday, After School in room 340"], [r"Club: Chess Club"], "school_clubs record (Clubs Catalog 2026-27)")
@@ -401,7 +401,7 @@ I("ms-09", "athletics_games", "ms_student", "clean", "When is the next middle sc
 # ---------------------------------------------------------------- phrasing variety (same verified facts, messier wording) + extra gaps
 I("cal-21", "calendar_schedules", "current_parent", "typo", "wen is thanksgiving brake", "answer", [date("Nov", 23), dayno(27)], [r"November Break", r"2026-11-23"], [r"No School : November Break"], CAL)
 I("cal-22", "calendar_schedules", "us_student", "typo", "is there skool on nov 27", "answer", [r"\bno\b", r"(Nov(ember)? 27|break)"], [r"November 27, 2026 - No classes \(Fall Break\)"], [r"Friday, November 27, 2026 - No classes"], DAY, retr=[r"November 27, 2026 - No classes"])
-I("gm-21", "athletics_games", "us_student", "slang", "sched for varsity b ball boys", "answer", [r"CSD Fremont", date("Nov", 17)], [r"US Boys Basketball Varsity - Game CSD Fremont - Home", r"2026-11-17"], [r"US Boys Basketball Varsity - Game CSD Fremont - Home"], SHEET, dynamic=dyn("2026-11-16"))
+I("gm-21", "athletics_games", "us_student", "slang", "sched for varsity b ball boys", "answer", [r"CSD Fremont", date("Nov", 18)], [r"US Boys Basketball Varsity - Game CSD Fremont - Home", r"2026-11-18"], [r"US Boys Basketball Varsity - Game CSD Fremont - Home"], SHEET, dynamic=dyn("2026-11-17"))
 I("gm-22", "athletics_games", "ms_student", "abbreviation", "ms soccer next game", "answer", [r"Girls", r"(Sacred Heart|Menlo|Harker|Crystal Springs|Priory|Castilleja)"], [r"Girls' Soccer\s+- Game"], [r"Girls' Soccer\s+- Game"], CAL, campus="hillsborough", dynamic=dyn("2026-12-14", {"type": "next_event", "match": "Soccer", "kind": "game"}))
 I("staff-14", "staff_contacts", "us_student", "abbreviation", "who teaches CAD", "answer", [r"Zomber"], [r"Rob Zomber"], [r"Intro to CAD: who teaches it, blocks and rooms \(Fall 2026\)"], "school_courses records")
 I("pol-16", "policies_handbook", "us_student", "abbreviation", "whats the pe req", "answer", [r"one semester", r"(sport|season|PE)"], [r"one semester per year OR one season in an interscholastic sport per year"], [r"Physical Education Requirements"], "Nexus resource board")
@@ -464,6 +464,48 @@ I("cov-40", "calendar_schedules", "current_parent", "clean", "What was the first
 I("cov-41", "day_types", "us_student", "clean", "Was there school on Yom Kippur this year?", "past_event", [r"(no|not)", r"(Sep(tember)? 21|Yom Kippur)"], [r"September 21, 2026 - No classes \(Yom Kippur\)"], [r"September 21, 2026 - No classes"], DAY)
 I("cov-42", "events", "us_student", "clean", "When was the 9th grade retreat?", "past_event", [date("Aug", 27)], [r"August 27, 2026 - No classes \(Grade Level Retreats\)"], [r"August 27, 2026 - No classes"], DAY)
 
+# ---------------------------------------------------------------- Upper School sports (verified catalog, athletics calendar, team sheets)
+ATHC = "public athletics calendar (nuevaschool.org/school-life/athletics/athletics-calendar) + team sheets, calendar_sheet rows"
+KNOW = "knowledge/athletics_us_teams.md + athletics_sports.md and the us_sports_matrix canonical records"
+I("sp-01", "athletics_teams", "us_student", "clean", "Is there a girls golf team and what season is it?", "answer", [r"girls", r"golf", r"fall"],
+  [r"Girls' Golf in the FALL is real", r"Girls' Golf \(Fall\)"], [r"Girls' Golf in the FALL is real", r"Girls' Golf \(Fall\)"], KNOW + "; 10 Girls Golf matches Sept 1-Nov 3 on the athletics calendar")
+I("sp-02", "athletics_teams", "current_parent", "clean", "Does the upper school have a boys flag football team?", "partial", [r"flag football", r"(PE|P\.E\.|page|club|not (confirmed|listed)|no (games|team|schedule)|only)"],
+  [r"Boys' Flag Football \(Fall\)", r"NOT confirmed as teams"], [r"Also listed on the US P\.E\. page only", r"Upper School sports listed on only one page"], KNOW + " (listed on the US PE page only; no games on any schedule)",
+  notes="honest uncertainty: say it is listed on one PE page but no team, schedule or games are confirmed; point to athletics@nuevaschool.org")
+I("sp-03", "athletics_teams", "us_student", "clean", "Does girls volleyball have a JV team?", "answer", [r"JV", r"(yes|there is|has|have)"],
+  [r"US Girls Volleyball JV - Game Castilleja - Home"], [r"US Girls Volleyball JV - Game"], ATHC + " (JV volleyball tab of the volleyball sheet)")
+I("sp-04", "athletics_games", "us_student", "clean", "When is the next US boys soccer game?", "answer", [date("Nov", 17), r"San Mateo"],
+  [r"US Boys Soccer - Game San Mateo \(scrimmage\) - Away", r"2026-11-17"], [r"US Boys Soccer - Game San Mateo \(scrimmage\) - Away"], ATHC, dynamic=dyn("2026-11-16"))
+I("sp-05", "athletics_teams", "current_parent", "clean", "Where does the girls soccer team play its home games?", "answer", [r"Skyline"],
+  [r"Girls' Soccer \(Winter\)[^\n]*Skyline College"], [r"Girls' Soccer \(Winter\)"], KNOW + " (handbook venue table: Skyline College)")
+I("sp-06", "athletics_games", "us_student", "clean", "What time is the girls soccer game against Eastside College Prep on December 3?", "answer", [r"3:30"],
+  [r"US Girls Soccer - Game Eastside College Prep - Home", r"Time: 3:30 PM to 5:00 PM"], [r"US Girls Soccer - Game Eastside College Prep - Home"], ATHC, dynamic=dyn("2026-12-02"))
+I("sp-07", "athletics_teams", "us_student", "clean", "When does boys varsity basketball practice?", "answer", [r"3:30", r"(Monday|Mon\b)"],
+  [r"Monday and Wednesday: Boys Varsity 3:30-5:00 PM"], [r"When and where do Upper School basketball teams practice"], "Practice Schedule tabs of the US basketball Google Sheets (shared gym grid)",
+  notes="grids change; a coach email overrides")
+I("sp-08", "athletics_teams", "community_member", "clean", "MaxPreps lists a Nueva girls softball team, is that right?", "no_such_thing", [r"\b(no|not|isn't|doesn't|does not)\b", r"softball"],
+  [r"Girls' Softball \(spring 2026-27; Nueva lists no softball team\)"], [r"Is MaxPreps right about Nueva's teams"], KNOW + " (MaxPreps placeholder)", absent=[r"US Girls Softball"])
+I("sp-09", "athletics_teams", "current_parent", "clean", "Which upper school teams have a JV team?", "answer", [r"JV", r"(volleyball|tennis|basketball)"],
+  [r"JV teams that have games on a schedule: Girls' Volleyball, Girls' Tennis, Boys' Basketball"], [r"JV teams that have games on a schedule"], KNOW)
+I("sp-10", "athletics_teams", "us_student", "clean", "What league is the cross country team in?", "answer", [r"PSAL|Private School Athletic League"],
+  [r"Cross Country \(Fall\)[^\n]*PSAL"], [r"Cross Country \(Fall\)"], KNOW + " (handbook: full PSAL member for cross-country)")
+I("sp-11", "athletics_games", "us_student", "clean", "When is the CCS cross country championship?", "answer", [date("Nov", 14)],
+  [r"US Cross Country - CIF-CCS Championships", r"2026-11-14"], [r"US Cross Country - CIF-CCS Championships"], ATHC, dynamic=dyn("2026-11-13"))
+I("sp-12", "athletics_games", "current_parent", "clean", "When is the girls basketball game against Burlingame?", "answer", [date("Dec", 1), r"5:30"],
+  [r"US Girls Basketball - Game Burlingame - Home", r"Time: 5:30 PM"], [r"US Girls Basketball - Game Burlingame - Home"], SHEET, dynamic=dyn("2026-11-30"))
+I("sp-13", "athletics_games", "current_parent", "clean", "When is the boys tennis schedule?", "partial", [r"(not (yet )?(posted|published)|no (game )?schedule|athletics@|spring)"],
+  [r"Boys Tennis \(Spring\): no game schedule published yet"], [r"Which Upper School teams have a game schedule posted"], KNOW + " (schedule coverage record)", dynamic=dyn("2027-01-31"),
+  notes="spring schedules are not posted yet: the honest answer says so and points to athletics@nuevaschool.org")
+I("sp-14", "athletics_teams", "us_student", "clean", "Is there a JV girls tennis team?", "answer", [r"JV", r"tennis"],
+  [r"US Girls Tennis JV - Game"], [r"US Girls Tennis JV - Game"], ATHC)
+I("sp-15", "athletics_teams", "current_parent", "clean", "Is swimming coed or separate girls and boys teams?", "partial", [r"(girls|boys|coed)", r"swim"],
+  [r"Swimming & Diving and Track & Field \(RESOLVED\)"], [r"Swimming & Diving and Track & Field \(RESOLVED\)"], KNOW + " (athletics page lists girls' and boys' teams; handbooks say Coed)")
+I("sp-16", "athletics_teams", "us_student", "clean", "Who coaches track and field?", "answer", [r"Robert Lopez|Coach Lopez"],
+  [r"Robert Lopez"], [r"Head Coach of Cross Country and Track and Field"], "Athletics staff page")
+I("sp-17", "athletics_games", "us_student", "clean", "What was the score of the girls volleyball home game against Castilleja?", "past_event", [r"Castilleja", r"3-0|3 - 0"],
+  [r"US Girls Volleyball - Game Castilleja - Home", r"Result \(MaxPreps \(third-party\)\): W 3-0"], [r"US Girls Volleyball - Game Castilleja - Home"], ATHC + " + MaxPreps result (third-party)",
+  notes="the score is third-party (MaxPreps) and the record says so", dynamic=dyn("2027-09-01"))
+
 PERSONA_OVERRIDE = {  # same questions, naturally asked by someone else (keeps persona coverage honest)
     "cal-04": "prospective_family", "cal-12": "current_parent", "cal-13": "current_parent", "cal-14": "current_parent", "cal-20": "current_parent",
     "ath-02": "prospective_family", "ath-03": "prospective_family", "ath-04": "current_parent", "ath-07": "current_parent", "ath-08": "prospective_family",
@@ -489,11 +531,11 @@ for _it in ITEMS:
 
 RETR = {  # retrieval-mode expectations for items whose `expect` holds answer language (already/no/closed...) rather than a data fact
     "cal-16": [r"Daylight Saving Time Ends"], "day-11": [r"November 11, 2026 - A day"], "lun-06": [r"Fall Break|No School|No classes"],
-    "trap-10": [r"HoCo|homecoming"], "gm-20": [r"sweep Summit Shasta"], "day-08": [r"November 27, 2026 - No classes"], "day-09": [r"October 30, 2026 - No classes"],
+    "trap-10": [r"HoCo|homecoming"], "gm-20": [r"Summit Shasta - (Home|Away)[^\n]*\n[^\n]*\n[^\n]*\n[^\n]*\n[^\n]*Result"], "day-08": [r"November 27, 2026 - No classes"], "day-09": [r"October 30, 2026 - No classes"],
     "ath-07": [r"Varsity offerings by season|Fall: Girls Volleyball"], "ath-06": [r"Varsity offerings by season|Fall: Girls Volleyball"], "ath-05": [r"Flag Football"],
     "trap-05": [r"Varsity offerings by season|Fall: Girls Volleyball"], "club-12": [r"119 listed"], "crs-05": [r"explicitly not designed to prepare students for AP exams"],
     "gm-10": [r"CCS FInals"], "ev-07": [r"HoCo"], "ev-08": [r"senior night"], "pol-14": [r"honor code|Academic Integrity"], "ms-05": [r"MS Halloween Parade"],
-    "mp-15": [r"First Day of Practice"], "pol-08": [r"closed-campus school for grades 9 & 10"],
+    "mp-15": [r"First Day of Practice"], "sp-02": [r"Flag Football"], "sp-08": [r"softball"], "sp-13": [r"no game schedule published yet"], "pol-08": [r"closed-campus school for grades 9 & 10"],
 }
 for _it in ITEMS:
     if _it["id"] in RETR:

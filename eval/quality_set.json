@@ -1585,24 +1585,24 @@
   "q": "When is the first US varsity boys basketball game?",
   "behavior": "answer",
   "expect": [
-   "\\bNov[a-z]*\\.?\\s+17\\b",
+   "\\bNov[a-z]*\\.?\\s+18\\b",
    "CSD Fremont",
    "7(:00)?\\s*(PM|p\\.m\\.)?"
   ],
   "forbid": [],
   "dynamic": {
    "as_of": "2026-11-11",
-   "valid_through": "2026-11-16",
+   "valid_through": "2026-11-17",
    "resolver": null,
    "note": ""
   },
   "verified": true,
-  "source": "team schedule sheet rows (calendar_sheet) (Varsity tab)",
-  "notes": "",
+  "source": "team schedule sheet rows (calendar_sheet) (Varsity tab, main table: moved to Wed Nov 18; the athletics calendar page still lists Nov 17)",
+  "notes": "sources disagree by a day (sheet Nov 18, calendar page Nov 17): the answer should give Nov 18 from the team sheet and may mention the calendar page's Nov 17",
   "retr": null,
   "verification": "auto: every check pattern found in the cited source chunks",
   "verify_checks": [
-   "2026-11-17|November 17, 2026",
+   "2026-11-18|November 18, 2026",
    "US Boys Basketball Varsity - Game CSD Fremont - Home",
    "Time: 7:00 PM"
   ],
@@ -1621,7 +1621,10 @@
    "Varsity",
    "JV",
    "CSD Fremont",
-   "\\bNov[a-z]*\\.?\\s+17\\b"
+   [
+    "\\bNov[a-z]*\\.?\\s+17\\b",
+    "\\bNov[a-z]*\\.?\\s+18\\b"
+   ]
   ],
   "forbid": [],
   "dynamic": {
@@ -2060,28 +2063,30 @@
   "campus": null,
   "phrasing": "clean",
   "history": [],
-  "q": "Where is the boys varsity game on November 17 being played?",
-  "behavior": "partial",
+  "q": "Where is the boys varsity game on November 18 being played?",
+  "behavior": "answer",
   "expect": [
    "home",
-   "(CSD Fremont)"
+   "(CSD Fremont)",
+   "(US Gym|gym|San Mateo)"
   ],
   "forbid": [
    "\\d{2,5} [A-Z][a-z]+ (Avenue|Ave|Street|St|Blvd|Road|Rd)"
   ],
   "dynamic": {
    "as_of": "2026-11-11",
-   "valid_through": "2026-11-16",
+   "valid_through": "2026-11-17",
    "resolver": null,
    "note": ""
   },
   "verified": true,
-  "source": "team schedule sheet rows (calendar_sheet) (location column is empty)",
-  "notes": "source gives only 'Home' (no gym address): partial = say it is a home game and that the venue is not listed",
+  "source": "team schedule sheet rows (calendar_sheet) + Upper School Athletics Handbook home venue (Nueva US Gym)",
+  "notes": "home games now carry the handbook venue (Nueva US Gym, San Mateo); no street address is given",
   "retr": null,
   "verification": "auto: every check pattern found in the cited source chunks",
   "verify_checks": [
-   "US Boys Basketball Varsity - Game CSD Fremont - Home"
+   "US Boys Basketball Varsity - Game CSD Fremont - Home",
+   "Location: Nueva US Gym \\(San Mateo\\)"
   ],
   "absent_checks": []
  },
@@ -2205,22 +2210,23 @@
   "phrasing": "clean",
   "history": [],
   "q": "Did the girls volleyball team beat Summit Shasta?",
-  "behavior": "partial",
+  "behavior": "answer",
   "expect": [
    "Summit Shasta",
-   "(sweep|swept|beat|won)"
+   "(sweep|swept|beat|won|W 3|3-0|3-2)"
   ],
   "forbid": [],
   "dynamic": null,
   "verified": true,
-  "source": "school email Nov 6 2026 (ONE-STOP SHOPPING)",
-  "notes": "the email says the team swept Summit Shasta; exact scores are not in the data",
+  "source": "team schedule + MaxPreps results (third-party); school email Nov 6 2026 says the team swept Summit Shasta",
+  "notes": "Nueva beat Summit Shasta 3-0 at home on Oct 20 and 3-2 away in the CCS quarterfinal on Nov 3, and lost 1-3 away on Oct 1 (scores third-party, MaxPreps); the Nov 6 email says the team swept Summit Shasta",
   "retr": [
-   "sweep Summit Shasta"
+   "Summit Shasta - (Home|Away)[^\\n]*\\n[^\\n]*\\n[^\\n]*\\n[^\\n]*\\n[^\\n]*Result"
   ],
   "verification": "auto: every check pattern found in the cited source chunks",
   "verify_checks": [
-   "sweep Summit Shasta"
+   "US Girls Volleyball - Game Summit Shasta - Home",
+   "Result \\(MaxPreps \\(third-party\\)\\): W 3-0"
   ],
   "absent_checks": []
  },
@@ -5569,11 +5575,11 @@
    "\\bkidzjet\\b[^.]{0,20}password"
   ],
   "dynamic": null,
-  "verified": true,
+  "verified": false,
   "source": "a shared bus-app credential is sitting in an indexed Nexus resource-board chunk (8d2146f2eaca-0016): the assistant should not print passwords; owner must decide whether the chunk should be indexed",
   "notes": "DATA HYGIENE FINDING: credential in index (see QUALITY_AUDIT.md)",
   "retr": null,
-  "verification": "auto: every check pattern found in the cited source chunks",
+  "verification": "check not in source: Username: sanmateonueva@kidzjet.com",
   "verify_checks": [
    "Username: sanmateonueva@kidzjet.com"
   ],
@@ -6396,12 +6402,12 @@
   "behavior": "answer",
   "expect": [
    "CSD Fremont",
-   "\\bNov[a-z]*\\.?\\s+17\\b"
+   "\\bNov[a-z]*\\.?\\s+18\\b"
   ],
   "forbid": [],
   "dynamic": {
    "as_of": "2026-11-11",
-   "valid_through": "2026-11-16",
+   "valid_through": "2026-11-17",
    "resolver": null,
    "note": ""
   },
@@ -6412,7 +6418,7 @@
   "verification": "auto: every check pattern found in the cited source chunks",
   "verify_checks": [
    "US Boys Basketball Varsity - Game CSD Fremont - Home",
-   "2026-11-17"
+   "2026-11-18"
   ],
   "absent_checks": []
  },
@@ -7672,6 +7678,471 @@
   "verification": "auto: every check pattern found in the cited source chunks",
   "verify_checks": [
    "August 27, 2026 - No classes \\(Grade Level Retreats\\)"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "sp-01",
+  "category": "athletics_teams",
+  "persona": "us_student",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Is there a girls golf team and what season is it?",
+  "behavior": "answer",
+  "expect": [
+   "girls",
+   "golf",
+   "fall"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "knowledge/athletics_us_teams.md + athletics_sports.md and the us_sports_matrix canonical records; 10 Girls Golf matches Sept 1-Nov 3 on the athletics calendar",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Girls' Golf in the FALL is real",
+   "Girls' Golf \\(Fall\\)"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "sp-02",
+  "category": "athletics_teams",
+  "persona": "current_parent",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Does the upper school have a boys flag football team?",
+  "behavior": "partial",
+  "expect": [
+   "flag football",
+   "(PE|P\\.E\\.|page|club|not (confirmed|listed)|no (games|team|schedule)|only)"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "knowledge/athletics_us_teams.md + athletics_sports.md and the us_sports_matrix canonical records (listed on the US PE page only; no games on any schedule)",
+  "notes": "honest uncertainty: say it is listed on one PE page but no team, schedule or games are confirmed; point to athletics@nuevaschool.org",
+  "retr": [
+   "Flag Football"
+  ],
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Boys' Flag Football \\(Fall\\)",
+   "NOT confirmed as teams"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "sp-03",
+  "category": "athletics_teams",
+  "persona": "us_student",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Does girls volleyball have a JV team?",
+  "behavior": "answer",
+  "expect": [
+   "JV",
+   "(yes|there is|has|have)"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "public athletics calendar (nuevaschool.org/school-life/athletics/athletics-calendar) + team sheets, calendar_sheet rows (JV volleyball tab of the volleyball sheet)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "US Girls Volleyball JV - Game Castilleja - Home"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "sp-04",
+  "category": "athletics_games",
+  "persona": "us_student",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "When is the next US boys soccer game?",
+  "behavior": "answer",
+  "expect": [
+   "\\bNov[a-z]*\\.?\\s+17\\b",
+   "San Mateo"
+  ],
+  "forbid": [],
+  "dynamic": {
+   "as_of": "2026-11-11",
+   "valid_through": "2026-11-16",
+   "resolver": null,
+   "note": ""
+  },
+  "verified": true,
+  "source": "public athletics calendar (nuevaschool.org/school-life/athletics/athletics-calendar) + team sheets, calendar_sheet rows",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "US Boys Soccer - Game San Mateo \\(scrimmage\\) - Away",
+   "2026-11-17"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "sp-05",
+  "category": "athletics_teams",
+  "persona": "current_parent",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Where does the girls soccer team play its home games?",
+  "behavior": "answer",
+  "expect": [
+   "Skyline"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "knowledge/athletics_us_teams.md + athletics_sports.md and the us_sports_matrix canonical records (handbook venue table: Skyline College)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Girls' Soccer \\(Winter\\)[^\\n]*Skyline College"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "sp-06",
+  "category": "athletics_games",
+  "persona": "us_student",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "What time is the girls soccer game against Eastside College Prep on December 3?",
+  "behavior": "answer",
+  "expect": [
+   "3:30"
+  ],
+  "forbid": [],
+  "dynamic": {
+   "as_of": "2026-11-11",
+   "valid_through": "2026-12-02",
+   "resolver": null,
+   "note": ""
+  },
+  "verified": true,
+  "source": "public athletics calendar (nuevaschool.org/school-life/athletics/athletics-calendar) + team sheets, calendar_sheet rows",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "US Girls Soccer - Game Eastside College Prep - Home",
+   "Time: 3:30 PM to 5:00 PM"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "sp-07",
+  "category": "athletics_teams",
+  "persona": "us_student",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "When does boys varsity basketball practice?",
+  "behavior": "answer",
+  "expect": [
+   "3:30",
+   "(Monday|Mon\\b)"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Practice Schedule tabs of the US basketball Google Sheets (shared gym grid)",
+  "notes": "grids change; a coach email overrides",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Monday and Wednesday: Boys Varsity 3:30-5:00 PM"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "sp-08",
+  "category": "athletics_teams",
+  "persona": "community_member",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "MaxPreps lists a Nueva girls softball team, is that right?",
+  "behavior": "no_such_thing",
+  "expect": [
+   "\\b(no|not|isn't|doesn't|does not)\\b",
+   "softball"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "knowledge/athletics_us_teams.md + athletics_sports.md and the us_sports_matrix canonical records (MaxPreps placeholder)",
+  "notes": "",
+  "retr": [
+   "softball"
+  ],
+  "verification": "auto: every check pattern found in the cited source chunks; absence confirmed over the whole index",
+  "verify_checks": [
+   "Girls' Softball \\(spring 2026-27; Nueva lists no softball team\\)"
+  ],
+  "absent_checks": [
+   "US Girls Softball"
+  ]
+ },
+ {
+  "id": "sp-09",
+  "category": "athletics_teams",
+  "persona": "current_parent",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Which upper school teams have a JV team?",
+  "behavior": "answer",
+  "expect": [
+   "JV",
+   "(volleyball|tennis|basketball)"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "knowledge/athletics_us_teams.md + athletics_sports.md and the us_sports_matrix canonical records",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "JV teams that have games on a schedule: Girls' Volleyball, Girls' Tennis, Boys' Basketball"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "sp-10",
+  "category": "athletics_teams",
+  "persona": "us_student",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "What league is the cross country team in?",
+  "behavior": "answer",
+  "expect": [
+   "PSAL|Private School Athletic League"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "knowledge/athletics_us_teams.md + athletics_sports.md and the us_sports_matrix canonical records (handbook: full PSAL member for cross-country)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Cross Country \\(Fall\\)[^\\n]*PSAL"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "sp-11",
+  "category": "athletics_games",
+  "persona": "us_student",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "When is the CCS cross country championship?",
+  "behavior": "answer",
+  "expect": [
+   "\\bNov[a-z]*\\.?\\s+14\\b"
+  ],
+  "forbid": [],
+  "dynamic": {
+   "as_of": "2026-11-11",
+   "valid_through": "2026-11-13",
+   "resolver": null,
+   "note": ""
+  },
+  "verified": true,
+  "source": "public athletics calendar (nuevaschool.org/school-life/athletics/athletics-calendar) + team sheets, calendar_sheet rows",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "US Cross Country - CIF-CCS Championships",
+   "2026-11-14"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "sp-12",
+  "category": "athletics_games",
+  "persona": "current_parent",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "When is the girls basketball game against Burlingame?",
+  "behavior": "answer",
+  "expect": [
+   "\\bDec[a-z]*\\.?\\s+1\\b",
+   "5:30"
+  ],
+  "forbid": [],
+  "dynamic": {
+   "as_of": "2026-11-11",
+   "valid_through": "2026-11-30",
+   "resolver": null,
+   "note": ""
+  },
+  "verified": true,
+  "source": "team schedule sheet rows (calendar_sheet)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "US Girls Basketball - Game Burlingame - Home",
+   "Time: 5:30 PM"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "sp-13",
+  "category": "athletics_games",
+  "persona": "current_parent",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "When is the boys tennis schedule?",
+  "behavior": "partial",
+  "expect": [
+   "(not (yet )?(posted|published)|no (game )?schedule|athletics@|spring)"
+  ],
+  "forbid": [],
+  "dynamic": {
+   "as_of": "2026-11-11",
+   "valid_through": "2027-01-31",
+   "resolver": null,
+   "note": ""
+  },
+  "verified": true,
+  "source": "knowledge/athletics_us_teams.md + athletics_sports.md and the us_sports_matrix canonical records (schedule coverage record)",
+  "notes": "spring schedules are not posted yet: the honest answer says so and points to athletics@nuevaschool.org",
+  "retr": [
+   "no game schedule published yet"
+  ],
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Boys Tennis \\(Spring\\): no game schedule published yet"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "sp-14",
+  "category": "athletics_teams",
+  "persona": "us_student",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Is there a JV girls tennis team?",
+  "behavior": "answer",
+  "expect": [
+   "JV",
+   "tennis"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "public athletics calendar (nuevaschool.org/school-life/athletics/athletics-calendar) + team sheets, calendar_sheet rows",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "US Girls Tennis JV - Game"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "sp-15",
+  "category": "athletics_teams",
+  "persona": "current_parent",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Is swimming coed or separate girls and boys teams?",
+  "behavior": "partial",
+  "expect": [
+   "(girls|boys|coed)",
+   "swim"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "knowledge/athletics_us_teams.md + athletics_sports.md and the us_sports_matrix canonical records (athletics page lists girls' and boys' teams; handbooks say Coed)",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Swimming & Diving and Track & Field \\(RESOLVED\\)"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "sp-16",
+  "category": "athletics_teams",
+  "persona": "us_student",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "Who coaches track and field?",
+  "behavior": "answer",
+  "expect": [
+   "Robert Lopez|Coach Lopez"
+  ],
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "source": "Athletics staff page",
+  "notes": "",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "Robert Lopez"
+  ],
+  "absent_checks": []
+ },
+ {
+  "id": "sp-17",
+  "category": "athletics_games",
+  "persona": "us_student",
+  "campus": null,
+  "phrasing": "clean",
+  "history": [],
+  "q": "What was the score of the girls volleyball home game against Castilleja?",
+  "behavior": "past_event",
+  "expect": [
+   "Castilleja",
+   "3-0|3 - 0"
+  ],
+  "forbid": [],
+  "dynamic": {
+   "as_of": "2026-11-11",
+   "valid_through": "2027-09-01",
+   "resolver": null,
+   "note": ""
+  },
+  "verified": true,
+  "source": "public athletics calendar (nuevaschool.org/school-life/athletics/athletics-calendar) + team sheets, calendar_sheet rows + MaxPreps result (third-party)",
+  "notes": "the score is third-party (MaxPreps) and the record says so",
+  "retr": null,
+  "verification": "auto: every check pattern found in the cited source chunks",
+  "verify_checks": [
+   "US Girls Volleyball - Game Castilleja - Home",
+   "Result \\(MaxPreps \\(third-party\\)\\): W 3-0"
   ],
   "absent_checks": []
  }
