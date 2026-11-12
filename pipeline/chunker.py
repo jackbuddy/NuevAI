@@ -20,7 +20,7 @@ from pathlib import Path
 from . import config
 from .common import load_pages
 from .links import build as build_links, link_cards
-from . import canonical, facts, safety, sheets, workbooks
+from . import calendar_feed, canonical, facts, safety, sheets, sports, workbooks
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))     # freshness.py lives at the repo root (shared with rag.py)
 import freshness      # noqa: E402
@@ -262,6 +262,9 @@ def run(log=print) -> list[dict]:
             continue
         if page.get("source") == "google_sheet" and sheets.sports_events(page, date(2000, 1, 1), date(2100, 1, 1)):
             continue          # a team schedule: its games become structured events below, the raw CSV text would only add noise
+        if page.get("source") == "nexus" and "home team" in page.get("text", "")[:300].lower() \
+                and any(s["kind"] == "team_schedule" and s["id"] in page.get("url", "") for s in config.LIVE_SHEETS):
+            continue          # the Nexus import's copy of a team schedule sheet: stale times, replaced by the structured events
         for n, content in chunk_page(page):
             body_hash = hashlib.sha1(content.split("\n\n", 1)[1].encode()).hexdigest()
             if body_hash in seen_bodies or near_duplicate(content, page["url"], seen_anchors):
@@ -275,14 +278,14 @@ def run(log=print) -> list[dict]:
                              "content_hash": hashlib.sha1(content.encode()).hexdigest()},
             })
     today = date.today()
+    sheet_events = []
     for page in load_pages():
         if sheets.is_sensitive(page) or config.SUPERSEDED_TITLE.search(page.get("title", "") or "") \
                 or config.NOISE_TITLE.search(page.get("title", "") or ""):
             continue
         page["title"] = page_title(page)
         if page.get("source") == "google_sheet":
-            for e in sheets.sports_events(page, today - timedelta(days=14), today + timedelta(days=430)):
-                chunks.append(sheets.event_chunk(e))
+            sheet_events.extend(sheets.sports_events(page, calendar_feed.window_floor(today), today + timedelta(days=430)))
             for j, (title, body) in enumerate(sheets.club_outline(page)):
                 content = f"Title: {title}\nSection: {title} (outline)\nSource: {page['url']}\n\n{body}"
                 chunks.append({"chunk_id": f"{hashlib.sha1(page['url'].encode()).hexdigest()[:12]}-clubs-{j:03d}", "content": content,
@@ -294,6 +297,8 @@ def run(log=print) -> list[dict]:
                            "content": content, "source_file": page["url"],
                            "metadata": {"source_url": page["url"], "title": page["title"], "source": page["source"],
                                         "kind": "outline", "content_hash": hashlib.sha1(content.encode()).hexdigest()}})
+    for e in sports.merge_events(sheet_events, today, log):        # team sheets + the athletics calendar page (+ third-party gap fill): one record per game
+        chunks.append(sheets.event_chunk(e))
     chunks.extend(facts.build_chunks(log))                 # curated, human-confirmed facts (bell schedule, ...)
     chunks.extend(workbooks.build_chunks(log))            # teacher/course map, A/B day calendar, advisors, clubs
     links = build_links(log)

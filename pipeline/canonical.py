@@ -246,15 +246,69 @@ def teams_with_schedules(chunks: list[dict], log=print) -> list[dict]:
         lines.append(f"- {name}: {', '.join(bits)} scheduled, {t['first']} to {t['last']} ({' and '.join(sorted(t['src']))})")
     doc = "Teams with schedules on the athletics calendar"
     out = []
-    parts = split_lines(lines)
+    parts = split_lines(lines, 880)
     for i, p in enumerate(parts):
         body = ("Teams that have games or practices on the school calendar or the team schedule sheets right now (US = Upper School, MS = Middle "
                 "School; levels such as Varsity, JV, 7th/8th VA, 5th/6th JVA are part of the team name). This is the list of teams WITH A SCHEDULE: "
                 "a sport can be offered by Nueva and not appear here until its season is on the calendar. All sports the school lists are in the "
                 "athletics offerings record.\n" if i == 0 else "") + "\n".join(p)
-        out.append(record("teams", numbered("Teams with games or practices on the schedule (by level and gender)", i, len(parts)), doc, body, as_of,
+        out.append(record("teams", numbered("Teams with games or practices on the schedule right now (Upper and Middle School, by level and gender)", i, len(parts)), doc, body, as_of,
                           "school calendar feed and team schedule sheets, read on the pipeline run date"))
     log(f"  canonical teams: {len(teams)} teams with a schedule -> {len(out)} records")
+    return out
+
+
+# --------------------------------------------------------------------------- Upper School sports matrix + schedule coverage (pipeline/sports.py catalog)
+def us_sports_matrix(log=print) -> list[dict]:
+    """Every confirmed Upper School team 2026-27 by season: gender, levels, league, venues, contact, confidence (from sports.OFFICIAL_TEAMS)."""
+    from . import athletics_calendar as ac, sports
+    as_of = ac.as_of() or date.today().isoformat()
+    doc = "Upper School teams 2026-27 by season (verified catalog)"
+    src = ("Upper School Athletics Handbook (venues, leagues), athletics page nuevaschool.org/school-life/athletics, US P.E. requirement page, public athletics "
+           f"calendar and team schedule sheets, read {as_of}")
+    out, lines = [], []
+    for season in ("Fall", "Winter", "Spring"):
+        lines.append(f"{season}:")
+        for t in sports.OFFICIAL_TEAMS:
+            if t["season"] != season:
+                continue
+            g = {"girls": "Girls'", "boys": "Boys'", "coed": "Coed"}[t["gender"]]
+            lines.append(f"- {g} {t['sport']} ({season}): {' and '.join(t['levels'])}; league {t['league']}; home {t['home']}; practice {t['practice']}; "
+                         f"contact {t['contact']}; confidence {t['confidence']}")
+    parts = split_lines(lines, 1000)
+    for i, p in enumerate(parts):
+        out.append(record("us_sports_matrix", numbered("Every Upper School sports team 2026-27 by season, gender, level, league and venue", i, len(parts)), doc,
+                          ("Confirmed Upper School (grades 9-12) interscholastic teams for 2026-27. A JV team is listed only where an official schedule has JV games.\n"
+                           if i == 0 else "") + "\n".join(p), as_of, src))
+    out.append(record("us_sports_matrix", "Upper School sports listed on only one page and NOT confirmed as teams (flag football, ultimate frisbee)", doc,
+                      "These appear on the US P.E. requirement page but on no schedule, handbook team list or the athletics page:\n" + "\n".join(f"- {u}" for u in sports.UNCONFIRMED),
+                      as_of, src))
+    log(f"  canonical US sports matrix: {len(sports.OFFICIAL_TEAMS)} teams -> {len(out)} records")
+    return out
+
+
+def us_schedule_coverage(chunks: list[dict], log=print) -> list[dict]:
+    """Which confirmed Upper School teams have a game schedule in the index, from which source, and which have none yet."""
+    from . import athletics_calendar as ac, sports
+    cov = sports.coverage(chunks)
+    as_of = ac.as_of() or date.today().isoformat()
+    have = [c for c in cov if c["games"]]
+    lines = []
+    for c in cov:
+        if c["games"]:
+            lines.append(f"- {c['team']} ({c['season']}): {c['games']} games and events scheduled {c['first']} to {c['last']} (levels: {', '.join(c['levels'])}; sources: "
+                         f"{', '.join(s for s in c['sources'] if s)})")
+        else:
+            lines.append(f"- {c['team']} ({c['season']}): no game schedule published yet (ask athletics@nuevaschool.org or watch the athletics calendar)")
+    doc = "Upper School team schedule coverage"
+    out = []
+    parts = split_lines(lines, 1000)
+    for i, p in enumerate(parts):
+        out.append(record("us_schedule_coverage", numbered("Which Upper School teams have a game schedule posted (and which do not yet)", i, len(parts)), doc,
+                          (f"{len(have)} of {len(cov)} Upper School teams have games on a schedule right now. Schedules come from the team schedule sheets, the school's public "
+                           "athletics calendar and, for games missing there, MaxPreps (third-party, labelled). Spring teams post schedules later.\n" if i == 0 else "")
+                          + "\n".join(p), as_of, f"team schedule sheets, nuevaschool.org athletics calendar and MaxPreps (third-party), read {as_of}"))
+    log(f"  canonical US schedule coverage: {len(have)}/{len(cov)} teams with games -> {len(out)} records")
     return out
 
 
@@ -289,7 +343,8 @@ def links_directory(links: list[dict], log=print) -> list[dict]:
 def build_chunks(existing_chunks: list[dict], pages: list[dict], links: list[dict], log=print) -> list[dict]:
     out = []
     for fn in (lambda: clubs_directory(log), lambda: courses_by_dept(pages, log), lambda: us_no_class_days(log),
-               lambda: teams_with_schedules(existing_chunks, log), lambda: links_directory(links, log)):
+               lambda: teams_with_schedules(existing_chunks, log), lambda: us_sports_matrix(log),
+               lambda: us_schedule_coverage(existing_chunks, log), lambda: links_directory(links, log)):
         try:
             out += fn()
         except Exception as e:                  # one missing source must not stop the whole pipeline

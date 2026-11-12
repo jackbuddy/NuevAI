@@ -40,7 +40,7 @@ jobs:
         run: python scripts/index_guard.py before
       - name: Run pipeline
         run: |
-          LIVE_KINDS=team_schedule python run_pipeline.py --stages calendar,lunch,live,chunk,index
+          LIVE_KINDS=team_schedule python run_pipeline.py --stages live,sports,calendar,lunch,chunk,index
       - name: Guard - index must not shrink by more than 10%
         run: python scripts/index_guard.py after --max-drop 0.10
       - name: Audit data against sources (CI mode)

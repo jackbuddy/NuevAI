@@ -282,6 +282,8 @@ def schedule_events(header: list[str], rows: list[list[str]], ref: date, title_h
             if away and home:
                 ours = home.lower().startswith(our_names)
                 opp, ha, kind = (away if ours else home), ("home" if ours else "away"), "game"
+                if re.fullmatch(r"(?i)\s*bye\s*", opp):
+                    continue                               # "Bye" is a week without a game (the team-sheet parser drops it too)
             else:
                 note = home or away
         elif "opp" in cols:

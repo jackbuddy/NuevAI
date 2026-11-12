@@ -40,7 +40,7 @@ def _cols(header: list[str]) -> dict:
     low = [h.strip().lower() for h in header]
     pick = lambda *names: next((i for i, h in enumerate(low) if h in names), None)
     return {"date": pick("date"), "home": pick("home team", "home"), "away": pick("away team", "away"),
-            "time": pick("time", "time "), "loc": pick("location", "venue")}
+            "time": pick("time", "time "), "loc": pick("location", "venue"), "notes": pick("notes")}
 
 
 def _date(cell: str) -> date | None:
@@ -71,9 +71,13 @@ def sports_events(page: dict, keep_from: date, keep_to: date) -> list[dict]:
     c = _cols(rows[hdr])
     if c["date"] is None or c["home"] is None:
         return []
-    out, seen = [], {}
+    out, seen, second = [], {}, []
     get = lambda r, k: (r[c[k]].strip() if c[k] is not None and c[k] < len(r) else "")
+    in_second = False
     for r in rows[hdr + 1:]:
+        if any(x.strip().lower() == "date" for x in r) and any("home" in x.strip().lower() for x in r):
+            in_second = True                                 # the second "Home schedule" table that repeats (and can lag behind) the main one
+            continue
         d = _date(get(r, "date"))
         home, away = get(r, "home"), get(r, "away")
         if not d or not (keep_from <= d <= keep_to) or not (home or away):
@@ -86,12 +90,21 @@ def sports_events(page: dict, keep_from: date, keep_to: date) -> list[dict]:
             if prev["start"] is None and _time(get(r, "time")):       # the copy that has a time wins over one without ("TBD" / empty)
                 out[seen[key]] = _event(page, d, home, away, r, get, c)
             continue
+        ev = _event(page, d, home, away, r, get, c)
+        if ev is None:                                   # a "Bye" week
+            continue
+        if in_second:
+            second.append(ev)
+            continue
         seen[key] = len(out)
-        out.append(_event(page, d, home, away, r, get, c))
+        out.append(ev)
+    for e in second:        # keep a repeated home game only when the main table has no game against that opponent within 10 days
+        if not any(x["kind"] == "game" and x["opp"].lower()[:6] == e["opp"].lower()[:6] and abs((x["date"] - e["date"]).days) <= 10 for x in out):
+            out.append(e)
     return out
 
 
-def _event(page: dict, d: date, home: str, away: str, r: list, get, c: dict) -> dict:
+def _event(page: dict, d: date, home: str, away: str, r: list, get, c: dict) -> dict | None:
     title = page["title"]
     if not away:                                    # a note row such as "First Day of Practice"
         summary, kind, ha, opp = f"{title} - {home.title() if home.isupper() else home}", "event", "", ""
@@ -100,10 +113,18 @@ def _event(page: dict, d: date, home: str, away: str, r: list, get, c: dict) -> 
         opp = away if nueva_home else home
         ha = "home" if nueva_home else "away"
         summary, kind = f"{title} - Game {opp} - {ha.title()}", "game"
+    if kind == "game" and re.fullmatch(r"bye", opp.strip(), re.I):       # "Bye" is a week without a game, not an opponent
+        return None
     start = _time(get(r, "time"))
     t_label = get(r, "time") or ("time to be announced" if kind == "game" else "all day")
+    note = get(r, "notes")
+    meta = {}
+    if kind == "game" and re.search(r"cancel", note, re.I):             # "Game canceled due to insufficient players by <opponent>"
+        summary += " - CANCELED"
+        meta["canceled"] = True
+    keep_note = note if re.search(r"cancel|moved|postpon|resched|pink|senior night|no school|varsity only|friendship|sportsmanship", note, re.I) else ""
     return {"date": d, "summary": summary, "kind": kind, "home_away": ha, "start": start, "time": t_label,
-            "location": get(r, "loc"), "url": page["url"], "opp": opp}
+            "location": get(r, "loc"), "url": page["url"], "opp": opp, "description": keep_note, "meta": meta}
 
 
 def event_chunk(e: dict) -> dict:
@@ -111,10 +132,21 @@ def event_chunk(e: dict) -> dict:
     lines = [f"Calendar event: {e['summary']}", f"Date: {when}", f"Time: {e['time']}" + (" (Pacific)" if e["start"] else "")]
     if e["location"]:
         lines.append(f"Location: {e['location']}")
-    content = f"Title: {e['summary']}\nSource: team schedule sheet\n\n" + "\n".join(lines)
+    meta = e.get("meta") or {}
+    prov = meta.get("provenance", "team schedule sheet")
+    for note in (e.get("description"), meta.get("time_note")):
+        if note:
+            lines.append(f"Note: {note}")
+    if e.get("result"):
+        lines.append(f"Result ({meta.get('result_source') or prov}): {e['result']}")
+    if meta.get("official") is False:
+        lines.append(f"Third-party schedule ({prov}, read {meta.get('as_of', '')}); the school's own calendar did not list this game, so confirm with athletics@nuevaschool.org.")
+    content = f"Title: {e['summary']}\nSource: {prov}\n\n" + "\n".join(lines)
     extra = {"end_date": e["date"].isoformat(), "summary": e["summary"], "when": when, "time": e["time"], "all_day": not e["start"],
-             "start_time": e["start"], "end_time": None, "location": e["location"], "description": "", "category": "athletics",
-             "kind": e["kind"], "home_away": e["home_away"]}
+             "start_time": e["start"], "end_time": None, "location": e["location"], "description": (e.get("description") or "")[:300],
+             "category": "athletics", "kind": e["kind"], "home_away": e["home_away"], **{k: v for k, v in meta.items() if v not in (None, "")}}
+    if e.get("result"):
+        extra["result"] = e["result"]
     cid = "sheet-" + hashlib.sha1(f"{e['url']}|{e['date']}|{e['summary']}".encode()).hexdigest()[:12]
     return {"chunk_id": cid, "content": content, "source_file": e["url"],
             "metadata": {"source": "calendar_sheet", "source_url": e["url"], "title": e["summary"], "event_date": e["date"].isoformat(),

@@ -190,7 +190,7 @@ check("audit ci: conflicts and orphans only warn, a mismatch fails", A.status("g
 B = ad.Audit({}, ci=False)
 B.check("g.conflict", False, "two sources disagree", "conflict")
 check("audit local: a conflict still fails unless accepted in audit_known.json", B.status("g.conflict") == "FAIL")
-check("audit ci: only groups that work on a bare runner are selected", set(ad.CI_GROUPS) == {"bell", "teams", "ical", "fresh", "email", "lunch"}
+check("audit ci: only groups that work on a bare runner are selected", set(ad.CI_GROUPS) == {"bell", "teams", "ical", "fresh", "email", "share", "lunch"}
       and set(ad.CI_SKIPPED) == {"days", "courses", "clubs", "index", "canon"})
 
 calls = []
