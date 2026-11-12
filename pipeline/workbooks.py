@@ -85,6 +85,70 @@ def kind_of_path(path: Path) -> str | None:
 
 
 # --------------------------------------------------------------------------- master schedule: days
+SPECIAL_TITLE = re.compile(r"^(community time \[(\d+) minutes?\]|full-day event)", re.I)
+SPECIAL_LINE = re.compile(r"^(?P<name>[^:\n]+?):\s*(?P<a>\d{1,2}:\d{2})\s*-\s*(?P<b>\d{1,2}:\d{2})\s*$")
+
+
+def _clock(t: str) -> tuple[int, int, str]:
+    """'12:55' -> (12, 55, 'PM'): the sheet writes school-day clock times without AM/PM; 8-11 are morning, 12 and 1-7 afternoon."""
+    h, m = (int(x) for x in t.split(":"))
+    return h, m, "AM" if 8 <= h <= 11 else "PM"
+
+
+def span(a: str, b: str) -> str:
+    (ha, ma, pa), (hb, mb, pb) = _clock(a), _clock(b)
+    left, right = f"{ha}:{ma:02d}", f"{hb}:{mb:02d}"
+    return f"{left}-{right} {pb}" if pa == pb else f"{left} {pa}-{right} {pb}"
+
+
+def parse_special_schedules(wb) -> dict[str, dict]:
+    """The "Special Schedule Configurations" cells next to the calendar: the bell schedule used on Community-time days (40 or 90 minutes)
+    and on full-day events. -> {"community_40": {"title", "minutes", "lines": [(name, "8:55-10:00 AM")]}, "community_90": ..., "full_day": ...}.
+    Read from the cells themselves (never typed in here); an unrecognised cell is ignored."""
+    out: dict[str, dict] = {}
+    if "Calendar AB + Special Schedule" not in wb.sheetnames:
+        return out
+    for row in wb["Calendar AB + Special Schedule"].iter_rows(values_only=True):
+        for v in row[10:14]:
+            if not isinstance(v, str) or not SPECIAL_TITLE.match(v.strip()):
+                continue
+            lines = [ln.strip() for ln in v.replace("\xa0", " ").split("\n")]
+            head = SPECIAL_TITLE.match(v.strip())
+            key = f"community_{head.group(2)}" if head.group(2) else "full_day"
+            mins = re.search(r"\[(\d+)-Minute Classes\]", v)
+            slots = []
+            for ln in lines:
+                m = SPECIAL_LINE.match(ln)
+                if m:
+                    slots.append((m.group("name").strip(), span(m.group("a"), m.group("b"))))
+            if slots:
+                out[key] = {"title": lines[0].replace("[", "(").replace("]", ")"), "minutes": int(mins.group(1)) if mins else None, "lines": slots}
+    return out
+
+
+def special_key(labels: list[str]) -> str | None:
+    """Which special bell schedule a day's labels ask for ("Community (40')" -> community_40), or None."""
+    for lab in labels:
+        m = re.match(r"community \((\d+)'\)", quote(lab).lower())
+        if m:
+            return f"community_{m.group(1)}"
+        if lab.lower().startswith("full-day"):
+            return "full_day"
+    return None
+
+
+def special_times(key: str, spec: dict, order: list[int] | None) -> str:
+    """The special schedule as one sentence. On class days block names are swapped for this day's block order (position 1 of the sheet's
+    "Block 1" is the day's first block, so on a B' day it is Block 5 and the last two are 8 then 7)."""
+    parts = []
+    for name, when in spec["lines"]:
+        m = re.fullmatch(r"Block (\d)", name)
+        if m and order:
+            name = f"Block {order[int(m.group(1)) - 1]}"
+        parts.append(f"{name} {when}")
+    return "; ".join(parts)
+
+
 def parse_days(wb) -> dict[date, dict]:
     ws = wb["Calendar AB + Special Schedule"]
     rows = grid(ws)
@@ -117,10 +181,37 @@ def parse_days(wb) -> dict[date, dict]:
                     continue
                 label, kind = cell(ev[j]), quote(cell(ty[j]))
                 days[dd] = {"labels": [x.strip() for x in re.split(r"\s*/\s*|\n", label) if x.strip()], "type": kind}
+            attach_event(days, r, ev, nums, ym)
             i += 3
             continue
         i += 1
     return days
+
+
+def attach_event(days: dict, hdr: list, ev: list, nums: list, ym) -> None:
+    """The "Special Schedule Days" table to the right of a week ("Event | Point Person(s) | Notes + Links"): one line naming what the week's
+    Community time or full-day event is ("Community (40') / Latine Heritage Month Assembly"). It is attached to the week's day whose label
+    names that format, and only when exactly one day does (otherwise the table cannot be tied to a date and is left out). The point-person
+    column is never read."""
+    if cell(hdr[7]).lower() != "event" or not cell(ev[7]):
+        return
+    parts = [x.strip() for x in re.split(r"\s*/\s*|\n", cell(ev[7])) if x.strip()]
+    if len(parts) < 2 or parts[0].lower() in ("n/a", "no events"):
+        return
+    fmt, name = parts[0], re.sub(r":\s*/\s*", ": ", " / ".join(parts[1:])).strip(" :/")
+    note = cell(ev[9]) if len(ev) > 9 else ""
+    cands = []
+    for j, d in nums:
+        try:
+            dd = date(ym[0], ym[1], int(d))
+        except ValueError:
+            continue
+        if dd in days and any(l.lower() == fmt.lower() or (fmt.lower().startswith("full-day") and l.lower().startswith("full-day")) for l in days[dd]["labels"]):
+            cands.append(dd)
+    if len(cands) == 1 and name:
+        days[cands[0]]["event"] = name
+        if note and note.lower() not in ("n/a", "na"):
+            days[cands[0]]["notes"] = re.sub(r"\s*\n\s*", " / ", note)
 
 
 def parse_advisory(wb) -> dict[date, dict[str, str]]:
@@ -147,18 +238,29 @@ def parse_advisory(wb) -> dict[date, dict[str, str]]:
 
 
 def day_chunks(wb, file: str) -> list[dict]:
-    days, adv = parse_days(wb), parse_advisory(wb)
+    days, adv, specials = parse_days(wb), parse_advisory(wb), parse_special_schedules(wb)
     chunks = []
     for d in sorted(set(days) | set(adv)):
         info = days.get(d, {})
         label = ", ".join(info.get("labels", []))
         t = info.get("type", "")
+        sched = ""
         if t in DAY_TYPES:
             order = ORDER[t]
             slots = [f"Block {order[0]} {SLOT_TIMES[0]}", f"Block {order[1]} {SLOT_TIMES[1]}", "Lunch 11:30 AM-12:00/12:30 PM",
                      f"Block {order[2]} {SLOT_TIMES[2]}", f"Block {order[3]} {SLOT_TIMES[3]}"]
             lead = f"{t} day: Blocks {order[0]}-{max(order)} meet, in the order {', '.join(map(str, order))}. Times: {'; '.join(slots)}."
-            status = lead + (f" Schedule notes: {label} (special events can adjust the regular times)." if label else "")
+            sk = special_key(info.get("labels", []))
+            if sk in specials:
+                sp = specials[sk]
+                status = (f"{t} day: Blocks {order[0]}-{max(order)} meet, in the order {', '.join(map(str, order))}, on the SPECIAL {sp['title']} schedule"
+                          f"{' (' + str(sp['minutes']) + '-minute classes)' if sp['minutes'] else ''} instead of the regular bell times. Times: {special_times(sk, sp, order)}."
+                          + (f" Event: {info['event']}." if info.get("event") else "") + (f" Notes: {info['notes']}." if info.get("notes") else "")
+                          + f" Schedule notes: {label}.")
+                sched = sk
+            else:
+                status = lead + (f" Schedule notes: {label} (special events can adjust the regular times)." if label else "")
+                sched = ""
             kind = "class_day"
         elif re.search(r"dismissal|early release", t + " " + label, re.I):
             # e.g. the last day of school: students come in, school ends at noon; the sheet gives no A/B day type for it
@@ -167,6 +269,15 @@ def day_chunks(wb, file: str) -> list[dict]:
         elif label.lower().startswith("full-day") and "no class" not in label.lower():
             status = (f"Full-day special event: {t or label}. The regular A/B class blocks do not meet; the master schedule lists this "
                       f"date as a full-day event instead of an A, A', B or B' day.")
+            sched = ""
+            if "full_day" in specials:
+                sp = specials["full_day"]
+                status += f" Full-day event schedule (no classes): {special_times('full_day', sp, None)}."
+                sched = "full_day"
+            if info.get("event"):
+                status += f" Event: {info['event']}."
+            if info.get("notes"):
+                status += f" Notes: {info['notes']}."
             kind = "full_day_event"
         elif t or "no class" in label.lower():
             status = f"No classes{(' (' + t + ')') if t else ''}." + (f" {label}." if label and label.lower() != "no classes" else "")
@@ -188,7 +299,8 @@ def day_chunks(wb, file: str) -> list[dict]:
             body += f" ({BLOCK_RULE})"
         chunks.append(mk(f"day|{d}", file, f"School day type: {head}", "A/B day calendar and advisory", body,
                          {"source": "school_day", "kind": kind, "event_date": d.isoformat(), "end_date": d.isoformat(),
-                          "day_type": t if t in DAY_TYPES else ""}))
+                          "day_type": t if t in DAY_TYPES else "", **({"label": label} if label else {}), **({"schedule": sched} if sched else {}),
+                          **({"event": info["event"]} if info.get("event") else {})}))
     return chunks
 
 

@@ -72,7 +72,8 @@ Key files (repo root unless noted):
   supabase/         analytics.sql, schema_v2.sql, functions/embed/index.ts
   app/ components/ lib/   frontend (Shell with Calendar/Chat/Resources tabs, ChatView, CalendarView, ResourcesView,
                     FeedbackButton, /insights page). Tokens in app/globals.css.
-  .github/workflows/   refresh-knowledge-base.yml (daily 13:30 UTC: calendar + live team schedules -> chunk -> index, then index_guard + audit),
+  .github/workflows/   refresh-knowledge-base.yml (daily 13:30 UTC: calendar + live team schedules -> chunk -> index, then index_guard + audit --ci + job summary;
+                    2026-11-12: it had failed daily since the audit was added, fixed, see QUEUE_LOG "calendar"; actions are on v7),
                     keep-warm.yml (pings /health every 10 min), ci.yml (compile, eval_retrieval, offline tests, tsc, next build),
                     nightly-quality.yml (eval_golden live vs eval_baseline.json). ci and nightly have NEVER run on GitHub yet.
   data/pipeline/    LOCAL ONLY, gitignored: crawled pages, chunks.json, manual_docs/, live/, download checklist, backups
@@ -266,3 +267,5 @@ See QUALITY_AUDIT.md sections 9-10 and README "Answer quality fixes". New module
 Server contract additions: SSE done {route, model, limited}; chat_answered {fallback (now the shared detector), refusal, canonical, redirect, hedged, rroute, div, chunks, answer_head}. Frontend TODO: read done.limited; log via:'suggestion' for chip clicks; a 'resources' suggestion action if wanted (the server cannot send one today).
 Owner/data action: 46 of 50 school_facts rows are superseded=true in the live index (they hold the quick answers); fix, then re-run `python eval_quality.py --mode retrieval`; run `--mode llm --sample 40` on a fresh Groq day (about 4.2k tokens per answer now).
 Tests: python test_quality_fixes.py (offline). The persona is 9.9k characters: trim before launch if quota is tight.
+
+2026-11-12 (calendar audit and Refresh-calendar fix, see CALENDAR_AUDIT.md + QUEUE_LOG.md "calendar"): the daily job failed because the audit compared the index with a run that has no local workbooks (orphan_rows, courses...) and because stale/duplicate team-sheet rows were never removed; `audit_data.py --ci` + calendar_sheet removal + dedupe fix it, the upload is retried and cannot fail the job, history (current school year) is kept. New: calendar_meta.py (division / no-classes from titles), special bell schedules (Community 40'/90', full-day) from the master sheet in the school_day records, /api/calendar `days` + the A/B badge, campus filter and fixed .ics in the Calendar tab. After merging: run `python run_pipeline.py --stages manual,chunk,index --dry-run` locally (the 32 special-schedule day records and ~690 calendar rows will be rewritten and re-embedded once), then without --dry-run; the first CI run after the merge re-embeds the calendar rows once (new metadata).

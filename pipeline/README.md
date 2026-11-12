@@ -15,7 +15,7 @@ python run_pipeline.py                    # the real run (needs SUPABASE_* in .e
 | `nexus`  | Imports pages from `../nexus-scraper`; `--refresh-nexus` re-scrapes with the saved session. Pages containing any term in `data/pipeline/private_terms.txt` are dropped. | Once, to sign in (SSO/2FA). Re-sign-in when the session expires; the run says so and still uses the last good scrape. |
 | `live` | Re-reads public Google Sheets that change during the year: the US Boys Basketball 26-27 tabs (fetched by tab id) and the Course Offerings workbook (downloaded as .xlsx). Configured in `pipeline/config.py` (`LIVE_SHEETS`). | No |
 | `manual` | Indexes files you download yourself into `data/pipeline/manual_docs/` (.docx .pdf .txt .md .html .csv). See `DOWNLOAD_THESE.md`. | You download them |
-| `calendar` | Reads the iCal feed in `NUEVAI_CALENDAR_URL` into dated event chunks + per-day digests; expired events are removed automatically. | No |
+| `calendar` | Reads the iCal feed in `NUEVAI_CALENDAR_URL` into dated event chunks + per-day digests (category, division, no-classes tags). The index stage removes cancelled/moved future events and dropped team-sheet games, and keeps past events of the school year as history. | No |
 | `google` | Exports every linked Google Doc / Sheet / Slides file (course catalog, handbooks, club lists), following links between docs 2 hops deep. | No, for "anyone with the link" files. Private files are listed in `needs_access.json`. |
 | `chunk`  | Also builds the canonical lists (`pipeline/canonical.py`: clubs by day, departments and courses, no-class days, teams with schedules, forms/links directory) and the curated fact records, and removes credentials/passcodes/personal cell numbers (`pipeline/safety.py`). Heading-aware ~1,100-char chunks that carry their section trail; boilerplate de-duplicated. Builds the **link registry** and one retrievable "link card" per booking / form / payment / calendar / document / portal link. | No |
 | `index`  | Embeds only new or changed chunks (BAAI/bge-large-en-v1.5, same as the server) and upserts to `document_chunks`. | No |
@@ -72,6 +72,7 @@ records each answer with its timings. View everything at `/insights` with the `M
 
 ### Audit and freshness
 * `python scripts/audit_data.py` re-derives A/B days, bell times, teacher-course-block-room records, clubs, team schedules and the iCal feed straight from the source files and compares them with the index (read-only). Exit 1 on a mismatch; known source conflicts are listed in `scripts/audit_known.json`. `--offline` skips network and database.
+* `python scripts/audit_data.py --ci` is the unattended subset used by the daily GitHub job (see README Operations, "Calendar refresh").
 * Every chunk carries `indexed_at`, `source_date`, `school_year` and `stale` (see `freshness.py`). `stale` marks documents written for an earlier school year; retrieval demotes them and the prompt tags them OUTDATED. Existing rows get the new metadata by a metadata-only patch on the next index run (no re-embedding). `--keep-expired` skips deleting expired calendar rows.
 * Rows the pipeline no longer produces from the workbooks are flagged `metadata.superseded` (ignored by retrieval) instead of deleted.
 

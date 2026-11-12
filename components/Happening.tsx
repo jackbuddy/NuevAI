@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarX2, Sparkles, Star, Trophy, UtensilsCrossed } from 'lucide-react';
-import { CalEvent, iso, nowLA, parseISO, timeLabel } from '@/lib/calendar';
+import { CalEvent, appliesToCampus, cancelsClasses, iso, nowLA, parseISO, timeLabel } from '@/lib/calendar';
 import { CAMPUSES, Campus } from '@/lib/chat';
 import { track } from '@/lib/analytics';
 import { Followed, getFollows, onFollowsChange } from '@/lib/visit';
@@ -73,9 +73,10 @@ export function Happening({ campus, onCampus, onOpenCalendar, onAsk }: {
       return first ? sorted.filter((e) => e.event_date === first).slice(0, 2) : [];
     };
     return {
-      noSchool: ev.find((e) => e.category === 'no_school' && e.event_date <= today && e.end_date >= today) ?? null,
+      // a no-classes event counts only for the viewer's own division ("No LS/MS Classes" is a normal school day in San Mateo)
+      noSchool: ev.find((e) => e.category === 'no_school' && e.event_date <= today && e.end_date >= today && (e.no_classes ? cancelsClasses(e, campus) : appliesToCampus(e, campus))) ?? null,
       games: upcoming(forCampus(ev.filter((e) => e.kind === 'game'))),
-      programs: upcoming(ev.filter((e) => e.kind === 'event' && e.category !== 'athletics' && e.category !== 'no_school')),
+      programs: upcoming(ev.filter((e) => e.kind === 'event' && e.category !== 'athletics' && e.category !== 'no_school' && appliesToCampus(e, campus))),
       mine,
     };
   }, [events, today, follows, campus]);

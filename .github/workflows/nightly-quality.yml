@@ -18,8 +18,8 @@ jobs:
     env:
       BACKEND: ${{ vars.BACKEND_URL || 'https://nuevai-backend.onrender.com' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Wake backend and check data
@@ -29,11 +29,28 @@ jobs:
       - name: Golden set (serial)
         run: python -u eval_golden.py "$BACKEND" --sleep 6 --threshold 0
       - name: Upload report
+        id: upload
         if: always()
-        uses: actions/upload-artifact@v4
+        continue-on-error: true         # a flaky artifact service must not fail (or mask) the quality verdict below
+        timeout-minutes: 6
+        uses: actions/upload-artifact@v7
         with:
           name: golden-report
           path: data/eval/golden_*.json
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Wait before the second upload attempt
+        if: always() && steps.upload.outcome == 'failure'
+        run: sleep 60
+      - name: Upload report (second attempt)
+        if: always() && steps.upload.outcome == 'failure'
+        continue-on-error: true
+        timeout-minutes: 6
+        uses: actions/upload-artifact@v7
+        with:
+          name: golden-report-retry
+          path: data/eval/golden_*.json
+          retention-days: 30
           if-no-files-found: warn
       - name: Compare with baseline
         run: python scripts/check_baseline.py --report "$(ls -t data/eval/golden_*.json | head -1)"

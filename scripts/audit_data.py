@@ -29,6 +29,11 @@ What is checked (each line of output is a group of checks):
                 and no non-staff email address or phone number in the text. They are kept out of every other group (they are not part of
                 the pipeline's plan, so they are never orphans or "missing freshness")
 
+--ci runs only the groups that are meaningful on a GitHub runner (no local workbooks, saved pages or chunk files: bell.*, teams.* against the
+live sheets, ical.*, fresh.*, email.*, lunch.*) and skips the rest with a "skipped in CI" note. In CI mode only a "mismatch" (the index disagrees
+with its source) or a crash fails the run; a "conflict" (two sources disagree, needs a person) or an "orphan" is a warning annotation; a database
+that cannot be read fails; a source that cannot be fetched (feed, sheet: a network flake) is a warning.
+
 Exit status 1 when any group has a mismatch beyond what scripts/audit_known.json accepts; 2 on a crash. A "conflict" is two
 sources disagreeing with each other (needs a person to decide); a "mismatch" is the index disagreeing with its source (fixable).
 Nothing is written anywhere except the optional --json report. The feed URL is read from NUEVAI_CALENDAR_URL and never printed.
@@ -59,8 +64,10 @@ STRUCTURED = ("school_day", "school_courses", "school_clubs", "school_advisory",
 
 # --------------------------------------------------------------------------- reporting
 class Audit:
-    def __init__(self, known: dict, verbose=False):
-        self.known, self.verbose = known, verbose
+    WARN_KINDS = ("conflict", "orphan", "info")      # in CI mode: need a person (or a local run), never fail the unattended job
+
+    def __init__(self, known: dict, verbose=False, ci=False):
+        self.known, self.verbose, self.ci = known, verbose, ci
         self.g: dict[str, dict] = collections.OrderedDict()
 
     def grp(self, name):
@@ -88,6 +95,11 @@ class Audit:
             return "SKIP"
         if not d["bad"]:
             return "ok"
+        if self.ci:
+            hard = [b for b in d["bad"] if b[0] not in self.WARN_KINDS]
+            if not hard:
+                return "warn"
+            return "known" if len(hard) <= int(self.known.get(name, {}).get("max", 0)) else "FAIL"
         return "known" if len(d["bad"]) <= int(self.known.get(name, {}).get("max", 0)) else "FAIL"
 
     def report(self, out=print):
@@ -97,6 +109,12 @@ class Audit:
             total += d["n"]
             n_bad = len(d["bad"])
             bad += n_bad if st == "FAIL" else 0
+            if self.ci and os.getenv("GITHUB_ACTIONS"):          # annotations show on the run page
+                for kind, msg in d["bad"][:5]:
+                    lvl = "error" if st == "FAIL" and kind not in self.WARN_KINDS else "warning"
+                    out(f"::{lvl} title=audit {name} ({kind})::{msg[:300]}".replace("\n", " "))
+                if d["skip"]:
+                    out(f"::notice title=audit {name} skipped::{d['skip']}")
             kinds = collections.Counter(k for k, _ in d["bad"])
             extra = f"  [{', '.join(f'{v} {k}' for k, v in kinds.items())}]" if kinds else ""
             why = f"  ({d['skip']})" if d["skip"] else ""
@@ -286,6 +304,14 @@ def read_day_grid(ws) -> dict[date, dict]:
 NO_CLASS = re.compile(r"no class", re.I)
 FULL_DAY = re.compile(r"^full-day", re.I)
 LAG_MAX = 12
+CI_GROUPS = ("bell", "teams", "ical", "fresh", "email", "lunch")
+CI_SKIPPED = {          # groups that need files only the owner's machine has (workbooks, saved pages, chunks.json); run `python scripts/audit_data.py` locally for them
+    "days": [("days.sheet", "needs the master-schedule workbook, which is downloaded by hand")],
+    "courses": [("courses.index", "needs the master-schedule and course-offerings workbooks")],
+    "clubs": [("clubs.index", "needs the clubs workbook")],
+    "index": [("index.orphan_rows", "compares the table with a full local pipeline run; CI only builds the calendar, lunch, live-sheet and knowledge-file part")],
+    "canon": [("canon.*", "needs the saved source pages and the full local chunk list")],
+}
 SHORT_DAY = re.compile(r"dismissal|early release", re.I)
 
 
@@ -337,6 +363,13 @@ def audit_days(A: Audit, S: Sources):
         by[r["metadata"].get("event_date")].append(r)
     order = {k: v for k, v in S.bell["orders"].items()}
     blocks = S.bell["blocks"]
+    special = {}          # "40" / "90" -> [(start, end), ...] read straight from the "Special Schedule Configurations" cells next to the calendar
+    for row in S.master["Calendar AB + Special Schedule"].iter_rows(values_only=True):
+        for v in row[10:14]:
+            m = re.match(r"Community Time \[(\d+) Minutes\]", v.strip()) if isinstance(v, str) else None
+            if m:
+                special[m.group(1)] = re.findall(r"(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})", v)
+    A.check(g, set(special) == {"40", "90"}, f"expected special schedules for Community 40 and 90 minutes, found {sorted(special)}")
     for d, v in sorted(tab1.items()):
         rs = by.get(d.isoformat(), [])
         t, label = v["type"], v["label"]
@@ -351,7 +384,16 @@ def audit_days(A: Audit, S: Sources):
             want = (f"{t} day: Blocks {seq[0]}-{max(seq)} meet, in the order {', '.join(map(str, seq))}. Times: "
                     f"Block {seq[0]} {blocks[seq[0]].replace('-', '-')}; Block {seq[1]} {blocks[seq[1]]}; Lunch 11:30 AM-12:00/12:30 PM; "
                     f"Block {seq[2]} {blocks[3]}; Block {seq[3]} {blocks[4]}")
-            A.check(g, want in text, f"{d} ({t}): block order/times in the index differ from knowledge/bell_schedule.md: {text[:150]!r}")
+            sk = re.search(r"Community \((40|90)'\)", label)
+            if sk and special.get(sk.group(1)):
+                # a Community-time day runs on the sheet's special schedule: every time in that configuration cell must be in the index text,
+                # and the day's own block order must be applied to it (Block n = this day's n-th block)
+                flat_text = re.sub(r"\s*(AM|PM)\b", "", text)
+                missing = [f"{a}-{b}" for a, b in special[sk.group(1)] if f"{a}-{b}" not in flat_text]
+                A.check(g, not missing and "SPECIAL" in text, f"{d} ({t}, Community ({sk.group(1)}')): special-schedule times missing from the index: {missing[:3]} {text[:120]!r}")
+                A.check(g, f"Block {seq[2]} " in text and text.index(f"Block {seq[2]} ") < text.index(f"Block {seq[3]} "), f"{d} ({t}): special schedule does not follow the day's block order {seq}")
+            else:
+                A.check(g, want in text, f"{d} ({t}): block order/times in the index differ from knowledge/bell_schedule.md: {text[:150]!r}")
         elif SHORT_DAY.search(t + " " + label):
             A.check(g, m.get("kind") == "short_day" and "early dismissal" in text and "No classes" not in text, f"{d}: sheet says {t!r} ({label!r}), a short day, but the index says: {text[:120]!r}")
         elif FULL_DAY.search(label) and not NO_CLASS.search(label):
@@ -847,12 +889,23 @@ def rd_schedule(text: str):
 def compare_team(A: Audit, g: str, label: str, evs: list[dict], db_rows: list[dict], today: date):
     lo, hi = today - timedelta(days=14), today + timedelta(days=430)
     exp, firsts = [], {}
-    for e in evs:                  # sheets repeat the home games in a second table: the first entry is the one the pipeline keeps
+    for e in evs:                  # sheets repeat the home games in a second table; the copy WITH a time is the one the pipeline keeps
         if not (lo <= e["date"] <= hi):
             continue
         k = (e["date"], e["opp"], e["ha"])
         if k in firsts:
-            A.check(g, firsts[k]["start"] == e["start"], f"{label}: {e['date']} vs {e['opp']} appears twice in the sheet with times {firsts[k]['start']} and {e['start']}", "conflict")
+            f = firsts[k]
+            if f["start"] == e["start"]:
+                A.passed(g)
+            elif f["start"] is None or e["start"] is None:
+                chosen = e if f["start"] is None else f
+                A.passed(g)
+                A.info(g, f"{label}: {e['date']} vs {e['opp']} is listed twice in the sheet, once without a time; the pipeline uses the copy with the time ({chosen['start']})")
+                if f["start"] is None:
+                    exp[exp.index(f)] = e
+                    firsts[k] = e
+            else:
+                A.check(g, False, f"{label}: {e['date']} vs {e['opp']} appears twice in the sheet with different times {f['start']} and {e['start']} (the first is used; fix the sheet)", "conflict")
             continue
         firsts[k] = e
         exp.append(e)
@@ -861,7 +914,7 @@ def compare_team(A: Audit, g: str, label: str, evs: list[dict], db_rows: list[di
     for e in exp:
         cands = [i for i, m in enumerate(got) if i not in used and m.get("event_date") == e["date"].isoformat()
                  and norm(e["opp"]) in norm(m.get("summary", ""))]
-        if not A.check(g, bool(cands), f"{label}: {e['date']} {'game vs' if e['game'] else 'note'} {e['opp']!r} is in the sheet but not in the index"):
+        if not A.check(g, bool(cands), f"{label}: {e['date']} {'game vs' if e['game'] else 'note'} {e['opp']} is in the sheet but not in the index"):
             continue
         i = cands[0]
         used.add(i)
@@ -873,7 +926,10 @@ def compare_team(A: Audit, g: str, label: str, evs: list[dict], db_rows: list[di
                 A.check(g, flat(m.get("location", "")) == flat(e["loc"]), f"{label} {e['date']} vs {e['opp']}: sheet location {e['loc']!r}, index {m.get('location')!r}")
     for i, m in enumerate(got):
         if i not in used:
-            A.check(g, False, f"{label}: index has {m.get('summary')!r} on {m.get('event_date')}, not in the sheet (stale or removed)")
+            if (m.get("event_date") or "") < today.isoformat():
+                A.info(g, f"{label}: past row {m.get('summary')!r} on {m.get('event_date')} is no longer on the sheet (kept as history)")
+            else:
+                A.check(g, False, f"{label}: index has {m.get('summary')!r} on {m.get('event_date')}, not in the sheet (stale or removed; the next refresh removes it)")
 
 
 def audit_teams(A: Audit, S: Sources):
@@ -966,6 +1022,8 @@ def parse_feed(text: str) -> tuple[list[dict], dict]:
         if s is None or not summ:
             continue
         loc = re.sub(r"\\([nN,;\\])", lambda m: "\n" if m.group(1) in "nN" else m.group(1), props.get("LOCATION", ("", ""))[1]).strip()
+        from pipeline import safety
+        loc = safety.scrub(loc)[0]            # the pipeline strips meeting passcodes (?pwd=) from invite links before indexing
         d0 = s.date()
         if allday:                 # all-day DTEND is exclusive; a timed DTEND on an all-day event is inclusive
             end_d = (e.date() - timedelta(days=1) if e_all else e.date()) if e else d0
@@ -986,6 +1044,8 @@ def audit_ical(A: Audit, S: Sources):
     load_dotenv(ROOT / ".env")
     url = os.getenv("NUEVAI_CALENDAR_URL", "").strip().strip("\"'")
     if not url:
+        if S.args.ci:       # the unattended job must not pass without reading the calendar: the secret is missing or empty
+            return A.check(g, False, "NUEVAI_CALENDAR_URL is not set: the daily refresh could not read the calendar (repository secret missing or empty)")
         return A.skip(g, "NUEVAI_CALENDAR_URL not set")
     try:
         import requests
@@ -998,7 +1058,8 @@ def audit_ical(A: Audit, S: Sources):
     ev, st = parse_feed(text)
     A.info(g, f"{st['vevent']} VEVENTs, {st['recurring']} with RRULE, {st['cancelled']} cancelled, tz {dict(st['tzids'])}, "
               f"{st['utc_times']} UTC times, {st['floating_times']} floating times")
-    A.check(g, st["recurring"] == 0, f"{st['recurring']} recurring events in the feed are not expanded by the pipeline")
+    if st["recurring"]:
+        A.check(g, False, f"{st['recurring']} recurring events (RRULE) in the feed: the pipeline expands them (pipeline/calendar_feed.py occurrences) but this independent reader does not, so ical.index may differ for them", "conflict")
     A.check(g, set(st["tzids"]) <= {"America/Los_Angeles"}, f"feed uses time zones other than America/Los_Angeles: {dict(st['tzids'])}")
     A.check(g, st["floating_times"] == 0, f"{st['floating_times']} timed events have no time zone (assumed Pacific by the pipeline)", "conflict")
     A.check(g, st["vevent"] == len(ev) + st["cancelled"], f"{st['vevent'] - len(ev) - st['cancelled']} events could not be read (no start or summary)")
@@ -1012,7 +1073,7 @@ def audit_ical(A: Audit, S: Sources):
     lo, hi = calendar_feed.window_floor(S.today), S.today + timedelta(days=430)
     seen, uniq = set(), []
     for e in sorted(ev, key=lambda x: (x["date"], x["start"] or "", x["summary"])):
-        if e["end_date"] < lo or e["date"] > hi:
+        if e["end_date"] < lo or e["date"] > hi or calendar_feed.CALLED_OFF.search(e["summary"]):     # "(MOVED TO OCT 8) ..." placeholders are not indexed
             continue
         k = (e["summary"], e["raw_start"], e["raw_end"], e["location"])
         if k not in seen:
@@ -1037,8 +1098,14 @@ def audit_ical(A: Audit, S: Sources):
     A.passed(g, len(exp))
     for k, n in (exp - got).items():
         lag.append(f"feed event not in the index (new or edited since the last refresh): {k[0]!r} {k[1]} {k[2] or 'all day'}-{k[3]} end {k[5]} loc {k[6]!r}")
+    history = 0
     for k, n in (got - exp).items():
+        if k[5] < S.today.isoformat():          # a past event of this school year that has left the feed: kept on purpose ("when was X" stays answerable)
+            history += n
+            continue
         lag.append(f"index event not in the feed (moved, edited or removed since the last refresh): {k[0]!r} {k[1]} {k[2] or 'all day'}-{k[3]} end {k[5]}")
+    if history:
+        A.info(g, f"{history} past calendar rows of this school year are no longer in the feed and are kept as history")
     A.check(g, len(lag) <= LAG_MAX, f"{len(lag)} calendar differences between the feed and the index (more than a day's churn of {LAG_MAX}: is the daily refresh failing?)")
     for x in lag[:LAG_MAX + 1]:
         A.info(g, f"awaiting the daily refresh: {x}")
@@ -1073,7 +1140,7 @@ def audit_ical(A: Audit, S: Sources):
             if d >= lo:
                 expd[d.isoformat()].add(flat(e["summary"]))
             d += timedelta(days=1)
-    differing = [d for d in sorted(set(expd) | set(digest)) if expd.get(d, set()) != digest.get(d, set())]
+    differing = [d for d in sorted(set(expd) | set(digest)) if expd.get(d, set()) != digest.get(d, set()) and d >= S.today.isoformat()]   # past days are kept as history
     A.passed(g, len(set(expd) | set(digest)) - len(differing))
     A.check(g, len(differing) <= 6, f"{len(differing)} day digests differ from the feed (a day's churn is tolerated; more means the refresh is failing): {differing[:8]}")
     for d in differing[:6]:
@@ -1143,7 +1210,7 @@ def audit_fresh(A: Audit, S: Sources):
         m = r["metadata"]
         if m.get("source") not in STRUCTURED:
             docs[m.get("source_url")].append(r)
-    nstale = 0
+    nstale = unverifiable = 0
     pages, pages_by_prefix = {}, {}
     for pth in config.PAGES_DIR.glob("*.json") if config.PAGES_DIR.exists() else []:
         d = json.loads(pth.read_text(encoding="utf-8"))
@@ -1160,12 +1227,20 @@ def audit_fresh(A: Audit, S: Sources):
         flags = {bool(r["metadata"].get("stale")) for r in rs if "stale" in r["metadata"]}
         if not flags:
             continue
+        if page is None and flags == {True} and not c["stale"]:
+            # no saved copy of the page here (CI): a short first line such as "Last updated: 5/09/2023" never becomes a chunk, so the chunk text
+            # alone cannot show why the page was flagged stale. Only the other direction (flagged current, text says old) is checkable.
+            A.passed(g)
+            unverifiable += 1
+            continue
         nstale += c["stale"]
         title = rs[0]["metadata"].get("title", "")[:50]
         # chunk-level: a chunk of a stale document must itself be flagged (every chunk carries the page's verdict)
         A.check(g, flags == {c["stale"]} or (not c["stale"] and flags == {True} and len(rs) == 1),
                 f"{title!r} ({rs[0]['metadata'].get('source')}): flagged stale={sorted(flags)} but its text says stale={c['stale']} ({c['stale_reason']})")
     A.info(g, f"{nstale} documents classified as written for an earlier school year")
+    if unverifiable:
+        A.info(g, f"{unverifiable} documents flagged stale could not be re-derived here (their saved page is not on this machine); checked by local runs")
     for src in ("public_site",):
         old = [rs[0]["metadata"].get("title", "")[:50] for rs in docs.values() if rs[0]["metadata"].get("source") == src and any(r["metadata"].get("stale") for r in rs)]
         A.info(g, f"{src}: {len(old)} pages flagged stale: {old[:6]}")
@@ -1195,8 +1270,8 @@ def audit_fresh(A: Audit, S: Sources):
         if m.get("source") in ("school_day", "calendar", "calendar_sheet", "calendar_day"):
             d = m.get("event_date")
             if m.get("source") != "school_day":
-                floor = calendar_feed.window_floor(S.today) if m.get("source") in ("calendar", "calendar_day") else S.today - timedelta(days=15)
-                if d and d < floor.isoformat():
+                floor = calendar_feed.window_floor(S.today)
+                if m.get("source") != "calendar_sheet" and d and d < floor.isoformat():      # team-sheet rows of past games are kept as history
                     old_cal.append(f"{m.get('source')} row {r['chunk_id']} dated {d}")
                 A.passed(g)
             else:
@@ -1556,15 +1631,22 @@ def main() -> int:
     ap.add_argument("--today", type=date.fromisoformat, default=date.today())
     ap.add_argument("--json", help="write the results here")
     ap.add_argument("--strict", action="store_true", help="a skipped group counts as a failure")
+    ap.add_argument("--ci", action="store_true", help="unattended CI mode: only the groups that make sense without local workbooks/pages; see the docstring")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
     known = json.loads(KNOWN_FILE.read_text()) if KNOWN_FILE.exists() else {}
-    A = Audit(known, args.verbose)
+    A = Audit(known, args.verbose, ci=args.ci)
     S = Sources(args)
     if S.db is None and not args.offline:
         print(f"note: database not read ({S.db_err}); database groups are skipped\n")
+        if args.ci:
+            A.check("ci.database", False, f"the index could not be read ({S.db_err}); nothing could be verified")
     for name, fn in (("days", audit_days), ("bell", audit_bell), ("courses", audit_courses), ("clubs", audit_clubs),
                      ("teams", audit_teams), ("ical", audit_ical), ("fresh", audit_fresh), ("index", audit_orphans), ("email", audit_email), ("lunch", audit_lunch), ("canon", audit_canon)):
+        if args.ci and name not in CI_GROUPS:
+            for grp_name, why in CI_SKIPPED.get(name, []):
+                A.skip(grp_name, f"skipped in CI: {why}")
+            continue
         try:
             fn(A, S)
         except Exception as e:

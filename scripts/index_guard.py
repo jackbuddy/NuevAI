@@ -19,9 +19,23 @@ try:
 except ImportError:
     pass
 STATE = ROOT / "data" / "index_count_before.txt"
+STATE_AFTER = ROOT / "data" / "index_count_after.txt"       # read by scripts/ci_summary.py
 
 
 def count_rows() -> int:
+    """Exact row count, retried: a transient network/API error is not a reason to fail the unattended job."""
+    import time
+    for attempt in range(4):
+        try:
+            return _count_rows()
+        except Exception:
+            if attempt == 3:
+                raise
+            time.sleep(3 * (attempt + 1))
+    return 0
+
+
+def _count_rows() -> int:
     from supabase import create_client
     import settings
     sb = create_client(os.environ["SUPABASE_URL"].strip().strip("\"'"), os.environ["SUPABASE_SERVICE_ROLE_KEY"].strip().strip("\"'"))
@@ -46,6 +60,7 @@ def main() -> int:
         return 1
     before = int(STATE.read_text())
     drop = (before - n) / before if before else 0.0
+    STATE_AFTER.write_text(str(n))
     print(f"index rows: before {before}, after {n} ({-drop:+.1%})")
     if drop > a.max_drop:
         print(f"::error::index row count dropped {drop:.1%} (limit {a.max_drop:.0%}). A bad scrape may have deleted data; "

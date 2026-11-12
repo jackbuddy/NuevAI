@@ -60,6 +60,7 @@ export function loadCampus(): Campus | null {
 }
 export function saveCampus(c: Campus | null) {
   try { if (c) localStorage.setItem(CAMPUS_KEY, c); else localStorage.removeItem(CAMPUS_KEY); } catch {}
+  try { window.dispatchEvent(new Event('nuevai:campus')); } catch {}      // the Calendar tab (kept mounted) re-reads the preference
 }
 
 export async function streamChat(query: string, history: { role: string; content: string }[], h: StreamHandlers, signal?: AbortSignal, grade?: number | null, campus?: Campus | null) {
