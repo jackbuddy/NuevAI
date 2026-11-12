@@ -31,7 +31,7 @@ import freshness                    # noqa: E402
 from pipeline import config, safety  # noqa: E402
 
 DOC_SOURCES = {"google_doc": 0, "manual": 1, "public_site": 2, "google_slides": 2, "nexus": 3, "google_sheet": 3}
-SKIP_SOURCES = {"calendar", "calendar_day", "calendar_sheet", "lunch", "email", "school_day", "school_courses", "school_clubs",
+SKIP_SOURCES = {"calendar", "calendar_day", "calendar_sheet", "lunch", "email", "share_sheet", "share_doc", "school_day", "school_courses", "school_clubs",
                 "school_advisory", "school_facts", "school_canonical"}
 DOC_COVERAGE = 0.75      # share of a copy's sentences found in a better copy for it to count as a copy at all
 ROW_COVERAGE = 0.60      # and per row, so a row that holds text only this copy has is kept
@@ -70,7 +70,7 @@ def doc_key(r: dict) -> str:
 def plan(rows: list[dict]) -> dict[str, tuple[str, str]]:
     """-> {chunk_id: (reason, note)} for every row that should be flagged."""
     flags: dict[str, tuple[str, str]] = {}
-    live = [r for r in rows if not (r.get("metadata") or {}).get("superseded") and not freshness.is_email_row(r["chunk_id"], (r.get("metadata") or {}).get("source"))]
+    live = [r for r in rows if not (r.get("metadata") or {}).get("superseded") and not freshness.is_ingested_row(r["chunk_id"], (r.get("metadata") or {}).get("source"), r.get("metadata"))]
     # 1. sensitive content
     for r in live:
         if (r["metadata"] or {}).get("source") in SKIP_SOURCES or (r["metadata"] or {}).get("source") in ("calendar", "calendar_day", "calendar_sheet", "lunch"):

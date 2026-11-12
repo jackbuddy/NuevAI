@@ -1,8 +1,12 @@
 name: Email ingest
 
-# Every 30 minutes: read the dedicated Gmail inbox over IMAP, and index forwarded school emails from allowed senders
-# (see README > Operations). Secrets reach the job only as environment variables and are never echoed.
-# "No new mail" is a success; only real errors (login failure, a message that could not be processed) fail the run.
+# Every 30 minutes, two incremental steps for the dedicated Gmail account (see README > Operations > Auto-ingestion):
+#   1. read the inbox over IMAP and index forwarded school emails from allowed senders (unseen messages only)
+#   2. read the Google Sheets / Docs shared with the account over the Drive + Sheets APIs (only files new or changed since the last successful
+#      ingest; the manifest lives in Supabase because runners are ephemeral). Time-boxed so it always finishes inside the job timeout; what does
+#      not fit is picked up by the next run. Skipped with a clear message when the three GOOGLE_OAUTH_* secrets are not set.
+# Secrets reach each step only as environment variables and are never echoed. "Nothing new" is a success; a malformed email or an oddly structured
+# sheet is logged and skipped. Only systemic failures (login/auth, Google API access, Drive listing, database) turn the run red.
 on:
   schedule:
     - cron: "*/30 * * * *"
@@ -34,4 +38,15 @@ jobs:
           EMAIL_ALLOWED_SENDERS: ${{ secrets.EMAIL_ALLOWED_SENDERS }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: python scripts/email_ingest.py --once
+        run: python scripts/email_ingest.py --only email --once
+      - name: Ingest Google Sheets and Docs shared with the account
+        # runs even if the email step failed, so one broken part never starves the other; the job is still red if either failed
+        if: ${{ !cancelled() }}
+        env:
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          GOOGLE_OAUTH_REFRESH_TOKEN: ${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SHARE_INGEST_BUDGET_SECONDS: "120"
+        run: python scripts/email_ingest.py --only google --once

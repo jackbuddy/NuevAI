@@ -42,6 +42,7 @@ jobs:
           python test_pipeline_fixes.py
           python test_resilience.py
           python test_email_ingest.py
+          python test_share_ingest.py
           python test_lunch.py
           python test_insights.py
 

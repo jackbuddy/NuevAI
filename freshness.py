@@ -16,7 +16,7 @@ import re
 from datetime import date, datetime, timedelta
 
 CURRENT_BY_CONSTRUCTION = {"school_day", "school_courses", "school_clubs", "school_advisory", "school_facts", "school_canonical",
-                           "calendar", "calendar_day", "calendar_sheet", "link_registry", "email", "lunch"}
+                           "calendar", "calendar_day", "calendar_sheet", "link_registry", "email", "lunch", "share_sheet", "share_doc"}
 
 YEAR_RANGE = re.compile(r"(?<!\d)(20\d{2})\s*[-–—/]\s*(?:20)?(\d{2})(?![\d:])")
 SHORT_RANGE = re.compile(r"(?<![\d:.$/])(2[3-9])\s*[-–]\s*(2[4-9])(?![\d:%])")
@@ -138,6 +138,22 @@ def is_email_row(chunk_id: str = "", source: str | None = None, metadata: dict |
     or row-count routine must leave them alone."""
     m = metadata or {}
     return str(chunk_id or "").startswith(EMAIL_ID_PREFIX) or source == "email" or m.get("source") == "email" or m.get("source_type") == "email"
+
+
+# ---------------------------------------------------------------- Google Sheets / Docs shared with the ingest account (pipeline/share_ingest.py)
+SHARE_ID_PREFIX = "share-"          # share-<file id hash>-<t|e><...>: every chunk of one shared file starts with share-<file id hash>-
+
+
+def is_share_row(chunk_id: str = "", source: str | None = None, metadata: dict | None = None) -> bool:
+    """True for a chunk written by the Drive ingest (shared Sheets/Docs and the event records parsed from them)."""
+    m = metadata or {}
+    return str(chunk_id or "").startswith(SHARE_ID_PREFIX) or source in ("share_sheet", "share_doc") or m.get("source") in ("share_sheet", "share_doc") \
+        or bool(m.get("share_file_hash"))
+
+
+def is_ingested_row(chunk_id: str = "", source: str | None = None, metadata: dict | None = None) -> bool:
+    """An email OR a shared-file row: neither is part of run_pipeline's plan, so every prune, orphan, superseded or row-count routine skips both."""
+    return is_email_row(chunk_id, source, metadata) or is_share_row(chunk_id, source, metadata)
 
 
 # ---------------------------------------------------------------- the cafe's monthly lunch menu (pipeline/lunch.py)

@@ -90,6 +90,61 @@ attachment is best; avoid student lists); (2) Actions > Email ingest > Run workf
 (4) ask the site a question about the email's facts (answers can lag up to 6 h through the answer cache for repeated questions, so use a new wording) and expect
 "per the school email of <date>"; (5) `python scripts/email_remove.py "<subject>"` to preview the removal.
 
+### Auto-ingestion from nuevai.updates@gmail.com (emails + shared Google Sheets/Docs)
+Anything sent to the account's inbox (the email section above) or **shared with the account in Google Drive** (a Sheet or Doc, or a folder of them) flows into the
+knowledge base on the existing 30-minute workflow `email-ingest.yml`: step 1 reads new mail, step 2 (`python scripts/email_ingest.py --only google`) reads Drive.
+Each run only does what is new: mail by IMAP unseen state; files by Drive id + `modifiedTime`/`version` against the manifest.
+
+- **Architecture:** `pipeline/gapi.py` (OAuth refresh-token client over `requests`: Drive `files.list` with `sharedWithMe = true` plus recursion into shared folders,
+  Sheets API v4 `spreadsheets.get` with grid data, Docs via Drive HTML export; backoff on 429/5xx, token refreshed in-process) -> `pipeline/gsheets.py` (cells, merges, hidden rows,
+  stacked tables -> the same CSV-style table text as the existing Sheets path, row-aligned chunks, event records) / `pipeline/share_ingest.py` (Docs, manifest, replace, run loop) ->
+  `pipeline/schedule_text.py` (dates/times/practice summaries, shared with emails). Email extensions are in `pipeline/email_ingest.py`.
+- **Manifest (survives CI runs):** Supabase table `share_ingest_manifest` (one row per file, keyed by a 12-hex hash of the Drive file id: modifiedTime, version, status, retry counter,
+  missing-run counter) and `share_ingest_log` (review log). Created with `supabase/share_ingest.sql` (already applied). If the tables are missing the run still works from the chunks' own
+  metadata and logs to stdout. No bodies, file ids or owner addresses are stored (owner = email domain only).
+- **IDs and replace:** every chunk of a file is `share-<file hash>-...` (text `...-s<tab id>t<n>-<part>` / `...-d-<n>`, events `...-e<hash>`). An edited file upserts changed chunks, then deletes the ids
+  of that file's prefix that are no longer produced (rows removed from the sheet disappear). Re-sharing the same file is a no-op. Deletion is limited to the exact `share-<hash>-` prefix.
+  Emails: `email-<content hash>-<n>` as before; an UPDATED announcement (same normalized subject + same original sender = thread key, stored as a hash) flags the older version
+  `superseded` (kept, ignored by retrieval); identical re-forwards stay no-ops; a late-arriving older version is the one flagged.
+- **Chunking rule:** by whole rows / logical tables, never by size: a table stays in one chunk up to ~1,500 characters, longer ones are cut BETWEEN rows with the header row repeated in each
+  chunk; an over-long single row gets a chunk of its own; stacked tables, side-by-side tables, captions and repeated header rows are recognised; hidden rows/columns are left out and noted.
+- **Events:** schedule tables (HOME TEAM/AWAY TEAM like the school's sheets, or OPPONENT + H/A + LOCATION) and email/doc game lists also produce `calendar_sheet` event records (same schema as
+  `pipeline/sheets.event_chunk`: `kind` game/practice/event, `event_date`, `home_away`, team label like `US Boys Soccer Varsity`) so "next game", the Calendar tab and Happening cards see them. Recurring
+  practice ("Tue/Thu 4:00-5:30 PM") is kept as a clean summary line on top of the text; dated practice events are only created when the announcement bounds them ("through Dec 12").
+- **Precedence when the same game is in several places** (public team tab `sheet-*`, shared sheet `share-*`, email `email-*`): same team words + date + kind + opponent = one event; the NEWEST source wins by day
+  (shared sheet: Drive last-modified; email: sent day; public tab: day last downloaded); a tie goes to the shared sheet/email. Resolved at read time in `event_precedence.py`; no other feature's rows are touched.
+- **Labels/prompt:** context shows `[Shared sheet: <title>, updated Nov 10, 2026]` / `[Shared doc: ...]` / `[School email, sent ...]`; newest wins; the model cites "per the varsity soccer schedule sheet updated Nov 10", never an owner or address.
+- **Never indexed:** roster-like or student data (name columns with grade/position/size/contact, student/guardian columns, sign-up/response/attendance/roster file names, `guard.student_data_reason`) ->
+  logged `needs_review`; a roster tab is skipped while the schedule tab of the same file is still indexed; sign-up/volunteer/parent columns are dropped; non-staff emails/phones redacted everywhere; hidden tabs are not read.
+  Share rows are exempt from every prune/superseded/orphan routine (`freshness.is_share_row`, `is_ingested_row`).
+- **Failures:** a bad file or message is logged with a reason and skipped; retried up to 3 times then `failed` until it changes. Exit code 1 only for systemic problems (auth/API disabled, Drive listing down, database/embedding down).
+  Runs are time-boxed (`SHARE_INGEST_BUDGET_SECONDS`, 120 in the workflow): newest-changed files first, the rest wait for the next run. Caps: 25 tabs, 2,000 rows x 40 columns per tab, 150 chunks per file (truncation is logged).
+  A file no longer listed for 2 complete runs in a row is flagged `superseded` (chunks kept) and the manifest says `unshared`; sharing it again restores it. An empty or incomplete listing never unshares anything.
+
+**One-time Google setup (about 10 minutes):**
+1. console.cloud.google.com -> create a project (any name). APIs & Services > Library: enable **Google Drive API** and **Google Sheets API**.
+2. OAuth consent screen: user type **External**, app name, your email; scopes `.../auth/drive.readonly` and `.../auth/spreadsheets.readonly`; add `nuevai.updates@gmail.com` as a **Test user**.
+3. Credentials > Create credentials > OAuth client ID > application type **Desktop app**. Copy the client id and secret.
+4. **IMPORTANT, do this before step 5: set the consent screen's Publishing status to "In production" (Publish app). An External app left in "Testing" makes Google expire refresh tokens after 7 DAYS, and the Action turns red a week later.
+   The app may stay unverified (you only see an "unverified app" warning once; personal-use limits apply).**
+5. On your machine, signed in to the browser as nuevai.updates@gmail.com: `GOOGLE_OAUTH_CLIENT_ID=... GOOGLE_OAUTH_CLIENT_SECRET=... python scripts/google_auth_setup.py` (or run it and answer the prompts).
+   It prints only the refresh token, once, and writes nothing to disk.
+6. GitHub > Settings > Secrets and variables > Actions: add `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN`. Until they exist the step prints "Google ingestion not configured" and exits 0 (email keeps working).
+If the token is ever revoked or expires, the run turns red with "Google refused the stored refresh token ... Re-authorize": repeat step 5 and update the secret.
+
+**Review / remove / force:** `python scripts/share_list.py` (log; `--files` manifest; `--chunks` indexed files; `--status needs_review`), `python scripts/share_remove.py "<title>"` (dry run by default, `--yes` deletes that file's `share-` rows
+only and marks it `removed` until it changes), `python scripts/email_ingest.py --only google --file-id <Drive id>` (re-ingest one file now), `--force`, `--dry-run`, `--limit N`, `--only email|google`;
+`python scripts/email_ingest.py --sheet-json saved.json --show-subjects` analyses a saved spreadsheets.get response offline. `python scripts/audit_data.py` has `share.*` groups. Tests: `python test_share_ingest.py` (offline, fake Google/Supabase).
+
+**Exact end-to-end test (after the secrets exist and this is merged to main):**
+1. Share a game-schedule Google Sheet (viewer is enough) with nuevai.updates@gmail.com. Use a title like "Varsity Boys Soccer 2026-27" with a header row `DATE | OPPONENT | H/A | TIME | LOCATION` and a few future games; no student names.
+2. From an allowed address, email (or forward) a practice announcement, e.g. subject "Ultimate Frisbee practice" and body "Practice: Tuesdays and Thursdays 4:00-5:30 PM at Field 2" plus a line `Sat 11/21 vs Menlo 10:00 AM (Home)`.
+3. Actions > Email ingest > Run workflow (or wait <= 30 min). Both steps should end with `summary: indexed=1` style lines; `python scripts/share_list.py` shows the sheet `indexed` with chunks and events; `python scripts/email_list.py` shows the email.
+4. Ask the site (new wording each time because of the answer cache): "when is the next varsity soccer game", "when does Ultimate Frisbee practice". Expect the dates/times/places from your files and "per the ... schedule sheet updated <date>" / "per the school email of <date>".
+5. Update test: change a time and delete a game row in the sheet, rerun the workflow: `share_list.py` shows it `indexed` again ("N changed, M removed chunk(s)"); the bot gives the new time and no longer lists the deleted game; `share_list.py --chunks` still shows one entry for the file. Send a corrected version of the email (same subject, same sender): the old one is `superseded`.
+6. Broken-input test: share a sheet named "Test roster" (or one with Student/Grade columns) and email gibberish: the run stays green, `share_list.py --status needs_review` explains the sheet, `email_list.py --status error` shows the bad mail (after 3 runs it is marked read).
+7. Cleanup: `python scripts/share_remove.py "Varsity Boys Soccer"` (preview), then `--yes`.
+
 ### Cafe lunch menu (`pipeline/lunch.py`, `lunch_lookup.py`, `GET /lunch`)
 The cafe (Epicurean Group, <https://nuevaschoolcafe.com/#our-menu>) posts one PDF per campus per month: San Mateo ("San Mateo US and Faculty Menu", the
 Upper School campus) and Hillsborough ("Lower and Middle School"; the separate PreK-K menu is not read). The daily `refresh-knowledge-base.yml` run has a

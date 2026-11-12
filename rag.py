@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 
 import embedder
+import event_precedence
 import freshness
 import guard
 import lunch_lookup
@@ -474,21 +475,21 @@ class Retriever:
                 if rd:
                     r["division"] = rd
                     r["rerank"] += DIV_BONUS if rd == division[0] else -(DIV_PENALTY_EXPLICIT if division[1] else DIV_PENALTY_DEFAULT)
-            if freshness.is_email_row(r.get("chunk_id", ""), None, m):
-                r["rerank"] += email_recency_boost(m.get("source_date"), today)     # newest email wins; emails are never "stale"
+            if freshness.is_ingested_row(r.get("chunk_id", ""), None, m):
+                r["rerank"] += email_recency_boost(m.get("source_date"), today)     # newest email / shared file wins; they are never "stale"
             elif freshness.meta_of(r)["stale"]:
                 r["rerank"] -= STALE_PENALTY       # written for an earlier school year: only wins when nothing current matches
         # the same document in two years ("2025-26 Course Catalog" / "2026-27 Course Catalog"): the older copy loses
         newest: dict[str, int] = {}
         for r in rows:
-            if freshness.is_email_row(r.get("chunk_id", ""), None, r.get("metadata")):
-                continue                                 # an email never demotes (or is demoted by) a document of another year
+            if freshness.is_ingested_row(r.get("chunk_id", ""), None, r.get("metadata")):
+                continue                                 # an email / shared file never demotes (or is demoted by) a document of another year
             f = freshness.meta_of(r)
             k = freshness.title_key((r.get("metadata") or {}).get("title", ""))
             if k and f["school_year"]:
                 newest[k] = max(newest.get(k, 0), int(f["school_year"][:4]))
         for r in rows:
-            if freshness.is_email_row(r.get("chunk_id", ""), None, r.get("metadata")):
+            if freshness.is_ingested_row(r.get("chunk_id", ""), None, r.get("metadata")):
                 continue
             f = freshness.meta_of(r)
             k = freshness.title_key((r.get("metadata") or {}).get("title", ""))
@@ -552,6 +553,7 @@ class Retriever:
                 .gte("metadata->>end_date", intent.start.isoformat()).lte("metadata->>event_date", intent.end.isoformat()) \
                 .or_(",".join(f"metadata->>summary.ilike.%{h}%" for h in intent.holidays)).limit(50).execute().data or []
             rows += [r for r in extra if r["chunk_id"] not in have and "basketball" not in (r["metadata"] or {}).get("summary", "").lower()]
+        rows = event_precedence.dedupe_events(rows)        # one copy of a team event listed by the public tab, a shared sheet and/or an email: newest source wins
         rows.sort(key=lambda r: ((r["metadata"] or {}).get("event_date", ""), (r["metadata"] or {}).get("start_time") or ""))
         self.calendar_cache.set(key, rows)
         return rows
@@ -568,6 +570,7 @@ class Retriever:
             r = self.sb().table(settings.CHUNKS_TABLE).select("chunk_id,content,metadata").in_("metadata->>source", ["calendar", "calendar_sheet"]) \
                 .ilike("metadata->>summary", f"%{t}%").gte("metadata->>end_date", (today - timedelta(days=30)).isoformat()).limit(40).execute().data or []
             rows += [x for x in r if x["chunk_id"] not in {y["chunk_id"] for y in rows}]
+        rows = event_precedence.dedupe_events(rows)
         rows = [r for r in rows if len(rows) <= 12]           # a word that matches dozens of rows is not a name
         rows.sort(key=lambda r: ((r["metadata"] or {}).get("event_date", ""), (r["metadata"] or {}).get("start_time") or ""))
         self.calendar_cache.set(key, rows, ttl=600)
@@ -981,7 +984,10 @@ def build_context(result: dict, max_events: int = 14, query: str = "") -> tuple[
         m = d.get("metadata") or {}
         f = freshness.meta_of(d)
         tag = ""
-        if freshness.is_email_row(d.get("chunk_id", ""), None, m):
+        if freshness.is_share_row(d.get("chunk_id", ""), None, m):
+            when = freshness.day_label(m.get("source_date"))
+            tag = f"[Shared {'doc' if m.get('source_type') == 'doc' else 'sheet'}: {(m.get('title') or '')[:70]}" + (f", updated {when}]" if when else "]") + " "      # handed over by staff; newest wins
+        elif freshness.is_email_row(d.get("chunk_id", ""), None, m):
             sent = freshness.day_label(m.get("source_date"))
             tag = f"[School email, sent {sent}] " if sent else "[School email] "          # a recent official update; newest wins over older sources
         elif f["stale"]:
