@@ -306,7 +306,7 @@ def read_day_grid(ws) -> dict[date, dict]:
 NO_CLASS = re.compile(r"no class", re.I)
 FULL_DAY = re.compile(r"^full-day", re.I)
 LAG_MAX = 12
-CI_GROUPS = ("bell", "teams", "ical", "fresh", "email", "lunch")
+CI_GROUPS = ("bell", "teams", "ical", "fresh", "email", "share", "lunch")
 CI_SKIPPED = {          # groups that need files only the owner's machine has (workbooks, saved pages, chunks.json); run `python scripts/audit_data.py` locally for them
     "days": [("days.sheet", "needs the master-schedule workbook, which is downloaded by hand")],
     "courses": [("courses.index", "needs the master-schedule and course-offerings workbooks")],
