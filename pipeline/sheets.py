@@ -71,7 +71,7 @@ def sports_events(page: dict, keep_from: date, keep_to: date) -> list[dict]:
     c = _cols(rows[hdr])
     if c["date"] is None or c["home"] is None:
         return []
-    out, seen = [], set()
+    out, seen = [], {}
     get = lambda r, k: (r[c[k]].strip() if c[k] is not None and c[k] < len(r) else "")
     for r in rows[hdr + 1:]:
         d = _date(get(r, "date"))
@@ -82,21 +82,28 @@ def sports_events(page: dict, keep_from: date, keep_to: date) -> list[dict]:
             home = get(r, "loc") or home
         key = (d, (home + "|" + away).lower())
         if key in seen:                                      # sheets repeat the home games in a second "Home schedule" table
+            prev = out[seen[key]]
+            if prev["start"] is None and _time(get(r, "time")):       # the copy that has a time wins over one without ("TBD" / empty)
+                out[seen[key]] = _event(page, d, home, away, r, get, c)
             continue
-        seen.add(key)
-        title = page["title"]
-        if not away:                                    # a note row such as "First Day of Practice"
-            summary, kind, ha, opp = f"{title} - {home.title() if home.isupper() else home}", "event", "", ""
-        else:
-            nueva_home = home.lower().startswith("nueva")
-            opp = away if nueva_home else home
-            ha = "home" if nueva_home else "away"
-            summary, kind = f"{title} - Game {opp} - {ha.title()}", "game"
-        start = _time(get(r, "time"))
-        t_label = get(r, "time") or ("time to be announced" if kind == "game" else "all day")
-        out.append({"date": d, "summary": summary, "kind": kind, "home_away": ha, "start": start, "time": t_label,
-                    "location": get(r, "loc"), "url": page["url"], "opp": opp})
+        seen[key] = len(out)
+        out.append(_event(page, d, home, away, r, get, c))
     return out
+
+
+def _event(page: dict, d: date, home: str, away: str, r: list, get, c: dict) -> dict:
+    title = page["title"]
+    if not away:                                    # a note row such as "First Day of Practice"
+        summary, kind, ha, opp = f"{title} - {home.title() if home.isupper() else home}", "event", "", ""
+    else:
+        nueva_home = home.lower().startswith("nueva")
+        opp = away if nueva_home else home
+        ha = "home" if nueva_home else "away"
+        summary, kind = f"{title} - Game {opp} - {ha.title()}", "game"
+    start = _time(get(r, "time"))
+    t_label = get(r, "time") or ("time to be announced" if kind == "game" else "all day")
+    return {"date": d, "summary": summary, "kind": kind, "home_away": ha, "start": start, "time": t_label,
+            "location": get(r, "loc"), "url": page["url"], "opp": opp}
 
 
 def event_chunk(e: dict) -> dict:

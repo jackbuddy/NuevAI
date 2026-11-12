@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, field_validator
 from dotenv import load_dotenv
 from groq import Groq
 
+import calendar_meta
 import settings
 from analytics import Analytics
 from cache import TTLCache
@@ -988,28 +989,69 @@ def _stream_inner(req: QueryRequest, request: Request, trace: Trace):
 
 
 # ------------------------------------------------------------------ calendar + links for the UI
+CAL_FIELDS = ("summary", "event_date", "end_date", "when", "time", "all_day", "start_time", "end_time", "location", "description", "category", "kind", "home_away")
+
+
+def calendar_event_out(meta: dict) -> dict:
+    """One /api/calendar event from a row's metadata. `division` ([] = whole school) and `no_classes` are stored by the calendar stage; rows
+    indexed before they existed get them computed from the title the same way, so the UI never depends on the refresh having run."""
+    m = meta or {}
+    e = {k: m.get(k) for k in CAL_FIELDS}
+    e["division"] = m["division"] if "division" in m else calendar_meta.divisions_of(m.get("summary") or "")
+    e["no_classes"] = m["no_classes"] if "no_classes" in m else calendar_meta.no_classes_for(m.get("summary") or "")
+    if e["no_classes"] and e["category"] != "no_school":
+        e["category"] = "no_school"
+    return e
+
+
+def _paged(query, cap: int, page: int = 500) -> list[dict]:
+    """Rows of a PostgREST query beyond its default page size (a busy month has more athletics rows than one page)."""
+    out, start = [], 0
+    while len(out) < cap:
+        r = query.range(start, start + page - 1).execute().data or []
+        out += r
+        if len(r) < page:
+            break
+        start += page
+    return out[:cap]
+
+
 @app.get("/api/calendar")
 def calendar_events(start: str = Query(..., alias="from"), to: str = Query(...), category: str = "", q: str = "", limit: int = 400):
+    """Events overlapping [from, to] plus `days`: the master schedule's record for each date in the range (A/B/A'/B' day type, no-classes
+    days, special bell schedule, the day's event), so the Calendar tab can show a day-type badge on every date."""
     for d in (start, to):
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", d):
             raise HTTPException(400, "from/to must be YYYY-MM-DD")
     key = (start, to, category, q.lower(), limit)
     if (hit := api_cache.get(key)) is not None:
         return hit
-    query = get_supabase().table(settings.CHUNKS_TABLE).select("metadata").in_("metadata->>source", ["calendar", "calendar_sheet"]) \
-        .gte("metadata->>end_date", start).lte("metadata->>event_date", to)
-    if category and re.fullmatch(r"[a-z_]{3,20}", category):
-        query = query.eq("metadata->>category", category)
-    if q:
-        safe = re.sub(r"[^A-Za-z0-9 '&-]", "", q)[:60]
-        if safe:
-            query = query.or_(f"metadata->>summary.ilike.%{safe}%,metadata->>location.ilike.%{safe}%")
-    rows = query.limit(min(limit, 600)).execute().data or []
-    events = [{k: (r["metadata"] or {}).get(k) for k in ("summary", "event_date", "end_date", "when", "time", "all_day", "start_time",
-                                                           "end_time", "location", "description", "category", "kind", "home_away")}
-              for r in rows]
+    sb = get_supabase()
+
+    def events_query():
+        qb = sb.table(settings.CHUNKS_TABLE).select("metadata").in_("metadata->>source", ["calendar", "calendar_sheet"]) \
+            .gte("metadata->>end_date", start).lte("metadata->>event_date", to) \
+            .order("metadata->>event_date").order("chunk_id")
+        if category and re.fullmatch(r"[a-z_]{3,20}", category):
+            qb = qb.eq("metadata->>category", category)
+        if q:
+            safe = re.sub(r"[^A-Za-z0-9 '&-]", "", q)[:60]
+            if safe:
+                qb = qb.or_(f"metadata->>summary.ilike.%{safe}%,metadata->>location.ilike.%{safe}%")
+        return qb
+    events = [calendar_event_out(r["metadata"]) for r in _paged(events_query(), min(limit, 1200))]
     events.sort(key=lambda e: (e["event_date"] or "", e["start_time"] or ""))
-    out = {"events": events, "count": len(events)}
+    days = {}
+    try:
+        for r in _paged(sb.table(settings.CHUNKS_TABLE).select("metadata").eq("metadata->>source", "school_day")
+                        .gte("metadata->>event_date", start).lte("metadata->>event_date", to)
+                        .order("metadata->>event_date").order("chunk_id"), 120):
+            m = r["metadata"] or {}
+            if m.get("event_date") and not m.get("superseded"):
+                days[m["event_date"]] = {k: m[k] for k in ("day_type", "kind", "label", "schedule", "event") if m.get(k)}
+    except Exception as e:                              # the day types are an extra: the events must still load without them
+        print(f"calendar days lookup failed: {type(e).__name__}: {str(e)[:120]}", flush=True)
+    out = {"events": events, "count": len(events), "days": days}
     api_cache.set(key, out, ttl=600)
     return out
 

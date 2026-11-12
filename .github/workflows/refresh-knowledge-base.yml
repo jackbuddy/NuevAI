@@ -1,57 +1,60 @@
 name: Refresh calendar
 
 # Daily unattended refresh: iCal calendar feed + the cafe's monthly lunch menus + live team-schedule sheets -> chunk -> embed -> Supabase.
-# Expired events are removed automatically. The public site is crawled once and
-# Nexus (behind school SSO/2FA) is refreshed by hand, both locally:
+# Calendar rows replaced by the feed or a sheet (cancelled/moved/edited events, games dropped from a team sheet) are removed; past events of the
+# current school year are kept as history. The public site is crawled once and Nexus (behind school SSO/2FA) is refreshed by hand, both locally:
 #   python run_pipeline.py --refresh-nexus
+#
+# What fails the run (GitHub emails the owner): the pipeline, the index-size guard, or a REAL audit failure (scripts/audit_data.py --ci).
+# What never does: the artifact upload (GitHub's artifact service has returned HTML error pages; it is retried and then ignored) and the summary.
+# Read the health summary at the top of the run page ("Refresh calendar: health").
 on:
   schedule:
     - cron: "30 13 * * *"      # daily 13:30 UTC (~6:30am Pacific)
   workflow_dispatch:
-    inputs:
-      prune:
-        description: "unused"
-        type: boolean
-        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refresh-calendar
+  cancel-in-progress: false
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 40
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      NUEVAI_CALENDAR_URL: ${{ secrets.NUEVAI_CALENDAR_URL }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: requirements-pipeline.txt
       - run: pip install -r requirements-pipeline.txt
       - name: Record index row count
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python scripts/index_guard.py before
       - name: Run pipeline
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          NUEVAI_CALENDAR_URL: ${{ secrets.NUEVAI_CALENDAR_URL }}
         run: |
           LIVE_KINDS=team_schedule python run_pipeline.py --stages calendar,lunch,live,chunk,index
       - name: Guard - index must not shrink by more than 10%
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python scripts/index_guard.py after --max-drop 0.10
-      - name: Audit data against sources
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          NUEVAI_CALENDAR_URL: ${{ secrets.NUEVAI_CALENDAR_URL }}
-        run: python scripts/audit_data.py --json data/pipeline/audit.json
-      - name: Upload report and unreadable-doc list
+      - name: Audit data against sources (CI mode)
+        # Only the checks that make sense on a runner without the owner's workbooks; fails on a real mismatch, warns on source conflicts.
+        run: python scripts/audit_data.py --ci --json data/pipeline/audit.json
+      - name: Health summary
         if: always()
-        uses: actions/upload-artifact@v4
+        run: python scripts/ci_summary.py >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload report and unreadable-doc list
+        id: upload
+        if: always()
+        continue-on-error: true         # a flaky artifact service must not fail the refresh
+        timeout-minutes: 6              # the last failure spent 10 minutes retrying inside the action
+        uses: actions/upload-artifact@v7
         with:
           name: pipeline-report
           path: |
@@ -59,3 +62,22 @@ jobs:
             data/pipeline/needs_access.json
             data/pipeline/links.json
             data/pipeline/audit.json
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Wait before the second upload attempt
+        if: always() && steps.upload.outcome == 'failure'
+        run: sleep 60
+      - name: Upload report (second attempt)
+        if: always() && steps.upload.outcome == 'failure'
+        continue-on-error: true
+        timeout-minutes: 6
+        uses: actions/upload-artifact@v7
+        with:
+          name: pipeline-report-retry
+          path: |
+            data/pipeline/report.json
+            data/pipeline/needs_access.json
+            data/pipeline/links.json
+            data/pipeline/audit.json
+          retention-days: 14
+          if-no-files-found: warn

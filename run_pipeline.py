@@ -60,20 +60,24 @@ def main() -> int:
         config.PUBLIC_MARKER.write_text(json.dumps({"at": datetime.now(timezone.utc).isoformat(), **s}))
         return s
 
-    stage("public", public)
-    stage("public_pages", lambda: public_pages.run())
-    stage("nexus", lambda: nexus_import.run(args.refresh_nexus))
-    stage("google", lambda: fetch_google.run([scraper_data / "google_links_deduped.json", scraper_data / "external_links.json"]))
-    stage("live", live_sheets.run)
-    stage("manual", manual_import.run)
-    stage("calendar", calendar_feed.run)
-    stage("lunch", lambda: lunch.run_soft(discover_online=not args.no_lunch_download))
-    stage("chunk", lambda: {"chunks": len(chunker.run())})
-    stage("index", lambda: index.run(args.prune, args.prune_legacy, args.dry_run, keep_expired=args.keep_expired, only_source=args.only_source, additive_only=args.additive_only))
-
-    report["finished"] = datetime.now(timezone.utc).isoformat()
-    config.REPORT_FILE.write_text(json.dumps(report, indent=1), encoding="utf-8")
-    print(f"\nreport -> {config.REPORT_FILE}")
+    try:
+        stage("public", public)
+        stage("public_pages", lambda: public_pages.run())
+        stage("nexus", lambda: nexus_import.run(args.refresh_nexus))
+        stage("google", lambda: fetch_google.run([scraper_data / "google_links_deduped.json", scraper_data / "external_links.json"]))
+        stage("live", live_sheets.run)
+        stage("manual", manual_import.run)
+        stage("calendar", calendar_feed.run)
+        stage("lunch", lambda: lunch.run_soft(discover_online=not args.no_lunch_download))
+        stage("chunk", lambda: {"chunks": len(chunker.run())})
+        stage("index", lambda: index.run(args.prune, args.prune_legacy, args.dry_run, keep_expired=args.keep_expired, only_source=args.only_source, additive_only=args.additive_only))
+    except BaseException as e:      # the report is still written, so the CI job summary can say which stage failed (never the full message: it can echo a URL)
+        report["error"] = {"stage_failed": next((n for n in ALL if n in stages and n not in report["stages"]), None), "type": type(e).__name__}
+        raise
+    finally:
+        report["finished"] = datetime.now(timezone.utc).isoformat()
+        config.REPORT_FILE.write_text(json.dumps(report, indent=1), encoding="utf-8")
+        print(f"\nreport -> {config.REPORT_FILE}")
     return 0
 
 

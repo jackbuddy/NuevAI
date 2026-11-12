@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarPlus, ChevronLeft, ChevronRight, Clock, MapPin, MessageCircle, Search, Star, X, CalendarX2, Home, Plane } from 'lucide-react';
-import { CATEGORIES, CalEvent, catMeta, downloadIcs, iso, onDay, parseISO, timeLabel, todayLA } from '@/lib/calendar';
+import { CATEGORIES, CalEvent, DayInfo, appliesToCampus, cancelsClasses, catMeta, dayBadge, dayHeadline, downloadIcs, iso, onDay, parseISO, timeLabel, todayLA } from '@/lib/calendar';
+import { loadCampus, type Campus } from '@/lib/chat';
 import { track } from '@/lib/analytics';
 import { Followed, getFollows, onFollowsChange, toggleFollow } from '@/lib/visit';
 import { parseTeam } from '@/lib/ux-logic';
@@ -26,7 +27,19 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
   const [practices, setPractices] = useState(false);
   const [selected, setSelected] = useState<string>(todayIso);
   const [events, setEvents] = useState<CalEvent[]>([]);
+  const [days, setDays] = useState<Record<string, DayInfo>>({});      // the master schedule's record per date: A/B/A'/B' day, no classes, special bell schedule
   const [state, setState] = useState<'loading' | 'ok' | 'error'>('loading');
+  // the campus preference (set in Chat > Preferences, browser-only): San Mateo = Upper School, Hillsborough = Lower/Middle School.
+  // By default the calendar hides events that are only for the other campus's divisions; one checkbox shows them.
+  const [campus, setCampus] = useState<Campus | null>(null);
+  const [otherCampus, setOtherCampus] = useState(false);
+  useEffect(() => {
+    const read = () => setCampus(loadCampus());
+    read();
+    window.addEventListener('nuevai:campus', read);
+    window.addEventListener('storage', read);
+    return () => { window.removeEventListener('nuevai:campus', read); window.removeEventListener('storage', read); };
+  }, []);
   const [follows, setFollows] = useState<Followed[]>([]);
   useEffect(() => { setFollows(getFollows()); return onFollowsChange(() => setFollows([...getFollows()])); }, []);
   const followKeys = useMemo(() => new Set(follows.map((f) => f.key)), [follows]);
@@ -46,7 +59,7 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
     const from = iso(grid[0]), to = iso(grid[41]);
     fetch(`/api/calendar?from=${from}&to=${to}&limit=600`)
       .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
-      .then((j) => { if (seq === loadSeq.current) { setEvents(j.events ?? []); setState('ok'); } })
+      .then((j) => { if (seq === loadSeq.current) { setEvents(j.events ?? []); setDays(j.days ?? {}); setState('ok'); } })
       .catch(() => { if (seq === loadSeq.current) setState('error'); });
   }, [grid]);
   useEffect(() => { load(); }, [load]);
@@ -56,9 +69,16 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
     const needle = q.trim().toLowerCase();
     return events.filter((e) =>
       (practices || e.kind !== 'practice') &&
+      (otherCampus || appliesToCampus(e, campus)) &&
       (cats.size === 0 || cats.has(e.category)) &&
       (!needle || e.summary.toLowerCase().includes(needle) || (e.location ?? '').toLowerCase().includes(needle)));
-  }, [events, cats, q, practices]);
+  }, [events, cats, q, practices, campus, otherCampus]);
+
+  // the master schedule is the Upper School's; a Hillsborough viewer sees the whole-school and LS/MS events but no A/B badges
+  const showDays = campus !== 'hillsborough';
+  const noClasses = useCallback((k: string) =>
+    (showDays && days[k]?.kind === 'no_classes') || events.some((e) => onDay(e, k) && cancelsClasses(e, campus)), [days, events, campus, showDays]);
+  const hiddenOther = useMemo(() => !!campus && !otherCampus ? events.filter((e) => !appliesToCampus(e, campus) && (practices || e.kind !== 'practice')).length : 0, [events, campus, otherCampus, practices]);
 
   const byDay = useMemo(() => {
     const m = new Map<string, CalEvent[]>();
@@ -127,6 +147,12 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
             <input type="checkbox" checked={practices} onChange={(e) => { setPractices(e.target.checked); track('calendar_practices', { on: e.target.checked }); }} className="h-4 w-4 accent-[var(--color-brand-600)]" />
             Show practices
           </label>
+          {campus && (hiddenOther > 0 || otherCampus) && (
+            <label className="ink-2 tap-h flex cursor-pointer items-center gap-2 text-xs font-medium">
+              <input type="checkbox" checked={otherCampus} onChange={(e) => { setOtherCampus(e.target.checked); track('calendar_other_campus', { on: e.target.checked, campus }); }} className="h-4 w-4 accent-[var(--color-brand-600)]" />
+              {campus === 'san_mateo' ? 'Include Lower/Middle School events' : 'Include Upper School events'}{!otherCampus && hiddenOther > 0 ? ` (${hiddenOther})` : ''}
+            </label>
+          )}
         </div>
 
         {state === 'error' && (
@@ -147,12 +173,18 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
               <div role="group" aria-label={`${monthLabel}, ${filtered.length} events`} aria-busy={state === 'loading'} className={`grid grid-cols-7 transition-opacity ${state === 'loading' ? 'opacity-50' : ''}`}>
                 {grid.map((d) => {
                   const k = iso(d), list = byDay.get(k) ?? [], mine = followKeys.size > 0 && list.some((e) => isMine(e, followKeys)), inMonth = d.getMonth() === cursor.getMonth(), isToday = k === todayIso, isSel = k === selected;
+                  const badge = showDays ? dayBadge(days[k]) : null, off = noClasses(k);
+                  const dayWord = off ? 'no classes' : badge && badge.tone !== 'off' ? (badge.tone === 'class' || badge.tone === 'special' ? `${badge.text} day` : badge.text.toLowerCase()) : '';
                   return (
                     <button key={k} onClick={() => pick(k, list.length)} aria-pressed={isSel} aria-current={isToday ? 'date' : undefined}
-                            aria-label={`${d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}${isToday ? ', today' : ''}, ${list.length ? `${list.length} event${list.length === 1 ? '' : 's'}` : 'no events'}${mine ? ', one of your teams plays' : ''}`}
-                            className={`relative min-h-[4.25rem] min-w-0 border-b border-r hairline p-1.5 text-left transition hover:bg-[var(--surface-2)] focus-visible:z-10 md:min-h-[6rem] ${!inMonth ? 'opacity-70' : ''} ${d.getDay() % 6 === 0 && !isSel ? 'bg-brand-50/70' : ''} ${isSel ? 'bg-brand-500/10 ring-2 ring-inset ring-brand-500' : ''}`}>
+                            aria-label={`${d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}${isToday ? ', today' : ''}${dayWord ? `, ${dayWord}` : ''}, ${list.length ? `${list.length} event${list.length === 1 ? '' : 's'}` : 'no events'}${mine ? ', one of your teams plays' : ''}`}
+                            className={`relative min-h-[4.25rem] min-w-0 border-b border-r hairline p-1.5 text-left transition hover:bg-[var(--surface-2)] focus-visible:z-10 md:min-h-[6rem] ${!inMonth ? 'opacity-70' : ''} ${off && !isSel ? 'bg-amber-500/10' : d.getDay() % 6 === 0 && !isSel ? 'bg-brand-50/70' : ''} ${isSel ? 'bg-brand-500/10 ring-2 ring-inset ring-brand-500' : ''}`}>
                       <span aria-hidden className={`grid h-6 w-6 place-items-center rounded-full text-xs font-semibold ${isToday ? 'bg-brand-600 text-white shadow-soft' : ''}`}>{d.getDate()}</span>
-                      {mine && <Star aria-hidden className="absolute right-1.5 top-1.5 h-3 w-3 fill-amber-400 text-amber-500" />}
+                      {badge && badge.tone !== 'off' && (
+                        <span aria-hidden title={dayHeadline(days[k])} className={`absolute right-1.5 top-1.5 rounded px-1 text-[10px] font-bold leading-4 ${badge.tone === 'special' ? 'bg-violet-500/15 text-violet-800' : badge.tone === 'event' ? 'bg-sky-500/15 text-sky-800' : 'bg-brand-500/10 text-brand-700'}`}><span className="md:hidden">{badge.short}</span><span className="hidden md:inline">{badge.text}</span></span>
+                      )}
+                      {off && <span aria-hidden className="absolute right-1.5 top-1.5 rounded bg-amber-500/20 px-1 text-[10px] font-bold leading-4 text-amber-900">Off</span>}
+                      {mine && <Star aria-hidden className={`absolute ${badge || off ? 'right-1.5 top-6' : 'right-1.5 top-1.5'} h-3 w-3 fill-amber-400 text-amber-500`} />}
                       <div aria-hidden className="mt-1 hidden space-y-0.5 md:block">
                         {list.slice(0, 2).map((e, i) => (
                           <div key={i} className={`truncate rounded px-1 py-0.5 text-[11px] font-medium leading-tight ${catMeta(e.category).chip}`}>{e.summary.trim()}</div>
@@ -166,11 +198,31 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
                   );
                 })}
               </div>
+              {showDays && Object.keys(days).length > 0 && (
+                <p className="ink-2 border-t hairline px-3 py-2 text-[11px] leading-snug">
+                  <b>A, A′, B, B′</b>: Upper School class-day type from the master schedule. <span className="rounded bg-violet-500/15 px-1 font-bold text-violet-800">Purple</span> = Community-time bell schedule. <b>Off</b> = no classes.
+                </p>
+              )}
             </div>
 
             <aside ref={detailRef} aria-label="Selected day" className="surface shadow-soft h-fit scroll-mt-4 rounded-3xl border-t-4 border-t-brand-500 p-4 lg:sticky lg:top-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">{selected === todayIso ? 'Today' : 'Selected day'}</p>
-              <h3 className="wrap-any mb-3 text-xl font-bold">{parseISO(selected).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</h3>
+              <h3 className="wrap-any mb-1 text-xl font-bold">{parseISO(selected).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</h3>
+              {(() => {
+                const info = showDays ? days[selected] : undefined, off = noClasses(selected);
+                const head = dayHeadline(info) || (off ? 'No classes' : '');
+                if (!head && !info?.event) return <div className="mb-2" />;
+                return (
+                  <div className="mb-3 text-sm">
+                    {head && <p className={`font-semibold ${off ? 'text-amber-800' : 'text-brand-700'}`}>{head}</p>}
+                    {info?.event && <p className="ink-2 text-xs">{info.label?.split(',')[0]?.trim() ? `${info.label.split(',')[0].trim()}: ` : ''}{info.event}</p>}
+                    {info?.schedule && info.schedule !== 'full_day' && (
+                      <button type="button" onClick={() => { track('calendar_ask', { summary: 'special schedule' }); onAsk(`What are the bell times on ${parseISO(selected).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}?`); }}
+                              className="mt-1 text-xs font-semibold text-brand-700 underline underline-offset-2">See the bell times for this day</button>
+                    )}
+                  </div>
+                );
+              })()}
               {dayEvents.length === 0 ? <Empty practicesHidden={!practices && events.some((e) => onDay(e, selected) && e.kind === 'practice')} /> :
                 <div className="space-y-2.5">{dayEvents.map((e, i) => <EventCard key={`${e.event_date}-${e.start_time}-${e.summary}-${i}`} e={e} onAsk={onAsk} followKeys={followKeys} />)}</div>}
             </aside>
@@ -186,6 +238,7 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
                 <h3 className="mb-2 flex items-baseline gap-2 text-sm font-semibold">
                   <span className={k === todayIso ? 'text-brand-700' : ''}>{parseISO(k).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</span>
                   {k === todayIso && <span className="rounded-full bg-brand-700 px-2 py-0.5 text-[10px] text-white">Today</span>}
+                  {(showDays && dayHeadline(days[k])) || noClasses(k) ? <span className="ink-2 text-xs font-medium">{(showDays && dayHeadline(days[k])) || 'No classes'}</span> : null}
                 </h3>
                 <div className="grid gap-2.5 md:grid-cols-2">{list.map((e, i) => <EventCard key={i} e={e} onAsk={onAsk} followKeys={followKeys} />)}</div>
               </section>
