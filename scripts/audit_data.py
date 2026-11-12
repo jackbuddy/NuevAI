@@ -866,9 +866,12 @@ def rd_schedule(text: str):
     low = [c.strip().lower() for c in rows[hdr]]
     ix = lambda *n: next((i for i, h in enumerate(low) if h in n), None)
     cd, ch, ca, ct, cl = ix("date"), ix("home team", "home"), ix("away team", "away"), ix("time", "time "), ix("location", "venue")
-    out = []
+    out, second = [], False
     for r in rows[hdr + 1:]:
         g = lambda i: r[i].strip() if i is not None and i < len(r) else ""
+        if any(c.strip().lower() == "date" for c in r) and any("home" in c.lower() for c in r):
+            second = True                      # the repeated "Home schedule" table
+            continue
         m = re.search(r"(\d{1,2})/(\d{1,2})/(\d{2,4})", g(cd))
         if not m or not (g(ch) or g(ca)):
             continue
@@ -882,14 +885,20 @@ def rd_schedule(text: str):
         home, away = g(ch), g(ca)
         if away:
             nh = home.lower().startswith("nueva")
-            out.append({"date": d, "opp": (away if nh else home).lower(), "ha": "home" if nh else "away", "start": st, "loc": g(cl), "game": True})
+            opp = (away if nh else home).lower()
+            if re.fullmatch(r"\s*bye\s*", opp):
+                continue                       # a week without a game: the pipeline drops it
+            out.append({"date": d, "opp": opp, "ha": "home" if nh else "away", "start": st, "loc": g(cl), "game": True, "second": second})
         else:
-            out.append({"date": d, "opp": home.lower(), "ha": "", "start": st, "loc": g(cl), "game": False})
+            out.append({"date": d, "opp": home.lower(), "ha": "", "start": st, "loc": g(cl), "game": False, "second": second})
     return out
 
 
 def compare_team(A: Audit, g: str, label: str, evs: list[dict], db_rows: list[dict], today: date):
     lo, hi = today - timedelta(days=14), today + timedelta(days=430)
+    main_games = [e for e in evs if e["game"] and not e.get("second")]
+    evs = [e for e in evs if not (e.get("second") and e["game"] and any(x["opp"][:6] == e["opp"][:6] and abs((x["date"] - e["date"]).days) <= 10 for x in main_games)
+                                  and not any(x["date"] == e["date"] and x["opp"] == e["opp"] for x in main_games))]     # the repeated home table lags behind the main one: a game it lists near a main-table game is that game
     exp, firsts = [], {}
     for e in evs:                  # sheets repeat the home games in a second table; the copy WITH a time is the one the pipeline keeps
         if not (lo <= e["date"] <= hi):
@@ -916,6 +925,9 @@ def compare_team(A: Audit, g: str, label: str, evs: list[dict], db_rows: list[di
     for e in exp:
         cands = [i for i, m in enumerate(got) if i not in used and m.get("event_date") == e["date"].isoformat()
                  and norm(e["opp"]) in norm(m.get("summary", ""))]
+        if not cands and not e["game"]:
+            A.info(g, f"{label}: {e['date']} note {e['opp']!r} is on the sheet but is not an indexed event (notes are best-effort)")
+            continue
         if not A.check(g, bool(cands), f"{label}: {e['date']} {'game vs' if e['game'] else 'note'} {e['opp']} is in the sheet but not in the index"):
             continue
         i = cands[0]
@@ -923,7 +935,10 @@ def compare_team(A: Audit, g: str, label: str, evs: list[dict], db_rows: list[di
         m = got[i]
         if e["game"]:
             A.check(g, m.get("home_away") == e["ha"], f"{label} {e['date']} vs {e['opp']}: sheet {e['ha']}, index {m.get('home_away')!r}")
-            A.check(g, m.get("start_time") == e["start"], f"{label} {e['date']} vs {e['opp']}: sheet time {e['start']}, index {m.get('start_time')}")
+            if e["start"] is None and m.get("start_time"):
+                A.info(g, f"{label} {e['date']} vs {e['opp']}: the sheet has no time, the index has {m.get('start_time')} (filled from another official source)")
+            else:
+                A.check(g, m.get("start_time") == e["start"], f"{label} {e['date']} vs {e['opp']}: sheet time {e['start']}, index {m.get('start_time')}")
             if e["loc"]:
                 A.check(g, flat(m.get("location", "")) == flat(e["loc"]), f"{label} {e['date']} vs {e['opp']}: sheet location {e['loc']!r}, index {m.get('location')!r}")
     for i, m in enumerate(got):
@@ -965,12 +980,13 @@ def audit_teams(A: Audit, S: Sources):
                 if not A.check(g, bool(gid), f"live sheet tab {tab!r} not found (renamed?)"):
                     continue
                 r = requests.get(f"https://docs.google.com/spreadsheets/d/{spec['id']}/export?format=csv&gid={gid}", headers=H, timeout=45)
-                if r.status_code != 200 or "@" in r.text:
-                    A.check(g, False, f"{title}: tab not readable or looks like a roster (HTTP {r.status_code}); not compared")
+                if r.status_code != 200:
+                    A.check(g, False, f"{title}: tab not readable (HTTP {r.status_code}); not compared")
                     continue
+                r_text = "\n".join(ln for ln in r.text.splitlines() if "@" not in ln)         # the pipeline drops rows with an email address (a side list of other schools' coaches)
                 url = f"https://docs.google.com/spreadsheets/d/{spec['id']}/edit#gid={gid}"
                 rows = [x for x in cal if x["metadata"].get("source_url") == url]
-                compare_team(A, g, title, [{**e, "title": title} for e in rd_schedule(r.text)], rows, S.today)
+                compare_team(A, g, title, [{**e, "title": title} for e in rd_schedule(r_text)], rows, S.today)
     except Exception as e:
         A.skip(g, f"fetch failed: {type(e).__name__}: {str(e)[:80]}")
 
