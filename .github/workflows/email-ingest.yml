@@ -11,6 +11,11 @@ on:
   schedule:
     - cron: "*/30 * * * *"
   workflow_dispatch:
+    inputs:
+      force_google:
+        description: "Re-read every shared Sheet/Doc even if unchanged (after a parser change)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -49,4 +54,4 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SHARE_INGEST_BUDGET_SECONDS: "120"
-        run: python scripts/email_ingest.py --only google --once
+        run: python scripts/email_ingest.py --only google --once ${{ inputs.force_google && '--force' || '' }}

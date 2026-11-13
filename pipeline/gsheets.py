@@ -454,6 +454,7 @@ def analyze_workbook(book: dict, meta: dict, now: datetime | None = None, event_
     label = f'shared Google Sheet "{name[:80]}", updated {freshness.day_label(modified_day)}'
     used_ids: set[str] = set()
     seen_events: dict[str, set] = {}
+    prior_games: dict[str, list] = {}
     sheets = book.get("sheets") or []
     for sh in sheets[:MAX_TABS]:
         title = str((sh.get("properties") or {}).get("title") or "Sheet")
@@ -485,6 +486,10 @@ def analyze_workbook(book: dict, meta: dict, now: datetime | None = None, event_
             a.team = a.team or ctx["team"]
             ctx["title"] = name
             events = st.schedule_events(t.header, t.rows, ref, f"{title} {t.title}", seen=seen_events.setdefault(title, set()))
+            prior = prior_games.setdefault(title, [])
+            if prior:       # a later table on the same tab (the repeated "Home schedule") lags behind the main one: a game it lists near a main-table game vs the same opponent is that game
+                events = [e for e in events if not (e["kind"] == "game" and any(po == (e["opp"] or "").lower()[:6] and 0 < abs((pd - e["date"]).days) <= 10 for pd, po in prior))]
+            prior.extend((e["date"], (e["opp"] or "").lower()[:6]) for e in events if e["kind"] == "game")
             if ctx["category"] == "general" and events:
                 ctx["category"] = "athletics" if any(e["kind"] in ("game", "practice") for e in events) else ctx["category"]
             if not ctx["season"] and events:

@@ -906,6 +906,22 @@ check("workflow: Google secrets reach only the Drive step as env; timeout and co
       and "cancel-in-progress: false" in wf and "run: echo" not in wf and "echo $" not in wf and "--only google" in wf and "--only email" in wf and 'cron: "*/30 * * * *"' in wf and "workflow_dispatch" in wf)
 check("CI runs this test file", "python test_share_ingest.py" in (HERE / ".github" / "workflows" / "ci.yml").read_text())
 
+
+# --- a repeated "Home schedule" table on the same tab lags behind the main table: its near-duplicate game must not become a second game
+DUP_CSV = """Date,Home Team,Away Team,Time,Location
+Wed 11/18/26,Nueva,CSD Fremont,7:00 PM,Nueva Gym
+Thu 11/19/26,Nueva,Design Tech,7:00 PM,Nueva Gym
+
+Date,Home Team,Away Team,Time,Location
+Tue 11/17/26,Nueva,CSD Fremont,7:00 PM,Nueva Gym
+Thu 11/19/26,Nueva,Design Tech,7:00 PM,Nueva Gym
+Tue 12/01/26,Nueva,Menlo,7:00 PM,Nueva Gym
+"""
+ad = gsheets.analyze_workbook(F.book(F.csv_tab(DUP_CSV, "Varsity"), title="US Boys Basketball Varsity"), M("US Boys Basketball Varsity"), NOW, event_window=WIDE)
+dg = sorted((c["metadata"]["event_date"], c["metadata"]["summary"]) for c in ad.chunks if c["metadata"].get("source") == "calendar_sheet" and c["metadata"].get("kind") == "game")
+check("repeated home table: a near-duplicate game (Nov 17 vs the main table's Nov 18) is dropped, an exact duplicate collapses, a genuinely new home game is kept",
+      [d for d, _ in dg] == ["2026-11-18", "2026-11-19", "2026-12-01"], dg)
+
 index._embed_and_upsert = saved_up
 print(f"\n{'all passed' if not FAILS else str(len(FAILS)) + ' FAILED: ' + ', '.join(FAILS)}")
 sys.exit(1 if FAILS else 0)
