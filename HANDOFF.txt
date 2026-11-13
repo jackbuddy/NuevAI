@@ -278,3 +278,14 @@ SPORTS (2026-11-12, branch worktree-agent-a733c31b97bff00ee): Upper School sport
 Live DB: calendar_sheet 125 -> 322 rows (197 new, 57 stale rows flagged superseded), school_facts +19, school_canonical +15 (additive), 11 old athletics fact/canonical rows and 5 stale Nexus copies of the volleyball sheet flagged; nothing deleted; email-/lunch-/gshare- rows untouched.
 Dependency: scripts/check_facts.py verifies the new fact files against two pages the `sports` stage saves (titles "Athletics sports offered (source data)" and "US Athletics Calendar (source data)"); run `python run_pipeline.py --stages sports` once in any checkout that runs the audit.
 Privacy: no rosters, no student names; schedule tabs drop any row with an email address.
+
+
+======================================================================================================================
+14. GOOGLE ACCESS FOR AUTO-INGESTION (set up 2026-11-13)
+======================================================================================================================
+Google Cloud project "NuevAI Ingest" (id nuevai-ingest) owned by nuevai.updates@gmail.com: Drive API + Sheets API enabled; OAuth consent screen External, published
+"In production" (unverified, so the refresh token does not expire after 7 days; branding links point at PRIVACY.md and TERMS.md in this repo); a Desktop OAuth client
+"Desktop client 1". GitHub repo secrets set: GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, GOOGLE_OAUTH_REFRESH_TOKEN (scopes drive.readonly + spreadsheets.readonly).
+Checked: token refresh + Drive listing succeed (0 files shared at the time). Not yet checked with a real shared Sheet/Doc: share one with nuevai.updates@gmail.com and run the
+"Email ingest" workflow (README: Auto-ingestion from nuevai.updates@gmail.com). If a run ever says the token was revoked/expired: run
+`python scripts/google_auth_setup.py` again (signed in as that account) and update GOOGLE_OAUTH_REFRESH_TOKEN. Do not set the app back to "Testing".
