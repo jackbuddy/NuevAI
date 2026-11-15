@@ -31,6 +31,7 @@ class AnswerStore:
         self._sb = get_supabase
         self.enabled = enabled
         self.down_until = 0.0
+        self.fresh_after = ""        # ISO UTC time of the newest ingested knowledge: answers stored before it are ignored (see query_server._knowledge_changed)
         self.last_error = ""
         self.stats = {"l2_hits": 0, "l2_misses": 0, "l2_writes": 0, "l2_errors": 0}
         self._q: queue.Queue = queue.Queue(maxsize=200)
@@ -56,7 +57,7 @@ class AnswerStore:
         def run():
             try:
                 now = datetime.now(timezone.utc).isoformat()
-                r = (self._sb().table(TABLE).select("answer,model_used,sources,suggestions,date_bound")
+                r = (self._sb().table(TABLE).select("answer,model_used,sources,suggestions,date_bound,created_at")
                      .eq("key", norm_key(question)).gt("expires_at", now).limit(1).execute())
                 out["rows"] = r.data or []
             except Exception as e:
@@ -75,6 +76,9 @@ class AnswerStore:
             self.stats["l2_misses"] += 1
             return None
         row = out["rows"][0]
+        if self.fresh_after and str(row.get("created_at") or "")[:19] <= self.fresh_after[:19]:
+            self.stats["l2_misses"] += 1         # written before the latest forwarded email / shared sheet arrived: answer again from the new data
+            return None
         self.stats["l2_hits"] += 1
         return {"answer": row["answer"], "model_used": row.get("model_used") or "cache", "sources": row.get("sources") or [],
                 "suggestions": row.get("suggestions") or [], "date_bound": bool(row.get("date_bound"))}

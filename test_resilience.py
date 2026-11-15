@@ -293,6 +293,22 @@ qs._warm()
 check("warm-up targets at most 30 questions (starters + top asked)", 4 <= len(asked) <= 30, str(len(asked)))
 os.environ["WARMUP_DISABLED"] = "1"
 
+# ---------------------------------------------------------------- new ingested knowledge invalidates cached answers
+qs._knowledge.update(stamp="", checked=time.time() + 1e9, busy=False)        # no background check during this drill
+qs.answer_cache.clear()
+st3 = {}
+qs.answer_l2 = AnswerStore(lambda: FakeSB(st3))
+check("knowledge stamp: the first observation clears nothing but marks L2", qs._knowledge_changed("2026-11-13T10:00:00+00:00") is False and qs.answer_l2.fresh_after.startswith("2026-11-13T10"))
+qs.answer_cache.set(("k",), {"answer": "old"})
+qs.answer_l2.put("when is the frisbee practice", {"answer": "old", "model_used": "m", "sources": [{"title": "t"}], "suggestions": []}, ttl=3600)
+qs.answer_l2.flush()
+check("knowledge stamp: an unchanged or older stamp keeps the caches", qs._knowledge_changed("2026-11-13T10:00:00+00:00") is False and qs._knowledge_changed("2026-11-01T00:00:00+00:00") is False
+      and qs.answer_cache.get(("k",)) and qs.answer_l2.get("when is the frisbee practice"))
+check("knowledge stamp: a newer ingest clears L1 and makes older L2 answers a miss", qs._knowledge_changed("2099-01-01T00:00:00+00:00") is True
+      and qs.answer_cache.get(("k",)) is None and qs.answer_l2.get("when is the frisbee practice") is None)
+qs._knowledge.update(stamp="", checked=0.0)
+qs.answer_l2 = AnswerStore(lambda: FakeSB({}))
+
 qs.groq_client = orig_groq
 fails = [n for n, ok in RESULTS if not ok]
 print(f"\n{len(RESULTS) - len(fails)}/{len(RESULTS)} drills pass")

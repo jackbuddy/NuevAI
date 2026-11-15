@@ -698,10 +698,51 @@ def _cache_key(req: QueryRequest, now: datetime):
     return (_norm(req.query), now.strftime("%Y-%m-%d"), req.model or LLM_MODEL)
 
 
+KNOWLEDGE_CHECK_S = 300
+_knowledge = {"checked": 0.0, "stamp": "", "busy": False}
+
+
+def _knowledge_changed(stamp: str) -> bool:
+    """A newer forwarded email or shared Sheet/Doc was indexed: drop cached answers so the next question is answered from it
+    (otherwise a repeated question keeps its old answer for up to six hours). Returns True when the caches were invalidated."""
+    if not stamp or stamp[:19] <= _knowledge["stamp"][:19]:
+        return False
+    first = not _knowledge["stamp"]
+    _knowledge["stamp"] = stamp
+    answer_l2.fresh_after = stamp           # also right after a restart: L2 rows older than the newest ingest are stale
+    if first:
+        return False                        # L1 is empty at boot; nothing to clear
+    answer_cache.clear()
+    print("new ingested knowledge: answer caches invalidated", flush=True)
+    return True
+
+
+def _check_knowledge():
+    """At most every few minutes, off the request path: read the newest indexed_at among ingested rows (email-*, share-*)."""
+    now = time.time()
+    if _knowledge["busy"] or now - _knowledge["checked"] < KNOWLEDGE_CHECK_S:
+        return
+    _knowledge.update(busy=True, checked=now)
+
+    def run():
+        try:
+            rows = (get_supabase().table(settings.CHUNKS_TABLE).select("t:metadata->>indexed_at")
+                    .or_("chunk_id.like.email-*,chunk_id.like.share-*").order("metadata->>indexed_at", desc=True, nullsfirst=False)
+                    .limit(1).execute().data or [])
+            _knowledge_changed(str((rows[0] if rows else {}).get("t") or ""))
+        except Exception as e:              # never let this affect answers
+            print(f"knowledge check skipped ({type(e).__name__})", flush=True)
+        finally:
+            _knowledge["busy"] = False
+
+    threading.Thread(target=run, daemon=True).start()
+
+
 def _cache_get(req: QueryRequest, key, trace: Trace | None = None):
     """L1 (memory) then L2 (Supabase). Returns the payload or None."""
     if not key:
         return None
+    _check_knowledge()
     if hit := answer_cache.get(key):
         if trace is not None:
             trace.cache_layer = "l1"
