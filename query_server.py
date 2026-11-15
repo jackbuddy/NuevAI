@@ -270,7 +270,7 @@ ANSWERING (confident, direct, honest)
 - Partial information: give what you know first, then say exactly what is missing in one sentence starting "I don't have" (for example "I don't have the Spring 2027 rooms yet"), and where to get it if the context names a person, page or phone number.
 - "Does Nueva have / offer X?": when the context contains the list that would show X (sports by season, clubs, courses, a policy) and X is not on it, answer "No, Nueva doesn't offer X" and name what it does offer, briefly. If no list in the context covers X, or the context is thin, never say no: use the "I don't have that" case below.
 - Past and upcoming: today's date is given below. An event dated before today already happened: say "That already happened on <date>" and add what the context says about it. Events dated today (even later today) or after are upcoming.
-- Genuinely not in the data: only when nothing in the context answers the question, begin exactly "I don't have that" (or "I don't have <the specific thing>"), add the nearest true fact if there is one, then name the exact office, person, page or phone number the context gives for it, never an invented one (if none, say the main office can help; main phone numbers are in KEY FACTS). Never send the user elsewhere for something the context states.
+- Genuinely not in the data: only when nothing in the context answers the question, begin exactly "I don't have that" (or "I don't have <the specific thing>"), add the nearest true fact if there is one, then name the exact office, person, page or phone number the context gives for it, never an invented one (if none, say the main office can help and give its phone number if the context has one). Never mention internal labels such as \"KEY FACTS\", \"context\" or section names to the user. Never send the user elsewhere for something the context states.
 - Freshness: for schedules, dates, prices and deadlines, say how current the source is in a few words when the context shows it ("as of the 2025-26 handbook", "per the school email of Oct 28"); not for answers that do not change.
 - Division: "[Upper/Middle/Lower School document]" labels and an AUDIENCE line say which division the context is for. Answer for the asker's division; if they did not say, answer for the Upper School and, when the context shows the other division differs, add one short sentence naming the difference.
 - Never invent dates, times, names, rooms, scores, phone numbers, URLs or policies; if the exact value is not in the context, say so. Never write passwords, logins or login details: say to ask the school's tech or front office.
@@ -301,7 +301,8 @@ def _norm(q: str) -> str:
 
 GREETING = re.compile(r"^\s*(hi|hello|hey|hiya|yo|howdy|good (morning|afternoon|evening))\b[\s!.,?]*$", re.I)
 THANKS = re.compile(r"^\s*(thanks|thank you|thx|ty|cool thanks|great thanks|awesome)\b[\s!.,]*$", re.I)
-CAPABILITIES = re.compile(r"^\s*(what can you do|what do you do|who are you|help|how does this work|what are you)\b[\s!.?]*$", re.I)
+CAPABILITIES = re.compile(r"^\s*(what can you do|what do you do|who are you|help|how does this work|what are you|what can i ask( you)?|what (can|do) you (help|know)( me)?( with| about)?|"
+                          r"(what is|what's|tell me) (everything|something|all) (that )?you (know|can do|can help( me)? with)|what is something you can help me with)\b[\s!.?]*$", re.I)
 
 
 IDENTITY = re.compile(r"^\s*(who (made|built|created|programmed|designed|owns|runs|trained) (you|this|nuevai)( ai| bot| chatbot| assistant| app| site| website)?|who do you work for|who (are you|is behind (you|this|nuevai))( made by)?|are you (an? )?(official|school[- ]approved|approved|endorsed)( by (the school|nueva|an admin|admin))?|(were|are) you (school )?(approved|endorsed|authorized) by (the school|nueva|an? admin\w*|admin\w*)|but were you approved by (the school|nueva|an? admin\w*)|is (this|nuevai) (official|school[- ]approved|approved))\b[\s!.?]*$", re.I)
@@ -327,10 +328,12 @@ def smalltalk(q: str) -> str | None:
         return "You're welcome! Ask me anything else about Nueva."
     if CAPABILITIES.match(q):
         return ("I'm NuevAI, an assistant for the Nueva community. I can help with:\n\n"
-                "- Courses: what's offered, prerequisites, what a class covers\n"
-                "- The school calendar and sports schedules: games, practices, breaks, events\n"
-                "- Handbook policies: attendance, phones, dress code, academic integrity\n"
-                "- Links: booking a tour, applying, giving, the store, key documents")
+                "- Today: what's for lunch, which day type it is, games and events\n"
+                "- Sports and clubs: schedules, teams, when and where clubs meet\n"
+                "- Classes and teachers: who teaches what, blocks, rooms, course details\n"
+                "- The calendar and handbook: breaks, no-school days, policies\n"
+                "- Links: tours, applying, forms and key documents\n\n"
+                "Try \"What's for lunch today?\" or \"When is the next home game?\"")
     return None
 
 

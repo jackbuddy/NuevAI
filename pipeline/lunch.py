@@ -50,6 +50,10 @@ MONTHS = {m: i + 1 for i, m in enumerate("january february march april may june 
 # Section names the cafe prints in bold inside a day's cell. Anything else in bold is the day's theme ("Street Food", "Global Adventure").
 SECTIONS = re.compile(r"^(earthly selections?|plant inspired|sandwich favou?rites?|superfood tossed|something different|it'?s a wrap|"
                       r"soup|salad bar|dessert|sides?)$", re.I)
+# Day themes the cafe prints in bold as the first label of a cell. When the soup line above it is bold too (November 2026 San Mateo menu),
+# the two bold lines must not be glued into one label ("Vegetarian Posole Street Food"): the first is the soup.
+THEMES = re.compile(r"^(global adventure|platillos latino|asian inspired|asian street food|street food|kitchen table|stone hearth|american bbq(?: series)?|"
+                    r"breakfast for lunch|meatless monday|taco tuesday|diwali|thanksgiving lunch!?|lunar new year|comfort classics?)$", re.I)
 FOOTER = re.compile(r"epicurean group|allergen containing|menu key|general manager|executive chef|@epicurean|menu here", re.I)
 PAGE_H = 1000.0          # vertical offset per page, so a week that continues on the next page keeps its order
 
@@ -121,6 +125,11 @@ def _structure(cell: list[dict]) -> list[dict]:
                 items.append({"label": clean_label(label), "text": clean_text(_join_lines(buf))})
                 buf = []
             elif label is not None:
+                if not items and not lead and THEMES.match(s["text"].strip()) and not THEMES.match(f"{label} {s['text']}".strip()) \
+                        and not SECTIONS.match(label.strip()):
+                    lead.append(label)                  # a bold soup line directly above the bold theme
+                    label = s["text"]
+                    continue
                 label = f"{label} {s['text']}"          # a label wrapped over two lines
                 continue
             label = s["text"]

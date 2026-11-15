@@ -189,6 +189,14 @@ m0 = c0["metadata"]
 check("records: metadata (source, campus, date, month, closed, items, source url, pdf name)", m0["source"] == "lunch" and m0["campus"] == "san_mateo" and m0["event_date"] == "2026-10-05"
       and m0["month"] == "2026-10" and m0["month_label"] == "October 2026" and not m0["closed"] and len(m0["items"]) == 6 and m0["source_url"].startswith("https://drive.google.com")
       and m0["pdf_name"] == "San Mateo Lunch Menu" and m0["content_hash"], m0)
+_b = lambda t, bold: {"text": t, "bold": bold}
+_cell = lunch._structure([_b("Vegetarian Posole", True), _b("Street Food", True), _b("Roasted Pork Rouladen", False), _b("Earthly Selections", True), _b("Tofu Pattie", False)])
+check("structure: a BOLD soup line above the bold theme is the soup, not part of the theme label",
+      [(i["label"], i["text"]) for i in _cell] == [("Soup", "Vegetarian Posole"), ("Street Food", "Roasted Pork Rouladen"), ("Earthly Selections", "Tofu Pattie")], _cell)
+_cell = lunch._structure([_b("American BBQ", True), _b("Series", True), _b("Brisket", False)])
+check("structure: a theme wrapped over two bold lines stays one label", [(i["label"], i["text"]) for i in _cell] == [("American BBQ Series", "Brisket")], _cell)
+_cell = lunch._structure([_b("Asian", True), _b("Street Food", True), _b("Bao", False)])
+check("structure: 'Asian' + 'Street Food' is the theme 'Asian Street Food', not a soup", [(i["label"], i["text"]) for i in _cell] == [("Asian Street Food", "Bao")], _cell)
 check("records: menu text carries the cafe note", lunch.NOTE in c0["content"] and "Soup: Tomato Basil" in c0["content"])
 check("records: closed day says no menu is listed", c1["metadata"]["closed"] and c1["metadata"]["kind"] == "no_menu_day" and "No lunch menu is listed" in c1["content"] and lunch.NOTE not in c1["content"])
 check("records: content hash is stable for the same menu, changes when a dish changes",
