@@ -277,6 +277,34 @@ def split_division(rows: list[dict], ip: Interp) -> tuple[list[dict], list[dict]
     return mine, other
 
 
+DIV_RANK = {"US": 0, None: 1, "MS": 2, "LS": 3}
+
+
+def game_order(r: dict) -> tuple[int, int]:
+    """Sort key for games: Upper School before unlabelled rows before Middle School before Lower School; within a division varsity before JV."""
+    return (DIV_RANK.get(row_division(r), 1), 1 if row_is_jv(r) else 0)
+
+
+def prioritize_games(rows: list[dict], ip: Interp, campus: str | None, ms_asked: bool) -> tuple[list[dict], bool]:
+    """Upper School games lead, then varsity before JV, then Middle School after.
+
+    With the San Mateo campus saved (or an Upper School division in the question) and no Middle School wording, the Middle / Lower School games
+    are left out altogether. A Hillsborough asker or an explicit Middle School question keeps the existing handling. -> (rows, withheld),
+    where withheld is True when Middle/Lower School games existed and were held back (so an empty result can say so).
+    Rows keep their date order within each (division, level) group."""
+    if ms_asked or ip.division == "MS" or campus == "hillsborough":
+        return rows, False
+    ordered = sorted(rows, key=game_order)                       # stable: date order survives inside each group
+    only_us = campus == "san_mateo" or ip.division == "US"
+    if not only_us:
+        return ordered, False
+    kept = [r for r in ordered if row_division(r) not in ("MS", "LS")]
+    withheld = len(kept) != len(ordered)
+    if kept and "Upper School" not in ip.defaults and ip.division is None:
+        ip.defaults.append("Upper School")
+    return kept, withheld
+
+
 def filter_level(rows: list[dict], ip: Interp) -> list[dict]:
     """'only varsity' / 'JV': keep that level among Upper School rows (a team with no JV row is its varsity). Never returns nothing."""
     if not ip.level:
@@ -307,10 +335,10 @@ def lead_games(events: list[dict], ip: Interp | None, today: date, per_team: int
             nxt = next((r for r in rows if (r["metadata"] or {}).get("event_date", "") >= tday), None)
             if nxt is not None and nxt not in take:
                 take = take[:1] + [nxt]
-        picked.append((row_is_jv(rows[0]), (take[0]["metadata"] or {}).get("event_date", ""), (take[0]["metadata"] or {}).get("start_time") or "", take))
-    picked.sort(key=lambda x: x[:3])
+        picked.append((DIV_RANK.get(row_division(rows[0]), 1), row_is_jv(rows[0]), (take[0]["metadata"] or {}).get("event_date", ""), (take[0]["metadata"] or {}).get("start_time") or "", take))
+    picked.sort(key=lambda x: x[:4])
     out = []
-    for _, _, _, take in picked[:limit]:
+    for *_, take in picked[:limit]:
         out += take
     if ip is not None and len(by_team) > 1 and not ip.level:
         jv = [t for t in by_team if row_is_jv(by_team[t][0])]

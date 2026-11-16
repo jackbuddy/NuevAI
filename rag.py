@@ -903,6 +903,7 @@ class Retriever:
         kw_terms = [w.lower() for i, w in enumerate(orig_words) if i > 0 and not w.islower() and w.lower() in set(rare)][:2]
 
         alt_events: list[dict] = []
+        game_flags = {"us_only": False}      # set by the calendar lookup: a games question from an Upper School asker
 
         def cal_task():
             nonlocal intent
@@ -931,6 +932,14 @@ class Retriever:
             if (intent.sport or intent.kind == "game") and intent.kind != "practice" and not intent.category:
                 rows = understand.filter_level(list(rows), ip)
                 rows, other = understand.split_division(rows, ip)
+                ms_asked = ip.division == "MS" or (division[0] == "MS" and division[1])
+                rows, withheld = understand.prioritize_games(rows, ip, campus, ms_asked)
+                us_only = (campus == "san_mateo" or ip.division == "US") and not ms_asked
+                game_flags["us_only"] = us_only
+                if us_only:
+                    other = []                      # an Upper School asker is not shown Middle School games, not even as an "other division" line
+                    if withheld and not rows:
+                        ip.notes.append("no Upper School games match this; Middle School has some: the student can ask for them by saying 'middle school'")
                 tday = today.isoformat()
                 alt_events.extend([r for r in other if (r.get("metadata") or {}).get("kind") == "game" and (r["metadata"].get("event_date") or "") >= tday][:1])
             timings["calendar_ms"] = round((time.time() - t) * 1000)
@@ -1029,6 +1038,9 @@ class Retriever:
             events, intent = [], None      # "Biology Research Teams 2" is a course, not a sports-team question: no team overview
         pin_ids = {p["chunk_id"] for p in pinned}
         docs = [d for d in docs if d["chunk_id"] not in ent_ids | pin_ids]
+        if game_flags["us_only"]:
+            # the vector search can also surface a Middle School game row: an Upper School asker does not see those either
+            docs = [d for d in docs if not ((d.get("metadata") or {}).get("source") in ("calendar", "calendar_sheet") and understand.row_division(d) in ("MS", "LS"))]
         # A confident structured answer (the calendar rows for a team / date / day-type question, a teaching record, a club record) needs
         # little else: fewer documents = fewer tokens and a faster, more direct answer. Links and the best documents stay.
         structured = None

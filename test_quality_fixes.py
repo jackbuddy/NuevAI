@@ -148,6 +148,31 @@ check("defaults: varsity opener leads, the JV opener follows, one line per team"
 ln = U.line(ip)
 check("interpretation line names the default, the season-opener reading and the alternatives", ln.startswith("INTERPRETATION:") and "Upper School" in ln and "season opener" in ln and "Middle School" in ln and "JV" in ln)
 check("interpretation line is empty when nothing was assumed", U.line(U.interpret("What time is Block 3?")) == "")
+
+# ---- Upper School first: campus decides what is shown; order is US varsity, US JV, then Middle School
+mixed = [_g("MS (4th - JVC) Boys' Basketball", "2026-11-16", "16:00", "MS"), _g("US Boys Basketball JV", "2026-11-17", "17:30", "US", "JV"),
+         _g("US Boys Basketball Varsity", "2026-11-19", "19:00", "US", "Varsity"), _g("MS Girls Soccer", "2026-11-17", "15:00", "MS")]
+ipg = U.interpret("When is the next home game?", "san_mateo")
+rows_sm, withheld = U.prioritize_games(list(mixed), ipg, "san_mateo", False)
+check("us-first: San Mateo asker sees no Middle School game, even for a question that names no sport", [r["metadata"]["team"] for r in rows_sm] == ["US Boys Basketball Varsity", "US Boys Basketball JV"] and withheld, str([r["metadata"]["team"] for r in rows_sm]))
+check("us-first: San Mateo reading is stated as an assumption", "Upper School" in ipg.defaults)
+ipn = U.interpret("When is the next home game?", None)
+rows_nc, w2 = U.prioritize_games(list(mixed), ipn, None, False)
+check("us-first: no saved campus keeps every game but orders US varsity, US JV, then Middle School", [r["metadata"]["team"] for r in rows_nc][:2] == ["US Boys Basketball Varsity", "US Boys Basketball JV"] and U.row_division(rows_nc[-1]) == "MS" and len(rows_nc) == 4 and not w2)
+ipms = U.interpret("When is the next middle school game?", "san_mateo")
+rows_ms, w3 = U.prioritize_games(list(mixed), ipms, "san_mateo", True)
+check("us-first: asking for Middle School explicitly shows Middle School games (even with San Mateo saved)", len(rows_ms) == 4 and not w3)
+iph = U.interpret("When is the next home game?", "hillsborough")
+rows_h, w4 = U.prioritize_games(list(mixed), iph, "hillsborough", False)
+check("us-first: a Hillsborough asker is not filtered", len(rows_h) == 4 and not w4)
+only_ms = [r for r in mixed if U.row_division(r) == "MS"]
+rows_e, w5 = U.prioritize_games(list(only_ms), U.interpret("When does the soccer team play?", "san_mateo"), "san_mateo", False)
+check("us-first: when only Middle School has games, nothing is shown and the caller is told games were withheld", rows_e == [] and w5)
+ip_us = U.interpret("When is the next US game?", None)
+rows_us, w6 = U.prioritize_games(list(mixed), ip_us, None, False)
+check("us-first: naming the Upper School drops Middle School even with no saved campus", all(U.row_division(r) == "US" for r in rows_us) and len(rows_us) == 2)
+lg = U.lead_games(list(mixed), U.interpret("next games", None), TODAY, per_team=1, limit=5)
+check("us-first: lead_games puts Middle School teams after Upper School teams, whatever the dates", [U.row_division(e) for e in lg][-2:] == ["MS", "MS"] and U.row_division(lg[0]) == "US", str([e["metadata"]["team"] for e in lg]))
 ipm = U.interpret("when is the next flag football game")
 U.apply_to_intent(ipm, I.parse_intent("when is the next flag football game", TODAY), TODAY)
 ms_only = [_g("MS Varsity (V) 7th/8th Flag Football", "2026-11-18", "16:00", "MS")]
