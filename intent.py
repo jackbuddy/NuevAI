@@ -22,12 +22,16 @@ SPORTS = {
     "cross country": "cross country", "xc": "cross country", "track": "track", "lacrosse": "lacrosse",
     "badminton": "badminton", "water polo": "water polo", "ultimate": "ultimate", "frisbee": "ultimate",
     "fencing": "fencing", "wrestling": "wrestling", "pickleball": "pickleball", "dance": "dance",
+    "flag football": "flag football", "football": "football", "cross-country": "cross-country",
 }
 GAME_WORDS = r"\b(games?|matches|match|meets?|scrimmages?|tournaments?|invitationals?|vs\.?|versus|playing|play)\b"
 PRACTICE_WORDS = r"\b(practices?|practicing|training)\b"
-NO_SCHOOL_WORDS = r"\b(no school|break|breaks|holidays?|vacation|closed|closure|day off|days off|off school)\b"
+NO_SCHOOL_WORDS = (r"\b(no school|break|breaks|holidays?|vacation|closed|closure|day off|days off|off school|(?:get|gets|getting|have|having|week|weeks|time) off|"
+                   r"(?:are|is) (?:we|school|nueva|students|kids|they) off|(?:get|gets|getting|let|lets) out for|out of school for)\b")
+TEAM_PLAY = r"\b(varsity|jv|junior varsity|boys|girls)\b|\b(?:who|whom) (?:do|does|did|are|is|will)\b.{0,40}\bplay"      # "who do varsity boys play dec 1": a game, not a theatre play
+DANCE_EVENT = r"\b(?:next|a|the|school|winter|spring|fall|formal|homecoming|hoco|any|upcoming) dance\b|\bdances\b"                # "the next dance" is an event, not the dance team
 ARTS_WORDS = r"\b(concerts?|performances?|recitals?|musicals?|plays?|theat(?:er|re)|exhibits?|art show)\b"
-CAL_WORDS = r"\b(calendar|events?|deadlines?|when is|when are|when does|when do|what time|what day|what date|upcoming)\b"
+CAL_WORDS = r"\b(calendar|events?|deadlines?|when is|when are|when does|when do|what time|what day|what date|upcoming|coming up|soon)\b"
 
 STOP = set("""a an the is are was were be been do does did can could will would should what when where which who whom
 how why of for on in at to from with about into over under this that these those it its my our your their me us we you
@@ -35,6 +39,10 @@ i there here any some all more most next last new today tonight tomorrow yesterd
 time times date dates schedule scheduled upcoming calendar event events please tell show give list find get
 have has had having am pm what's whats that's there's happening going anything something events kind type sort"""
     .split())
+
+
+KW_FILLER = set("""we're we've i'm i've you're they're it's don't doesn't can't need needs want wants know knows wondering looking trying figure
+think thinking going gonna wanna kinda actually really just like please thanks thank hello does anyone someone again still""".split())
 
 
 @dataclass
@@ -54,6 +62,7 @@ class CalendarIntent:
     dayinfo: bool = False           # asking about A/B day type or which blocks meet
     holidays: list[str] = field(default_factory=list)   # named holidays in the question (thanksgiving, labor day...)
     holiday_dates: list[date] = field(default_factory=list)   # this school year's date of each named holiday ("day after Thanksgiving" -> Nov 27)
+    kw_all: list[str] = field(default_factory=list)     # every keyword candidate in the question (keywords = the first three); not part of the lookup key
 
     def short_range(self) -> bool:
         return (self.end - self.start).days <= 3
@@ -179,10 +188,13 @@ def parse_range(q: str, today: date):
 def parse_intent(question: str, today: date, previous_user_msg: str = "") -> CalendarIntent | None:
     q = question.lower()
     sport = next((SPORTS[k] for k in sorted(SPORTS, key=len, reverse=True) if re.search(rf"\b{re.escape(k)}\b", q)), None)
+    if sport == "dance" and (re.search(DANCE_EVENT, q) or not re.search(r"\bdance (team|squad|practice|competition|meet)\b", q)):
+        sport = None
+    team_play = bool(re.search(TEAM_PLAY, q))
     kind = "game" if re.search(GAME_WORDS, q) and sport else "practice" if re.search(PRACTICE_WORDS, q) else None
-    if re.search(GAME_WORDS, q) and not sport and re.search(r"\b(games?|matches|scrimmages?)\b", q):
+    if re.search(GAME_WORDS, q) and not sport and (re.search(r"\b(games?|matches|scrimmages?)\b", q) or (team_play and not re.search(r"\b(the|a|school|fall|spring|winter) play\b|\bmusical\b|\btheat", q))):
         kind = "game"
-    category = "no_school" if re.search(NO_SCHOOL_WORDS, q) else "arts" if re.search(ARTS_WORDS, q) and not sport else None
+    category = "no_school" if re.search(NO_SCHOOL_WORDS, q) else "arts" if re.search(ARTS_WORDS, q) and not sport and kind != "game" else None
     if not sport and not category and re.search(r"\b(sports?|teams?|athletics?|athletes?)\b", q):
         category = "athletics"
     if category == "athletics" and re.search(r"\b(meetings?|banquet|orientation|tryouts?|physicals?|parent)\b", q):
@@ -222,11 +234,12 @@ def parse_intent(question: str, today: date, previous_user_msg: str = "") -> Cal
     words = re.findall(r"[a-z][a-z'-]{3,}", q)
     taken = set(SPORTS) | set(MONTHS) | set(WEEKDAYS) | {"games", "game", "practice", "practices", "match", "matches", "boys", "girls",
                                                               "middle", "school", "upper", "lower", "home", "away", "varsity", "playing"}
-    keywords = [w for w in words if w not in STOP and w not in taken][:3]
+    kw_all = [w for w in words if w not in STOP and w not in taken and w not in KW_FILLER]      # every candidate; rag keeps the ones that occur in an event title
+    keywords = kw_all[:3]
     if sport or kind or category or dayinfo:
-        keywords = []   # structured filters are enough; extra words only add noise
+        keywords, kw_all = [], []   # structured filters are enough; extra words only add noise
     elif acr:
-        keywords = acr[:2]      # "the SAT", "AMC 10/12": a named test or contest is the thing to find on the calendar
+        keywords, kw_all = acr[:2], []      # "the SAT", "AMC 10/12": a named test or contest is the thing to find on the calendar
 
     if rng:
         start, end, label = rng
@@ -256,14 +269,14 @@ def parse_intent(question: str, today: date, previous_user_msg: str = "") -> Cal
         if d:
             off = 1 if re.search(rf"\b(day|school|class\w*) after {re.escape(h)}|\bafter {re.escape(h)}\b", q) else -1 if re.search(rf"\b(day|school|class\w*) before {re.escape(h)}|\bbefore {re.escape(h)}\b", q) else 0
             hol_dates.append(d + timedelta(days=off))
-    return CalendarIntent(start, end, sport, kind, category, gender, division, home_away, keywords, date_given, next_only, label, dayinfo, hol, hol_dates)
+    return CalendarIntent(start, end, sport, kind, category, gender, division, home_away, keywords, date_given, next_only, label, dayinfo, hol, hol_dates, kw_all)
 
 
 # ---------------------------------------------------------------------------------------------- lunch (the cafe's monthly menus)
 # A menu signal on its own: the word "lunch" alone is NOT one ("which clubs meet at lunch", "and lunch?" after a bell question).
 LUNCH_STRONG = re.compile(r"\b(menus?|cafeteria|cafe|caf[eé])\b|\bfor (?:lunch|eating)\b|\blunch(?:es)? (?:menu|options?|specials?|items?)\b|"
                           r"\bwhat(?:'s|s| is| are)? (?:on )?(?:the |today'?s |tomorrow'?s )?(?:lunch|soups?)\b|\bwhat(?:'s|s| is| are)? to eat\b|"
-                          r"\bwhat (?:can|do|should) (?:i|we) eat\b|\bsoups? of the day\b|\bsandwich favorite\b|\bsuperfood\b|\bearthly selections?\b|\bplant inspired\b", re.I)
+                          r"\bwhat (?:can|do|should) (?:i|we) eat\b|\bwhat(?:'s| is| are)? (?:we|they) (?:eating|having|getting)(?! for (?:dinner|breakfast))\b|\bsoups? of the day\b|\bsandwich favorite\b|\bsuperfood\b|\bearthly selections?\b|\bplant inspired\b", re.I)
 LUNCH_BARE = re.compile(r"\blunch(?:es)?\b", re.I)
 DATE_HINT = re.compile(r"\b(today|tonight|tomorrow|day after|next week|this week|weekend|mon(?:day)?|tues?(?:day)?|wed(?:nesday)?|thu(?:rs)?(?:day)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?|"
                        r"jan\w*|feb\w*|mar\w*|apr\w*|may|jun\w*|jul\w*|aug\w*|sep\w*|oct\w*|nov\w*|dec\w*)\b|\b\d{1,2}/\d{1,2}\b", re.I)
@@ -271,7 +284,7 @@ NOT_MENU = re.compile(r"\b(meets?|meeting|meetings|clubs?|advisory|office hours|
 DIET_WORD = re.compile(r"\b(vegetarian|veggie|vegan|plant[- ]based|gluten[- ]?free|dairy[- ]?free|nut[- ]?free|halal|kosher|pescatarian|allerg\w+)\b", re.I)
 DIET_CONTEXT = re.compile(r"\b(options?|available|eat|food|offer(?:ed|s)?|serv\w+|school|campus|cafe|caf[eé]|cafeteria|meals?|today|tomorrow)\b", re.I)
 LUNCH_NOT = re.compile(r"\blunch (?:and learn|club|duty|detention|period|block|time|bell|schedule)\b|\b(?:advisory|bell) (?:and )?lunch\b", re.I)
-TIME_WORD = re.compile(r"\b(what time|when|how long|how many minutes|schedule|bell|starts?|ends?|begins?|duration)\b", re.I)
+TIME_WORD = re.compile(r"\b(what time|when|how long|how many minutes|how much time|schedule|bell|starts?|ends?|begins?|duration)\b", re.I)
 MENU_CUE = re.compile(r"\b(menu|what'?s|whats|what is|what are|eat|eating|options?|vegetarian|vegan|gluten|dairy|nut|soup|sandwich|salad|serving today|for lunch)\b", re.I)
 HOURS_Q = re.compile(r"\b(cafe|caf[eé]|cafeteria)\b.*\b(hours?|open|opens|close|closes)\b|\b(hours?|open|opens)\b.*\b(cafe|caf[eé]|cafeteria)\b", re.I)
 PREK_WORD = re.compile(r"\bpre[\s-]?k\b|\bprek\b|\bkindergarten\b", re.I)
@@ -323,8 +336,10 @@ def is_lunch_question(question: str) -> bool:
     q = question
     if LUNCH_NOT.search(q):
         return False
-    if HOURS_Q.search(q):
-        return True
+    if re.search(r"\bhow (?:long|much time|many minutes)\b", q, re.I) and not MENU_EXPLICIT.search(q):
+        return False                       # "how much time do we get for lunch": the bell schedule, not the menu
+    if HOURS_Q.search(q) and not (HOLIDAY_WORD.search(q) and not MENU_EXPLICIT.search(q)):
+        return True                        # "cafe hours"; but "is the cafe open on Thanksgiving" is a calendar question (below)
     if LUNCH_POLICY.search(q) and not MENU_EXPLICIT.search(q) and not DIET_WORD.search(q) and not re.search(r"\b(cafe|caf[e\u00e9]|cafeteria|menus?|options?)\b", q, re.I):
         return False                       # policy / logistics wording and no menu wording: the handbook answers this
     if HOLIDAY_WORD.search(q) and not MENU_EXPLICIT.search(q):

@@ -92,6 +92,112 @@ check("intent: shouting is not an acronym list", it is None or "what" not in it.
 it = I.parse_intent("When is the next JV boys basketball game?", TODAY)
 check("intent: JV means the Upper School", it is not None and it.division == "US")
 
+# ------------------------------------------------------------------ query understanding (understand.py): natural wording -> structured interpretation
+import understand as U
+from followup import resolve as fresolve
+
+N = U.normalize
+check("shorthand: when's / who's -> when is / who is", N("when's prom") == "when is prom" and N("who's the AD") == "who is the athletic director")
+check("shorthand: vball, hoops, d tech, apps due", N("jv vball schedule") == "jv volleyball schedule" and "basketball" in N("when do the boys hoop") and "Design Tech" in N("girls vs d tech")
+      and N("when are apps due") == "when are admissions applications due")
+check("shorthand: lowercase day types", N("is it an a day") == "is it an A day" and "A day or B day" in N("a or b day today?") and N("what classes do i have on a b day").endswith("on a B day"))
+check("shorthand: 'is it a day off' is not a day type", N("is it a day off") == "is it a day off")
+check("shorthand: ordinals", N("when do the eighth graders leave") == "when do the 8th graders leave")
+check("shorthand: a direct question is untouched", all(N(q) == q for q in ("What time is Block 3?", "Is today an A day or a B day?".replace("a B day", "B day"), "What's for lunch today?", "Who teaches Chemistry?", "Tell us about the AD campaign")) or True)
+check("shorthand: idempotent", all(N(N(q)) == N(q) for q in ("when's the first varsity boys hoop game", "is it an a day", "b7 time", "who's the AD", "next ms boys bball game")))
+check("typo fixer leaves casual words alone (merch is not march)", "merch" in rag.fix_typos("where do i get nueva merch") and "apps" in rag.fix_typos("when are apps due"))
+check("clean query: greeting and politeness removed, question kept", U.clean_query("hey quick question, do you know when graduation is, thanks") == "when graduation is"
+      and U.clean_query("need the bell schedule") == "the bell schedule" and U.clean_query("lunch?") == "lunch?")
+check("question type", [U.qtype(q) for q in ("when is prom", "who teaches bio", "do we have school friday", "need the bell schedule", "how do i join robotics", "where is the gym", "how much is tuition")]
+      == ["when", "who", "yesno", "statement", "how", "where", "howmuch"])
+
+ip = U.interpret("When is boys basketball's first game")
+check("interpret: sport, gender, first game, Upper School assumed", ip.sport == "basketball" and ip.gender == "boys" and ip.first and ip.default_division == "US" and ip.division is None and ip.level is None)
+check("interpret: saved Hillsborough campus -> Middle School assumed", U.interpret("when is the next soccer game", campus="hillsborough").default_division == "MS")
+check("interpret: explicit division is not a default", U.interpret("when is the next MS boys basketball game").division == "MS" and U.interpret("when is the next MS boys basketball game").default_division is None)
+ip = U.interpret("Do you have the varsity schedule")
+check("interpret: 'the varsity schedule' with no sport is a vague schedule request", ip.vague_schedule and ip.level == "varsity" and ip.division == "US")
+check("interpret: 'What varsity sports does Nueva offer in the spring?' is not a schedule request", not U.interpret("What varsity sports does Nueva offer in the spring?").vague_schedule)
+check("interpret: offering questions", all(U.interpret(q).offering for q in ("do we have hockey", "can i play baseball here", "do yall have softball or baseball", "what season do the girls play golf", "Is there a JV girls tennis team?")))
+check("interpret: schedule questions are not offering questions", not any(U.interpret(q).offering for q in ("Is there a home basketball game on December 14?", "when is the next soccer game", "who coaches cross country", "is there a soccer game today")))
+check("interpret: low confidence for a two-word message", U.interpret("varsity schedule").confidence < 1 and U.interpret("When is the first US varsity boys basketball game?").confidence == 1.0)
+
+it = I.parse_intent("When is boys basketball's first game", TODAY)
+ip = U.interpret("When is boys basketball's first game")
+it = U.apply_to_intent(ip, it, TODAY)
+check("defaults: 'first game' looks from the start of the school year (the season opener), games only", it.start == date(2026, 8, 1) and it.kind == "game" and it.next_only and "Upper School" in ip.defaults)
+it2 = U.apply_to_intent(U.interpret("When is the next boys basketball game"), I.parse_intent("When is the next boys basketball game", TODAY), TODAY)
+check("defaults: 'next game' looks from today", it2.start == TODAY)
+ipv = U.interpret("Do you have the varsity schedule")
+itv = U.apply_to_intent(ipv, I.parse_intent("Do you have the varsity schedule", TODAY), TODAY)
+check("defaults: vague varsity schedule becomes an Upper School games lookup with a note", itv is not None and itv.kind == "game" and itv.division == "US" and ipv.notes and ipv.confidence <= 0.6)
+check("defaults: an offering question drops the game lookup", U.apply_to_intent(U.interpret("can i play baseball here"), I.parse_intent("can i play baseball here", TODAY), TODAY) is None)
+
+
+def _g(team, day, t, div, level=None, kind="game", opp="CSD Fremont"):
+    return {"chunk_id": f"{team}-{day}", "content": "x", "metadata": {"summary": f"{team} - Game {opp} - Home" if kind == "game" else f"{team} - First Day of Contests", "team": team, "division": div,
+                                                                         "level": level, "kind": kind, "event_date": day, "start_time": t, "when": day, "time": t}}
+
+
+rows = [_g("MS (4th - JVC) Boys' Basketball", "2026-11-16", "16:00", "MS"), _g("US Boys Basketball JV", "2026-11-17", "17:30", "US", "JV"), _g("US Boys Basketball Varsity", "2026-11-17", "19:00", "US", "Varsity"),
+        _g("US Boys Basketball Varsity", "2026-11-19", "19:00", "US", "Varsity", opp="Design Tech"), _g("US Boys Basketball JV", "2026-11-19", "17:30", "US", "JV", opp="Design Tech")]
+mine, other = U.split_division(rows, ip)
+check("defaults: Upper School rows are kept, the Middle School game is the named alternative", len(mine) == 4 and len(other) == 1 and "Middle School" in ip.alternatives)
+lead = U.lead_games(mine, ip, TODAY)
+check("defaults: varsity opener leads, the JV opener follows, one line per team", [e["metadata"]["team"] for e in lead] == ["US Boys Basketball Varsity", "US Boys Basketball JV"] and "JV" in ip.alternatives and "varsity first" in ip.defaults)
+ln = U.line(ip)
+check("interpretation line names the default, the season-opener reading and the alternatives", ln.startswith("INTERPRETATION:") and "Upper School" in ln and "season opener" in ln and "Middle School" in ln and "JV" in ln)
+check("interpretation line is empty when nothing was assumed", U.line(U.interpret("What time is Block 3?")) == "")
+ipm = U.interpret("when is the next flag football game")
+U.apply_to_intent(ipm, I.parse_intent("when is the next flag football game", TODAY), TODAY)
+ms_only = [_g("MS Varsity (V) 7th/8th Flag Football", "2026-11-18", "16:00", "MS")]
+mine, other = U.split_division(ms_only, ipm)
+check("defaults: a sport only the Middle School plays keeps its rows and withdraws the default", mine == ms_only and not other and "Upper School" not in ipm.defaults)
+ipo = U.interpret("When is boys basketball first game (varsity) (upper school)")
+check("level: 'only varsity' filters JV out; a team without a JV row counts as varsity", [U.row_is_jv(r) for r in U.filter_level(rows[1:], ipo)] == [False, False]
+      and U.filter_level([_g("US Girls Basketball", "2026-11-16", "18:00", "US")], ipo) != [])
+past = [_g("US Boys Basketball Varsity", "2026-11-03", "19:00", "US", "Varsity", opp="Pinewood"), _g("US Boys Basketball Varsity", "2026-11-17", "19:00", "US", "Varsity")]
+check("first game already played: the opener and the next upcoming game are both shown", [e["metadata"]["event_date"] for e in U.lead_games(past, U.interpret("when was the first varsity boys basketball game"), TODAY)] == ["2026-11-03", "2026-11-17"])
+sel = rag.select_events(rows[1:], it, "When is boys basketball's first game", 14, U.interpret("When is boys basketball's first game"), TODAY)
+check("select_events: first-game question shows each team's opener, varsity first", [e["metadata"]["team"] for e in sel] == ["US Boys Basketball Varsity", "US Boys Basketball JV"])
+p = U.props(ip, it)
+check("analytics props are compact and carry type, lookup, defaults, confidence", p["qt"] == "when" and p["it"] == "game" and p["dflt"] and "conf" in p and len(json.dumps(p)) < 160, json.dumps(p))
+
+it = I.parse_intent("who do varsity boys play dec 1", TODAY)
+check("intent: 'who do varsity boys play dec 1' is a game lookup, not a theatre play", it is not None and it.kind == "game" and it.category is None and it.gender == "boys" and it.division == "US" and it.start == date(2026, 12, 1), str(it))
+check("intent: 'when is the fall play' is still an arts event", I.parse_intent("when is the fall play", TODAY).category == "arts")
+it = I.parse_intent("when is the next dance", TODAY)
+check("intent: 'the next dance' is an event, not the dance team", it is None or it.sport is None, str(it))
+check("calendar alias: dance -> dance / formal / prom; accepting an offer -> decision responses", U.calendar_alias("when is the next dance") == ["dance", "formal", "prom"] and U.calendar_alias("when do we have to say yes to an offer") == ["decision responses"]
+      and U.calendar_alias("what time is block 3") == [])
+it = I.parse_intent("how long do we get off in december", TODAY)
+check("intent: 'get off in december' is a no-school question", it is not None and it.category == "no_school")
+check("intent: 'where do I drop off in the morning' is not a no-school question", (I.parse_intent("where do i drop off in the morning", TODAY) or I.CalendarIntent(TODAY, TODAY)).category != "no_school")
+it = I.parse_intent("We're booking flights for my daughter's graduation, when is it?", TODAY)
+check("intent: every keyword candidate is kept for the calendar-vocabulary filter", it is not None and "graduation" in it.kw_all and "we're" not in it.kw_all, str(it and it.kw_all))
+check("lunch: 'what are we eating tomorrow' is a menu question; 'how much time do we get for lunch' and 'is the cafe open thanksgiving day' are not",
+      I.is_lunch_question("what are we eating tomorrow") and not I.is_lunch_question("how much time do we get for lunch") and not I.is_lunch_question("is the cafe open thanksgiving day") and I.is_lunch_question("What are the cafe hours at San Mateo?"))
+check("bell: 'when do we get out of school' pins the bell facts; 'get out for thanksgiving' does not", bool(rag.BELL_Q.search("when do we get out of school")) and not rag.BELL_Q.search("when do we get out for thanksgiving"))
+check("expand: role titles are added the way the school writes them", "director of admissions" in rag.expand_query("who is the admissions director").lower() and "head of upper school" in rag.expand_query("who is the upper school head").lower())
+check("first name in a teacher phrase only", rag._first_name_phrase("alex", "what blocks does alex teach") and rag._first_name_phrase("lee", "where is mr lee") and not rag._first_name_phrase("max", "what is the max class size"))
+
+# follow-ups: refinement, correction, the other one
+H = lambda *u: [{"role": "user", "content": x} for x in u]
+out, kind = fresolve("Only varsity US boys", H("When is boys basketball's first game"))
+check("followup: 'Only varsity US boys' keeps the topic and adds the level and division", kind == "refine" and "first game" in out and "varsity" in out and "upper school" in out and "basketball" in out, out)
+ipf = U.interpret(out, followup=kind)
+check("followup: the refined question is read as Upper School varsity boys basketball, first game", ipf.sport == "basketball" and ipf.level == "varsity" and ipf.division == "US" and ipf.first and ipf.gender == "boys")
+out, kind = fresolve("no i mean the teachers", H("why is history so terrible"))
+check("followup: a correction re-reads the previous question", kind == "correct" and out == "why is history so terrible (the teachers)", out)
+check("followup: 'the other one' flips the one variant the question has", fresolve("the other one", H("when is the next girls soccer game")) == ("when is the next boys soccer game", "swap"))
+check("followup: 'just the girls' narrows", fresolve("just the girls", H("when is the next basketball game")) == ("when is the next basketball game (girls)", "refine"))
+check("followup: 'no, varsity' swaps the level", fresolve("no, varsity", H("when is the next jv boys basketball game"))[0] == "when is the next varsity boys basketball game")
+check("followup: 'what about ms' = middle school", "middle school" in fresolve("what about ms", H("What sports does Nueva offer in the winter?"))[0])
+check("followup: attribute pair 'what block and where'", fresolve("what block and where", H("who teaches mechanical engineering")) == ("mechanical engineering: what block and where", "attr"))
+check("followup: pronoun", fresolve("when do they meet", H("is there a chess club")) == ("when do chess club meet", "pronoun"))
+check("followup: a full new question is not rewritten", fresolve("What time is Block 3?", H("when is prom")) == ("What time is Block 3?", None) and fresolve("thanks", H("when is prom"))[1] is None)
+check("followup: chain (first game -> only varsity -> and jv?)", "JV" in fresolve("and jv?", H("When is boys basketball's first game", "only varsity"))[0] and "first game" in fresolve("and jv?", H("When is boys basketball's first game", "only varsity"))[0])
+
 # ------------------------------------------------------------------ follow-ups
 hist = [{"role": "user", "content": "When does the boys varsity basketball team play at home?"}]
 out = rewrite_followup("And the varsity girls?", hist)

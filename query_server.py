@@ -337,6 +337,63 @@ def smalltalk(q: str) -> str | None:
     return None
 
 
+# Personal trivia about a named person ("whats lee fertigs favorite color", "how old is mr chao", "is ms hart married"): the index holds roles,
+# classes, rooms and office contacts, never private details, so the honest answer is a short decline. It is given without a model call
+# only when (1) the wording is clearly personal, (2) a name-like word is present and (3) a keyword search finds no chunk that has that name
+# together with the attribute; anything else takes the normal path. guard.check (privacy, safety) has already run and is not changed.
+PERSONAL_ATTR = re.compile(
+    r"\bfavou?rite (colou?r|food|movie|film|song|band|music|artist|animal|sport|team|book|show|number|ice cream|flavou?r|drink|snack|restaurant|game|season|holiday|player|candy|pizza|car|thing)s?\b|"
+    r"\b(birthday|zodiac|star sign|horoscope|net worth|middle name|maiden name|shoe size)\b|\bhow (old|tall|rich)\b|\bhow much does? .{2,30} weigh\b|\bwhen (was|were) .{2,30} born\b|"
+    r"\b(is|are) .{2,30} (married|single|dating|divorced|gay|straight|religious)\b|\b(wife|husband|girlfriend|boyfriend|spouse|crush)\b|\bwho is .{2,30} dating\b|"
+    r"\bwhere does .{2,30} live\b|\bhome address\b|\b(instagram|insta|tiktok|snapchat|snap|twitter|facebook)\b|\bwhat (religion|political party)\b|\bwho did .{2,30} vote\b", re.I)
+PERSONAL_SUBJECT_NOT = re.compile(r"\b(your|you|nueva'?s?|school'?s?|the school|team'?s?|mavericks?|club'?s?|my|our|i|we)\b", re.I)
+PERSONAL_REPLY = ("I don't have personal details like that about people at Nueva. I can tell you what someone teaches, their role, "
+                  "their room, or how to reach their office.")
+_personal_cache = TTLCache(max_items=300, ttl=1800)
+
+
+def personal_decline(q: str) -> str | None:
+    """-> the short decline for clearly personal trivia about a named person, or None (normal path). One keyword-search RPC, no LLM."""
+    try:
+        m = PERSONAL_ATTR.search(q)
+        if not m or len(q) > 160:
+            return None
+        import qnorm
+        from rag import STOP, normalize_query
+        qn = normalize_query(q)
+        attr = set(re.findall(r"[a-z]{3,}", m.group(0).lower()))
+        names = []
+        for t in re.findall(r"[a-z]{4,}", re.sub(r"'s\b", "", qn.lower())):
+            if t in STOP or t in attr or t in qnorm.COMMON:
+                continue
+            base = t[:-1] if t.endswith("s") and not qnorm.df(t) and qnorm.df(t[:-1]) else t          # "fertigs" -> "fertig"
+            if qnorm.df(base) <= 60:                    # a name is rare in the index (or unseen); common words are not names
+                names.append(base)
+        subject_free = PERSONAL_SUBJECT_NOT.search(re.sub(PERSONAL_ATTR, " ", qn))
+        if not names or (subject_free and not any(qnorm.df(n) for n in names)):
+            return None                                 # "what's your favorite color", "the school's colors": not about a named person
+        key = (tuple(names[:2]), tuple(sorted(attr)))
+        hit = _personal_cache.get(key)
+        if hit is None:
+            words = [w for w in attr if w not in ("favorite", "favourite", "does", "much", "how", "who", "was", "were", "when", "where", "what", "are")] or list(attr)
+            r = get_supabase().rpc("search_chunks_fts", {"query_text": f"{names[0]} & ({' | '.join(sorted(words))})", "match_count": 1}).execute()
+            hit = "found" if (r.data or []) else "none"
+            _personal_cache.set(key, hit)
+        return PERSONAL_REPLY if hit == "none" else None
+    except Exception:
+        return None                                     # fail open: the normal path answers
+
+
+def quick_reply(q: str) -> tuple[str, str] | None:
+    """Replies that need no retrieval and no model: (text, kind). kind 'smalltalk' (greetings, capabilities, guard replies) or 'personal'
+    (a short decline for personal trivia about a named person)."""
+    if (canned := smalltalk(q)) is not None:
+        return canned, "smalltalk"
+    if (text := personal_decline(q)) is not None:
+        return text, "personal"
+    return None
+
+
 POLICY_TOPIC = re.compile(r"\b(polic\w*|rules?|allowed|attendance|absen\w*|tard\w*|late|phones?|dress code|uniform|discipline|plagiar\w*|cheat\w*|honor|graduat\w*|grading|grades?|homework|late work|make-?up|retake|laptops?|ai|excused)\b", re.I)
 
 
@@ -468,7 +525,8 @@ def _prepare(req: QueryRequest, trace: Trace | None = None):
     standalone = result.get("resolved") or req.query
     follow_note = (f"\n\nThe student's latest message is a follow-up. Treat it as: \"{standalone[:300]}\"."
                    if standalone.strip().lower() != req.query.strip().lower() and req.history else "")
-    system = (f"{SYSTEM_PERSONA}\n\nToday is {now.strftime('%A, %B %-d, %Y')} (Pacific time).{grade_note}{follow_note}\n\n"
+    interp_note = f"\n\n{result['interp_line']}" if result.get("interp_line") else ""
+    system = (f"{SYSTEM_PERSONA}\n\nToday is {now.strftime('%A, %B %-d, %Y')} (Pacific time).{grade_note}{follow_note}{interp_note}\n\n"
               f"CONTEXT:\n{context}")
     msgs = [{"role": "system", "content": system}]
     msgs += [{"role": t.role if t.role in ("user", "assistant") else "user", "content": t.content[:700]} for t in req.history[-4:]]
@@ -658,6 +716,15 @@ def _answer_props(answer: str, result: dict | None, sources: list[dict], query: 
         props["rroute"] = "docs"
     if r.get("division"):
         props["div"] = r["division"][0]
+    try:        # how the question was understood: question type, lookup kind, defaults applied, rewrite used, confidence (a few dozen bytes, no text)
+        import understand
+        iu = understand.props(r.get("interp"), "lunch" if r.get("lunch") else it)
+        if iu:
+            if r.get("structured"):
+                iu["st"] = r["structured"][:3]
+            props["iu"] = iu
+    except Exception:
+        pass
     head = re.sub(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", "[email]", answer[:600])          # logs never hold addresses or numbers, not even the school's
     head = re.sub(r"(?<![\w.])(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)", "[phone]", head)
     props["answer_head"] = head
@@ -805,10 +872,13 @@ def _answer(req: QueryRequest, request: Request | None) -> dict:
 def _answer_inner(req: QueryRequest, request: Request | None, trace: Trace) -> dict:
     t0 = time.time()
     now = datetime.now(PACIFIC)
-    if (canned := smalltalk(req.query)) is not None:
+    if (quick := quick_reply(req.query)) is not None:
+        canned, qkind = quick
         trace.route = _canned_route(req.query)
-        _track(req, request, {"query": req.query[:300], "cached": True, "smalltalk": True, "total_ms": 0, "ttft_ms": 0, "sources": 0, "alen": len(canned)}, trace)
-        return {"answer": canned, "model_used": "none", "sources": [], "suggestions": [], "cached": True, "timings": {"total_ms": 0}}
+        total = round((time.time() - t0) * 1000)
+        _track(req, request, {"query": req.query[:300], "cached": True, "smalltalk": True, "total_ms": total, "ttft_ms": total, "sources": 0, "alen": len(canned),
+                              **({"decline": "personal", "iu": {"qt": "what", "it": "personal", "conf": 1.0}} if qkind == "personal" else {})}, trace)
+        return {"answer": canned, "model_used": "none", "sources": [], "suggestions": [], "cached": True, "timings": {"total_ms": total}}
     key = _cache_key(req, now)
     if key and (hit := _cache_get(req, key, trace)):
         total = round((time.time() - t0) * 1000)
@@ -932,12 +1002,15 @@ def _stream_inner(req: QueryRequest, request: Request, trace: Trace):
     t0 = time.time()
     try:
         now = datetime.now(PACIFIC)
-        if (canned := smalltalk(req.query)) is not None:
+        if (quick := quick_reply(req.query)) is not None:
+            canned, qkind = quick
             yield _sse("meta", {"sources": [], "cached": True})
             yield _sse("delta", {"t": canned})
             trace.route = _canned_route(req.query)
-            yield _sse("done", {"cached": True, "timings": {"total_ms": 0, "ttft_ms": 0}, "suggestions": [], "route": trace.route, "model": "none"})
-            _track(req, request, {"query": req.query[:300], "cached": True, "smalltalk": True, "total_ms": 0, "ttft_ms": 0, "sources": 0, "alen": len(canned)}, trace)
+            total = round((time.time() - t0) * 1000)
+            yield _sse("done", {"cached": True, "timings": {"total_ms": total, "ttft_ms": total}, "suggestions": [], "route": trace.route, "model": "none"})
+            _track(req, request, {"query": req.query[:300], "cached": True, "smalltalk": True, "total_ms": total, "ttft_ms": total, "sources": 0, "alen": len(canned),
+                                  **({"decline": "personal", "iu": {"qt": "what", "it": "personal", "conf": 1.0}} if qkind == "personal" else {})}, trace)
             return
         key = _cache_key(req, now)
         hit = _cache_get(req, key, trace)
