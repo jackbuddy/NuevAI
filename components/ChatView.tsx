@@ -56,6 +56,16 @@ function withDated(pool: StarterItem[], todayIso: string): StarterItem[] {
   const teach = teacherStarter(todayIso), soon = comingUpStarter(todayIso);
   return pool.map((s) => (s.topic === 'courses' ? { ...s, ...teach } : s.label === 'When is the next no-school day?' && s.topic === 'calendar' ? { ...s, ...soon } : s));
 }
+const STARTER_TONE: Partial<Record<Topic, { chip: string; pill: string }>> & { other: { chip: string; pill: string } } = {
+  lunch: { chip: 'bg-amber-100 text-amber-800', pill: 'border-amber-200/70 bg-amber-50/70 hover:bg-amber-50' },
+  games: { chip: 'bg-teal-100 text-teal-700', pill: 'border-teal-200/70 bg-teal-50/70 hover:bg-teal-50' },
+  courses: { chip: 'bg-violet-100 text-violet-700', pill: 'border-violet-200/70 bg-violet-50/70 hover:bg-violet-50' },
+  calendar: { chip: 'bg-sky-100 text-sky-700', pill: 'border-sky-200/70 bg-sky-50/70 hover:bg-sky-50' },
+  school_day: { chip: 'bg-sky-100 text-sky-700', pill: 'border-sky-200/70 bg-sky-50/70 hover:bg-sky-50' },
+  clubs: { chip: 'bg-rose-100 text-rose-700', pill: 'border-rose-200/70 bg-rose-50/70 hover:bg-rose-50' },
+  resources: { chip: 'bg-brand-100 text-brand-700', pill: 'border-brand-200/70 bg-brand-50/70 hover:bg-brand-50' },
+  other: { chip: 'bg-brand-100 text-brand-700', pill: 'border-brand-200/70 bg-brand-50/70 hover:bg-brand-50' },
+};
 const LOADING_LABEL: Partial<Record<Topic, string>> = {
   lunch: 'Checking the lunch menu…', courses: 'Checking the course sheet…', games: 'Looking at the athletics calendar…', school_day: 'Checking the school calendar…',
   calendar: 'Checking the school calendar…', clubs: 'Looking through the clubs list…', resources: 'Looking for the right link…',
@@ -357,30 +367,20 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar, onOpenReso
               </div>
             )}
 
-            {firstRun ? (
-              /* first visit: bigger tap cards that read as "try me", with the accuracy note kept small underneath instead of leading */
-              <div className="animate-rise mt-5" style={{ animationDelay: '140ms' }}>
-                <div className="grid grid-cols-2 gap-2.5" role="group" aria-label="Try one of these questions">
-                  {startersShown.map((s) => (
-                    <button key={s.label} onClick={() => { track('starter_click', { label: s.label, first_run: true }); send(s.label, 'starter'); }}
-                            className="surface shadow-soft tap-h group flex min-h-[4.5rem] flex-col items-start justify-between gap-2 rounded-2xl p-3.5 text-left transition hover:-translate-y-0.5 hover:shadow-lift">
-                      <span className="grid h-7 w-7 place-items-center rounded-full bg-brand-100 text-brand-700"><s.icon className="h-4 w-4" aria-hidden /></span>
-                      <span className="text-[14px] font-semibold leading-snug text-brand-900">{s.label}</span>
-                    </button>
-                  ))}
-                </div>
-                <p className="ink-2 mt-3 text-center text-[12px] leading-snug">Answers come from Nueva’s calendar, lunch menus and school documents, and can be wrong. Check the sources.</p>
-              </div>
-            ) : (
-              <div className="animate-rise mt-4 flex flex-wrap justify-center gap-2" style={{ animationDelay: '140ms' }}>
-                {startersShown.map((s) => (
-                  <button key={s.label} onClick={() => { track('starter_click', { label: s.label }); send(s.label, 'starter'); }}
-                          className="surface-2 tap-h inline-flex items-center gap-2 rounded-full border border-transparent px-4 py-2 text-[13px] font-medium text-brand-800 transition hover:border-[var(--line)] hover:bg-white hover:shadow-soft">
-                    <s.icon className="h-3.5 w-3.5 text-brand-500" />{s.label}
+            {/* pill-sized starters; each carries a small tinted icon chip in its topic's colour (same hues as Happening and Calendar) */}
+            <div className="animate-rise mt-4 flex flex-wrap justify-center gap-2" style={{ animationDelay: '140ms' }} role="group" aria-label="Try one of these questions">
+              {startersShown.map((s) => {
+                const tone = STARTER_TONE[s.topic] ?? STARTER_TONE.other;
+                return (
+                  <button key={s.label} onClick={() => { track('starter_click', firstRun ? { label: s.label, first_run: true } : { label: s.label }); send(s.label, 'starter'); }}
+                          className={`tap-h group inline-flex max-w-full items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-4 text-[13px] font-medium text-brand-900 transition hover:-translate-y-0.5 hover:shadow-soft ${tone.pill}`}>
+                    <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full ${tone.chip}`}><s.icon className="h-3.5 w-3.5" aria-hidden /></span>
+                    <span className="min-w-0 text-left leading-tight">{s.label}</span>
                   </button>
-                ))}
-              </div>
-            )}
+                );
+              })}
+            </div>
+            {firstRun && <p className="ink-2 mt-3 text-center text-[12px] leading-snug">Answers come from Nueva’s calendar, lunch menus and school documents, and can be wrong. Check the sources.</p>}
 
             <WhatsNew />
             <Happening campus={campus} onCampus={chooseCampus} onOpenCalendar={onOpenCalendar} onAsk={(q) => send(q, 'starter')} />
