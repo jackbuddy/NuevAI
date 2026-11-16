@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, CalendarDays, Check, ChevronDown, Copy, History, Lightbulb, Link2, MapPin, RotateCw, Info, ShieldCheck, Square, SquarePen, Trophy, UtensilsCrossed, Users, Zap } from 'lucide-react';
+import { ArrowDown, ArrowUp, CalendarDays, Check, ChevronDown, Copy, GraduationCap, History, Lightbulb, Link2, MapPin, RotateCw, Info, ShieldCheck, Square, SquarePen, Trophy, UtensilsCrossed, Users, Zap } from 'lucide-react';
 import { Markdown } from './Markdown';
 import { Logo } from './Logo';
 import { track } from '@/lib/analytics';
@@ -17,6 +17,7 @@ import { Hint } from './Hint';
 import { InstallPrompt } from './InstallPrompt';
 import { WhatsNew } from './WhatsNew';
 import { PLACEHOLDERS } from '@/lib/ideas';
+import { comingUpStarter, teacherStarter } from '@/lib/starters';
 import { HintId, Starter, Topic, chooseHint, provenance, rankStarters, topicOf } from '@/lib/ux-logic';
 import { Visit, addRecent, endOnboarding, hintResolved, hintShown, markUsed, noteAnswer, onUxChange, onboardingShown, readVisit, recents, ux } from '@/lib/visit';
 
@@ -24,34 +25,39 @@ import { Visit, addRecent, endOnboarding, hintResolved, hintShown, markUsed, not
 // school days, clubs); the extras only matter once someone has already asked the first ones. Policy/course questions live in Ideas.
 type StarterItem = Starter & { icon: typeof Trophy };
 const STARTERS: StarterItem[] = [
-  { icon: Trophy, label: 'What games are this week?', topic: 'games' },
   { icon: UtensilsCrossed, label: 'What’s for lunch today?', topic: 'lunch' },
-  { icon: CalendarDays, label: 'Is there school tomorrow?', topic: 'school_day' },
-  { icon: Users, label: 'Which clubs meet today?', topic: 'clubs' },
   { icon: Trophy, label: 'When is the next home game?', topic: 'games' },
-  { icon: UtensilsCrossed, label: 'What’s for lunch tomorrow?', topic: 'lunch' },
+  { icon: GraduationCap, label: 'Who teaches Biology?', topic: 'courses' },     // replaced by a rotating, date-aware pick (lib/starters.ts)
+  { icon: CalendarDays, label: 'When is the next no-school day?', topic: 'calendar' },   // likewise
+  { icon: Users, label: 'Which clubs meet today?', topic: 'clubs' },
+  { icon: Trophy, label: 'What games are this week?', topic: 'games' },
 ];
 const STARTERS_BY_ROLE: Record<Role, StarterItem[]> = {
   student: STARTERS,
   parent: [
     { icon: UtensilsCrossed, label: 'What’s for lunch today?', topic: 'lunch' },
-    { icon: Trophy, label: 'What games are this week?', topic: 'games' },
-    { icon: CalendarDays, label: 'Is there school tomorrow?', topic: 'school_day' },
+    { icon: Trophy, label: 'When is the next home game?', topic: 'games' },
     { icon: MapPin, label: 'How do I book a campus tour?', topic: 'resources' },
     { icon: CalendarDays, label: 'When is the next no-school day?', topic: 'calendar' },
-    { icon: UtensilsCrossed, label: 'What’s for lunch tomorrow?', topic: 'lunch' },
+    { icon: GraduationCap, label: 'Who teaches Biology?', topic: 'courses' },
+    { icon: Trophy, label: 'What games are this week?', topic: 'games' },
   ],
   staff: [
-    { icon: CalendarDays, label: 'What kind of day is it tomorrow?', topic: 'school_day' },
     { icon: UtensilsCrossed, label: 'What’s for lunch today?', topic: 'lunch' },
     { icon: CalendarDays, label: 'When are the next PD days?', topic: 'calendar' },
-    { icon: Trophy, label: 'What games are this week?', topic: 'games' },
+    { icon: Trophy, label: 'When is the next home game?', topic: 'games' },
+    { icon: CalendarDays, label: 'What kind of day is it tomorrow?', topic: 'school_day' },
     { icon: Users, label: 'Which clubs meet today?', topic: 'clubs' },
-    { icon: UtensilsCrossed, label: 'What’s for lunch tomorrow?', topic: 'lunch' },
+    { icon: Trophy, label: 'What games are this week?', topic: 'games' },
   ],
 };
+/** Swap the two date-aware slots (a real teacher/course question, the next break) into a role's list. */
+function withDated(pool: StarterItem[], todayIso: string): StarterItem[] {
+  const teach = teacherStarter(todayIso), soon = comingUpStarter(todayIso);
+  return pool.map((s) => (s.topic === 'courses' ? { ...s, ...teach } : s.label === 'When is the next no-school day?' && s.topic === 'calendar' ? { ...s, ...soon } : s));
+}
 const LOADING_LABEL: Partial<Record<Topic, string>> = {
-  lunch: 'Checking the lunch menu…', games: 'Looking at the athletics calendar…', school_day: 'Checking the school calendar…',
+  lunch: 'Checking the lunch menu…', courses: 'Checking the course sheet…', games: 'Looking at the athletics calendar…', school_day: 'Checking the school calendar…',
   calendar: 'Checking the school calendar…', clubs: 'Looking through the clubs list…', resources: 'Looking for the right link…',
 };
 const STORE_KEY = 'nuevai.chat.v2';
@@ -107,26 +113,39 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar, onOpenReso
     const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
     el.scrollTo({ top: el.scrollHeight, behavior: smooth && !reduce ? 'smooth' : 'auto' });
   }, []);
+  // Where to follow a growing answer to: the bottom, but never past the point where the answer's own first line would leave the screen.
+  // On a phone a long answer therefore opens at its start (the reader scrolls down), instead of landing on its last line.
+  const followTop = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return 0;
+    const bottom = Math.max(0, el.scrollHeight - el.clientHeight);
+    const last = endRef.current?.previousElementSibling as HTMLElement | null;   // the newest message (the answer being written)
+    if (!last) return bottom;
+    const top = last.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - 12;
+    return Math.max(0, Math.min(bottom, top));
+  }, []);
+  const follow = useCallback(() => { scrollRef.current?.scrollTo({ top: followTop(), behavior: 'auto' }); }, [followTop]);
   const onScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
     const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     // only a scroll UP stops the auto-follow: content that grows under a programmatic scroll (action row, rating panel) must not look like the reader leaving
     const up = el.scrollTop < lastTop.current - 2;
+    const past = el.scrollTop > followTop() + 8;      // scrolled below the answer's start: the reader is reading on, so stop pulling them back
     lastTop.current = el.scrollTop;
     if (near) { stick.current = true; setAway(false); }
-    else if (up) { stick.current = false; setAway(true); }
+    else if (up || past) { stick.current = false; setAway(true); }
   };
-  useEffect(() => { if (stick.current) toBottom(false); }, [messages, toBottom]);
+  useEffect(() => { if (stick.current) follow(); }, [messages, follow]);
   // content can grow after the messages change (action row, rating panel, suggestions): keep following while the reader is at the bottom
   const hasMessages = messages.length > 0;
   useEffect(() => {
     const inner = scrollRef.current?.firstElementChild;
     if (!inner || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(() => { if (stick.current) toBottom(false); });
+    const ro = new ResizeObserver(() => { if (stick.current) follow(); });
     ro.observe(inner);
     return () => ro.disconnect();
-  }, [hasMessages, toBottom]);
+  }, [hasMessages, follow]);
   // desktop: ready to type. Touch screens: do not pop the keyboard up over the page on load.
   useEffect(() => { if (typeof matchMedia === 'function' && matchMedia('(pointer: fine)').matches && messages.length === 0) taRef.current?.focus(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -257,7 +276,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar, onOpenReso
   }, [ideasOpen]);
 
   const startersShown = useMemo(() => {
-    const pool = STARTERS_BY_ROLE[role ?? 'student'];
+    const pool = withDated(STARTERS_BY_ROLE[role ?? 'student'], nowLA().date);
     if (!hydrated || firstRun) return pool.slice(0, 4);
     return rankStarters(pool, ux().topics, recents(), 4);
   }, [role, hydrated, firstRun, empty]);   // eslint-disable-line react-hooks/exhaustive-deps

@@ -9,13 +9,14 @@ export const DAY = 24 * HOUR;
 
 // ---------------------------------------------------------------- topics
 
-export type Topic = 'lunch' | 'games' | 'clubs' | 'school_day' | 'calendar' | 'resources' | 'policy' | 'other';
+export type Topic = 'lunch' | 'games' | 'clubs' | 'courses' | 'school_day' | 'calendar' | 'resources' | 'policy' | 'other';
 
 /** Rough, local-only classification of a question (drives hints, loading labels and starter ranking). */
 export function topicOf(q: string): Topic {
   const s = q.toLowerCase();
   if (/\bclubs?\b/.test(s)) return 'clubs';
   if (/\b(lunch|cafe|cafeteria|menu)\b/.test(s)) return 'lunch';
+  if (/\b(teach(es|er|ers)?|taught|instructor)\b/.test(s)) return 'courses';
   if (/\b(games?|scrimmages?|matches?|teams?|basketball|soccer|volleyball|tennis|swim(ming)?|baseball|softball|track|sports?|athletics?|varsity)\b/.test(s) && !/\b(game design|video games?)\b/.test(s)) return 'games';
   if (/\b(school|class(es)?)\s+(tomorrow|today|on|monday|tuesday|wednesday|thursday|friday)\b|\b[ab]['’]?[- ]?day\b|\bwhat (kind of )?day\b|\bday type\b|\bno[- ]school\b/.test(s)) return 'school_day';
   if (/\b(forms?|links?|book|booking|portal|tutorial|tour|handbook|resources?|tech|laptop|help ?desk|transcripts?|lost and found)\b/.test(s)) return 'resources';

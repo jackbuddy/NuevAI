@@ -7,6 +7,7 @@ export const IDEAS: IdeaGroup[] = [
   { id: 'clubs', label: 'Clubs', prompts: ['What clubs meet today?', 'What clubs meet at lunch?', 'How do I start a club?', 'Which clubs are about coding or robotics?'] },
   { id: 'lunch', label: 'Lunch', prompts: ['What’s for lunch tomorrow?', 'What’s for lunch at San Mateo?', 'What’s for lunch at Hillsborough?', 'What’s for lunch on Friday?'] },
   { id: 'calendar', label: 'Calendar & days', prompts: ['When is the next no-school day?', 'When is Thanksgiving break?', 'When is winter break?', 'Is tomorrow an A day or a B day?', "What does an A' day mean?", 'When are the next PD days?'] },
+  { id: 'classes', label: 'Classes & teachers', prompts: ['Does Mara Ballmer teach Biology?', 'Who teaches Math 3?', 'What does Scott Cairns teach?', 'Who teaches Physics?', 'Where do I find course offerings?'] },
   { id: 'handbook', label: 'Handbook & policies', prompts: ['What’s the dress code?', 'What’s the attendance policy?', 'What’s the phone policy?', 'What are the graduation requirements?'] },
   { id: 'resources', label: 'Resources', prompts: ['How do I book a campus tour?', 'Where can I find the student handbook?', 'Where do I find course offerings?'] },
 ];
@@ -17,6 +18,7 @@ export const PLACEHOLDERS = [
   'What’s for lunch tomorrow?',
   'Is there a home game this week?',
   'Which clubs meet today?',
+  'Who teaches Physics?',
   'When is the next no-school day?',
   'What’s the dress code?',
   'How do I book a campus tour?',

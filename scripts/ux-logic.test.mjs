@@ -4,6 +4,7 @@ import {
   DAY, HOUR, HINT_COOLDOWN_MS, HINT_LIFETIME_CAP, emptyHints, recordHintShown, chooseHint, topicOf, visitNumber, isFirstRun,
   canShowInstall, whatsNewActive, rankStarters, pushRecent, provenance, parseTeam,
 } from '../lib/ux-logic.ts';
+import { teacherStarter, comingUpStarter } from '../lib/starters.ts';
 
 let passed = 0;
 const t = (name, fn) => { try { fn(); passed++; } catch (e) { console.error('FAIL', name, '\n ', e.message); process.exitCode = 1; } };
@@ -158,5 +159,22 @@ t('team: special events keep the team', () => {
 t('team: not a team shape', () => { assert.equal(parseTeam('Veterans Day'), null); assert.equal(parseTeam('A - B'), null); });
 t('team: Varsity and JV are different follows', () => assert.notEqual(parseTeam('US Boys Basketball Varsity - Game X - Home').key, parseTeam('US Boys Basketball JV - Game X - Home').key));
 t('hour constant sane', () => assert.equal(HOUR * 24, DAY));
+
+// ---- date-aware starters
+t('topic: teacher questions are their own topic', () => { assert.equal(topicOf('Does Mara Ballmer teach Biology?'), 'courses'); assert.equal(topicOf('Who teaches Math 3?'), 'courses'); assert.equal(topicOf('What does Scott Cairns teach?'), 'courses'); });
+t('topic: lunch and games unaffected', () => { assert.equal(topicOf('What is for lunch today?'), 'lunch'); assert.equal(topicOf('When is the next home game?'), 'games'); });
+t('starters: teacher pick rotates daily, always a courses question with a name or course', () => {
+  const seen = new Set();
+  for (let d = 1; d <= 8; d++) { const s = teacherStarter(`2026-11-${String(d).padStart(2, '0')}`); assert.equal(s.topic, 'courses'); assert.match(s.label, /teach/i); seen.add(s.label); }
+  assert.ok(seen.size >= 3);
+  assert.equal(teacherStarter('2026-11-16').label, teacherStarter('2026-11-16').label);   // stable within a day
+});
+t('starters: next break follows the calendar', () => {
+  assert.equal(comingUpStarter('2026-11-16').label, 'When is Thanksgiving break?');
+  assert.equal(comingUpStarter('2026-12-02').label, 'When is winter break?');
+  assert.equal(comingUpStarter('2027-02-10').label, 'When is spring break?');
+  assert.equal(comingUpStarter('2027-05-01').label, 'When is the last day of school?');
+  assert.equal(comingUpStarter('2027-08-01').label, 'When is the next no-school day?');
+});
 
 console.log(`${passed} passed${process.exitCode ? ', with failures' : ''}`);

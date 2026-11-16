@@ -69,7 +69,10 @@ body { background: var(--bg); color: var(--ink); font-family: var(--font-sans); 
 :focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: 2px; }
 .bare:focus-visible { outline: none; }   /* the wrapper shows a focus ring instead */
 .on-navy:focus-visible { outline-color: var(--color-brand-300); }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
+/* phones: no double-tap-zoom delay on controls, and a small press response so taps feel registered */
+button, a, [role="tab"], summary, label { touch-action: manipulation; }
+@media (pointer: coarse) { button:not(:disabled):active { transform: scale(.97); transition: transform .08s; } }
 .wrap-any { overflow-wrap: anywhere; word-break: break-word; }
 
 /* soft atmosphere behind the home screen: two blurred washes of the brand blues, nothing heavier */
