@@ -269,6 +269,83 @@ PARA = {
                  ("multi_part", "who teaches mechanical engineering and who teaches computer vision", {"with": ["crs-09"]})],
 }
 
+# HOLD-OUT: wordings written AFTER the understanding fixes were made and never used to tune them (ids "<source>~h<n>", holdout=true).
+# eval_natural.py reports them separately: this is the honest, out-of-sample robustness number. Do not tune on these; add new ones instead.
+HOLDOUT = {
+    "cal-01": [("casual", "what days do we have off for thanksgiving")],
+    "cal-02": [("casual", "when does christmas break start and when's the first day back")],
+    "cal-03": [("indirect", "what's the final day of classes before summer")],
+    "cal-04": [("casual", "when do seniors graduate")],
+    "cal-06": [("parent", "Which week is spring break? Trying to plan a trip.")],
+    "cal-09": [("slang", "winter formal when??")],
+    "cal-10": [("indirect", "is prom in april or may, and what time")],
+    "cal-13": [("casual", "what week is intersession this year")],
+    "cal-18": [("casual", "is jan 4 a school day")],
+    "day-03": [("casual", "what kind of day is it on november 30th")],
+    "day-06": [("casual", "which blocks do we have on b days")],
+    "day-08": [("casual", "are we off the day after thanksgiving")],
+    "day-12": [("abbrev", "12/3 a or b day?")],
+    "bell-01": [("casual", "block 2 is from when to when")],
+    "bell-03": [("casual", "what time do i have to be at school and when is it over")],
+    "bell-04": [("casual", "how long is lunch break")],
+    "bell-07": [("casual", "how many classes do we have per day")],
+    "ath-01": [("casual", "which sports can you do at nueva")],
+    "ath-03": [("casual", "what can i play this winter")],
+    "ath-05": [("casual", "is there a football team here")],
+    "ath-11": [("casual", "who's in charge of sports at nueva")],
+    "ath-13": [("abbrev", "what league is nueva in")],
+    "ath-16": [("casual", "do we have a trainer for injuries")],
+    "cov-17": [("casual", "what's the nueva mascot")],
+    "sp-09": [("casual", "which teams have a jv squad")],
+    "sp-05": [("casual", "where are girls soccer home games played")],
+    "gm-03": [("casual", "varsity boys basketball dec 8 who do they play")],
+    "gm-05": [("casual", "who's jv boys basketball playing on nov 17, what time")],
+    "gm-12": [("casual", "next middle school boys basketball game?")],
+    "gm-17": [("casual", "what dates does girls basketball play design tech")],
+    "sp-12": [("casual", "girls basketball vs burlingame, when is that")],
+    "club-01": [("casual", "what day is chess club and where")],
+    "club-04": [("casual", "who's the teacher for mock trial")],
+    "club-05": [("abbrev", "MUN meeting day and room?")],
+    "club-07": [("casual", "is mahjong club a thing")],
+    "club-15": [("casual", "what's the process for starting a club")],
+    "staff-01": [("casual", "who do i have for mechanical engineering")],
+    "staff-06": [("casual", "what does max cowan teach besides that"), ],
+    "staff-07": [("casual", "phone number for the upper school office")],
+    "staff-09": [("casual", "what's the nurse's email")],
+    "staff-11": [("casual", "who's the head of the upper school")],
+    "cov-23": [("casual", "my laptop won't connect, who do i contact")],
+    "cov-27": [("casual", "who do i ask for a transcript")],
+    "pol-01": [("casual", "are we allowed to use phones during class")],
+    "pol-05": [("casual", "at what point am i counted tardy")],
+    "pol-09": [("casual", "can juniors and seniors go off campus")],
+    "pol-10": [("casual", "what's nueva's dress code like")],
+    "pol-11": [("casual", "are we allowed to use chatgpt for schoolwork")],
+    "lun-01": [("casual", "san mateo lunch on nov 12?")],
+    "lun-07": [("casual", "what time does the san mateo cafe open and close")],
+    "ev-01": [("casual", "evening of the arts is when?")],
+    "ev-04": [("casual", "what night is the us trips info session")],
+    "adm-01": [("casual", "how can i tour the school")],
+    "adm-02": [("casual", "what's the fee for applying")],
+    "adm-04": [("casual", "when will we know if my kid got in")],
+    "adm-09": [("casual", "where do i donate")],
+    "adm-11": [("parent", "What does a year at Nueva cost?")],
+    "camp-01": [("casual", "what's the high school's address")],
+    "camp-06": [("casual", "where do i sign up for a locker")],
+    "cov-33": [("casual", "is caltrain free for students")],
+    "crs-01": [("casual", "which languages can i take")],
+    "crs-05": [("casual", "does nueva do ap courses")],
+    "crs-10": [("casual", "software engineering - which block and room")],
+    "cov-34": [("casual", "how many years of math are required")],
+    "adv-01": [("casual", "advisory 11.1 - who and which room")],
+    "nx-01": [("casual", "where do i log into nexus")],
+    "nx-07": [("casual", "where's the work permit form")],
+    "mp-05": [("follow_up", "which block, and where is it", [{"role": "user", "content": "who teaches mechanical engineering"}, {"role": "assistant", "content": "Dan Norgan teaches it."}])],
+    "gm-18": [("follow_up", "ok and the jv team?", [{"role": "user", "content": "when is the first varsity boys basketball game"}, {"role": "assistant", "content": "The varsity opener is at home against CSD Fremont."}])],
+    "mp-12": [("follow_up", "who's in charge of it", [{"role": "user", "content": "when does ethics bowl meet"}, {"role": "assistant", "content": "Mondays after school."}])],
+    "ms-01": [("casual", "middle school hours?")],
+    "ms-03": [("casual", "what days is the middle school musical on")],
+}
+
 # Real questions from the production logs that have no golden source item. Expectations are stated here and proven against the live index
 # (every `verify` string must be found in a chunk; read-only). `route`: the path the question must take (canned = no retrieval, no LLM).
 # `retr_forbid`: patterns that must NOT be in the context (the wrong division's games shown for an Upper School question).
@@ -349,7 +426,7 @@ def _live_expectations(sb, today):
 def build(verify_live: bool = True) -> list[dict]:
     src = {i["id"]: i for i in json.load(open(HERE / "quality_set.json"))}
     out = []
-    for sid, paras in PARA.items():
+    for sid, paras, hold in [(s, p, False) for s, p in PARA.items()] + [(s, p, True) for s, p in HOLDOUT.items()]:
         s = src[sid]
         if not s.get("verified"):
             raise SystemExit(f"{sid} is not a verified source item")
@@ -357,7 +434,7 @@ def build(verify_live: bool = True) -> list[dict]:
             kind, q = p[0], p[1]
             extra = p[2] if len(p) > 2 else None
             item = {k: s[k] for k in ("category", "persona", "campus", "behavior", "forbid", "dynamic", "verified", "retr")}
-            item.update(id=f"{sid}~{n}", source_id=sid, phrasing=kind, q=q, history=[], expect=list(s["expect"]), direct_q=s["q"])
+            item.update(id=f"{sid}~{'h' if hold else ''}{n}", source_id=sid, phrasing=kind, q=q, history=[], expect=list(s["expect"]), direct_q=s["q"], holdout=hold)
             if isinstance(extra, list):
                 item["history"] = extra
             elif isinstance(extra, dict):

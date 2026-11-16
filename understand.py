@@ -31,9 +31,11 @@ SHORTHAND = [
     (re.compile(r"\bhoops?\b(?!\s+(?:earrings?|skirt))", re.I), "basketball"),
     (re.compile(r"\bcross[- ]country\b", re.I), "cross country"),
     (re.compile(r"(?-i:\bAD\b)|(?<=\bthe )ad\b(?!\s+(?:for|about|on|in)\b)", re.I), "athletic director"),
-    (re.compile(r"\bapps?\b(?=\s+(?:are\s+|is\s+)?(?:due|deadline|open|close))|(?<=\bwhen are )apps?\b|(?<=\bwhen is the )app\b", re.I), "admissions applications"),
+    (re.compile(r"(?-i:\bFA\b)\s+apps?\b", re.I), "financial assistance application"),
+    (re.compile(r"(?<!assistance )(?<!aid )(?<!college )\bapps?\b(?=\s+(?:are\s+|is\s+)?(?:due|deadline|open|close))|(?<=\bwhen are )apps?\b|(?<=\bwhen is the )app\b", re.I), "admissions applications"),
     (re.compile(r"(?-i:\bPT\b) conferences|\bpt conferences\b|\bparent[- ]teacher conf\w*", re.I), "parent-teacher conferences"),
     (re.compile(r"(?-i:\bFA\b)(?=\s+(?:app\w*|deadline|workshop|form))|\bfin(?:ancial)? aid\b", re.I), "financial assistance"),
+    (re.compile(r"\bcommunity service[- ]learning\b", re.I), "CSL (community service learning)"),
     (re.compile(r"\bd[- ]?tech\b", re.I), "Design Tech"),
     (re.compile(r"\bb([1-8])\b(?=\s+(?:time|start|end|today|tomorrow|on|class|room)|\s*\??$)", re.I), lambda m: f"block {m.group(1)}"),
     (re.compile(r"\bms\b(?=\s+(?:boys|girls|soccer|basketball|volleyball|sports?|teams?|games?|musical|clubs?|lunch|trips?|dance|parents?|students?|conferences)\b)|(?<=\babout )ms\b|(?<=\bfor )ms\b"), "MS"),
@@ -110,7 +112,7 @@ ONLY_RX = re.compile(r"\b(only|just|specifically|not (?:the )?(?:jv|junior varsi
 FIRST_RX = re.compile(r"\b(first|opening|opener|season opener|1st)\b", re.I)
 NEXT_RX = re.compile(r"\b(next|upcoming|soonest|coming up)\b", re.I)
 GAME_RX = re.compile(r"\b(games?|matches|match|meets?|scrimmages?|tournaments?|vs\.?|versus|playing|plays?|against)\b", re.I)
-SCHEDULE_RX = re.compile(r"\b(schedules?|games?|matches|playing|plays?|fixtures?|season)\b", re.I)
+SCHEDULE_RX = re.compile(r"\b(schedules?|games?|matches|fixtures?)\b", re.I)
 NOTE_RX = re.compile(r"\b(practices?|tryouts?|playoffs?|ccs|championships?|scrimmages?|first day|start(?:s|ing)?|begins?|season (?:start|begin|end)\w*|break)\b", re.I)
 MS_RX = re.compile(r"\b(middle school|hillsborough|(?:5th|6th|7th|8th|fifth|sixth|seventh|eighth)[- ]grade(?:rs?)?)\b|(?-i:\bMS\b)", re.I)
 US_RX = re.compile(r"\b(upper school|high school|highschool|san mateo|varsity|jv|junior varsity|freshm[ae]n|sophomores?|juniors?|seniors?|(?:9th|10th|11th|12th)[- ]grade(?:rs?)?)\b|(?-i:\bUS\b)", re.I)
@@ -125,7 +127,7 @@ OFFER_RX = re.compile(r"\b(?:do|does|did) (?:we|you|u|ya|yall|y'all|nueva|the sc
                       r"\b(?:what|which) season\b|\b(?:have|has|offer|offers) an? (?:\w+ ){1,3}team\b|\bis (?:\w+ ){1,2}(?:a thing|offered|a sport)\b", re.I)
 SCHED_SIGNAL = re.compile(r"\b(next|first|schedule|games?|score|scores|when|what time|where|who|tonight|today|tomorrow|this week|against|vs\.?|practices?|coach\w*|league|tryouts?|"
                           r"jan\w*|feb\w*|mar\w*|apr\w*|jun\w*|jul\w*|aug\w*|sep\w*|oct\w*|nov\w*|dec\w*|mon(?:day)?|tue\w*|wed\w*|thu\w*|fri(?:day)?|sat\w*|sun(?:day)?)\b|\d{1,2}/\d{1,2}", re.I)
-OFFER_WORDS = "varsity offerings by season athletics teams sports offered no-cut limited-roster teams Fall Winter Spring"
+OFFER_WORDS = "varsity offerings by season athletics teams no-cut limited-roster teams Fall Winter Spring"       # the same words rag.SYNONYMS adds for "is there a X team" (added once)
 
 
 @dataclass

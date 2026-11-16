@@ -172,6 +172,7 @@ def main() -> int:
     ap.add_argument("--category", default="")
     ap.add_argument("--phrasing", default="")
     ap.add_argument("--no-direct", action="store_true", help="skip running the direct source questions")
+    ap.add_argument("--holdout", action="store_true", help="run only the hold-out wordings (written after the fixes, never tuned on): the out-of-sample number")
     ap.add_argument("--today", default="", help="YYYY-MM-DD: evaluate as if it were this day")
     ap.add_argument("--tag", default="", help="label stored in the report (e.g. baseline, after)")
     ap.add_argument("--verbose", action="store_true")
@@ -191,7 +192,7 @@ def main() -> int:
                 print(f"  {i['id']} verified={i['verified']}  {i['verification'][:160]}")
         if a.build_only:
             return 0
-    items = [i for i in json.load(open(a.file)) if i.get("verified")]
+    items = [i for i in json.load(open(a.file)) if i.get("verified") and bool(i.get("holdout")) == a.holdout]      # the hold-out wordings are never mixed with the tuned set
     if a.ids:
         items = [i for i in items if i["id"] in a.ids.split(",") or i.get("source_id") in a.ids.split(",")]
     if a.category:

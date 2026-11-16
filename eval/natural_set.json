@@ -17,7 +17,8 @@
    "\\bNov[a-z]*\\.?\\s+23\\b",
    "(?<![\\d:])27(?![\\d:])"
   ],
-  "direct_q": "When is Thanksgiving break this year?"
+  "direct_q": "When is Thanksgiving break this year?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -37,7 +38,8 @@
    "\\bNov[a-z]*\\.?\\s+23\\b",
    "(?<![\\d:])27(?![\\d:])"
   ],
-  "direct_q": "When is Thanksgiving break this year?"
+  "direct_q": "When is Thanksgiving break this year?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -57,7 +59,8 @@
    "\\bNov[a-z]*\\.?\\s+23\\b",
    "(?<![\\d:])27(?![\\d:])"
   ],
-  "direct_q": "When is Thanksgiving break this year?"
+  "direct_q": "When is Thanksgiving break this year?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -80,7 +83,8 @@
     "\\bJan[a-z]*\\.?\\s+5\\b"
    ]
   ],
-  "direct_q": "When does winter break start and when do we come back?"
+  "direct_q": "When does winter break start and when do we come back?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -103,7 +107,8 @@
     "\\bJan[a-z]*\\.?\\s+5\\b"
    ]
   ],
-  "direct_q": "When does winter break start and when do we come back?"
+  "direct_q": "When does winter break start and when do we come back?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -122,7 +127,8 @@
   "expect": [
    "\\bJun[a-z]*\\.?\\s+4\\b"
   ],
-  "direct_q": "What is the last day of school this year?"
+  "direct_q": "What is the last day of school this year?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -141,7 +147,8 @@
   "expect": [
    "\\bJun[a-z]*\\.?\\s+4\\b"
   ],
-  "direct_q": "What is the last day of school this year?"
+  "direct_q": "What is the last day of school this year?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -161,7 +168,8 @@
    "\\bJun[a-z]*\\.?\\s+6\\b",
    "2\\s*(PM|p\\.m\\.)|2:00"
   ],
-  "direct_q": "When is graduation?"
+  "direct_q": "When is graduation?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -181,7 +189,8 @@
    "\\bJun[a-z]*\\.?\\s+6\\b",
    "2\\s*(PM|p\\.m\\.)|2:00"
   ],
-  "direct_q": "When is graduation?"
+  "direct_q": "When is graduation?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -201,7 +210,8 @@
    "\\bJan[a-z]*\\.?\\s+18\\b",
    "no (school|classes)|closed|off"
   ],
-  "direct_q": "is thr school on martin luther king day"
+  "direct_q": "is thr school on martin luther king day",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -221,7 +231,8 @@
    "\\bJan[a-z]*\\.?\\s+18\\b",
    "no (school|classes)|closed|off"
   ],
-  "direct_q": "is thr school on martin luther king day"
+  "direct_q": "is thr school on martin luther king day",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -244,7 +255,8 @@
     "(?<![\\d:])2(?![\\d:])"
    ]
   ],
-  "direct_q": "When is spring break?"
+  "direct_q": "When is spring break?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -267,7 +279,8 @@
     "(?<![\\d:])2(?![\\d:])"
    ]
   ],
-  "direct_q": "When is spring break?"
+  "direct_q": "When is spring break?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -292,6 +305,7 @@
    "\\bJun[a-z]*\\.?\\s+4\\b"
   ],
   "direct_q": "When is spring break?",
+  "holdout": false,
   "with": [
    "cal-03"
   ]
@@ -314,7 +328,8 @@
    "\\bFeb[a-z]*\\.?\\s+15\\b",
    "(?<![\\d:])19(?![\\d:])"
   ],
-  "direct_q": "when is feb break"
+  "direct_q": "when is feb break",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -334,7 +349,8 @@
    "\\bFeb[a-z]*\\.?\\s+15\\b",
    "(?<![\\d:])19(?![\\d:])"
   ],
-  "direct_q": "when is feb break"
+  "direct_q": "when is feb break",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -361,7 +377,8 @@
    "\\bMar[a-z]*\\.?\\s+10\\b",
    "(?<![\\d:])12(?![\\d:])"
   ],
-  "direct_q": "When are the next upper school parent-teacher conferences?"
+  "direct_q": "When are the next upper school parent-teacher conferences?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -388,7 +405,8 @@
    "\\bMar[a-z]*\\.?\\s+10\\b",
    "(?<![\\d:])12(?![\\d:])"
   ],
-  "direct_q": "When are the next upper school parent-teacher conferences?"
+  "direct_q": "When are the next upper school parent-teacher conferences?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -408,7 +426,8 @@
    "\\bJan[a-z]*\\.?\\s+29\\b",
    "7\\s*(PM|p\\.m\\.)?\\s*(-|to)\\s*9:30"
   ],
-  "direct_q": "when's winter formal"
+  "direct_q": "when's winter formal",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -428,7 +447,8 @@
    "\\bJan[a-z]*\\.?\\s+29\\b",
    "7\\s*(PM|p\\.m\\.)?\\s*(-|to)\\s*9:30"
   ],
-  "direct_q": "when's winter formal"
+  "direct_q": "when's winter formal",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -448,7 +468,8 @@
    "\\bApr[a-z]*\\.?\\s+24\\b",
    "6\\s*(PM)?\\s*(-|to)\\s*11"
   ],
-  "direct_q": "when is prom"
+  "direct_q": "when is prom",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -468,7 +489,8 @@
    "\\bApr[a-z]*\\.?\\s+24\\b",
    "6\\s*(PM)?\\s*(-|to)\\s*11"
   ],
-  "direct_q": "when is prom"
+  "direct_q": "when is prom",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -488,7 +510,8 @@
    "\\bMay[a-z]*\\.?\\s+14\\b",
    "(?<![\\d:])16(?![\\d:])"
   ],
-  "direct_q": "When is the US musical?"
+  "direct_q": "When is the US musical?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -508,7 +531,8 @@
    "\\bMay[a-z]*\\.?\\s+14\\b",
    "(?<![\\d:])16(?![\\d:])"
   ],
-  "direct_q": "When is the US musical?"
+  "direct_q": "When is the US musical?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -528,7 +552,8 @@
    "\\bJan[a-z]*\\.?\\s+5\\b",
    "(?<![\\d:])8(?![\\d:])"
   ],
-  "direct_q": "When is Intersession for the upper school?"
+  "direct_q": "When is Intersession for the upper school?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -548,7 +573,8 @@
    "\\bJan[a-z]*\\.?\\s+5\\b",
    "(?<![\\d:])8(?![\\d:])"
   ],
-  "direct_q": "When is Intersession for the upper school?"
+  "direct_q": "When is Intersession for the upper school?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -568,7 +594,8 @@
    "\\bMay[a-z]*\\.?\\s+20\\b",
    "(?<![\\d:])27(?![\\d:])"
   ],
-  "direct_q": "When are US trips?"
+  "direct_q": "When are US trips?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -588,7 +615,8 @@
    "\\bMay[a-z]*\\.?\\s+20\\b",
    "(?<![\\d:])27(?![\\d:])"
   ],
-  "direct_q": "When are US trips?"
+  "direct_q": "When are US trips?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -616,7 +644,8 @@
   "expect": [
    "\\bNov[a-z]*\\.?\\s+23\\b"
   ],
-  "direct_q": "When is the next school break?"
+  "direct_q": "When is the next school break?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -644,7 +673,8 @@
   "expect": [
    "\\bNov[a-z]*\\.?\\s+23\\b"
   ],
-  "direct_q": "When is the next school break?"
+  "direct_q": "When is the next school break?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -664,7 +694,8 @@
    "\\bJun[a-z]*\\.?\\s+18\\b",
    "clos"
   ],
-  "direct_q": "When is Juneteenth observed and is school closed?"
+  "direct_q": "When is Juneteenth observed and is school closed?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -684,7 +715,8 @@
    "\\bJun[a-z]*\\.?\\s+18\\b",
    "clos"
   ],
-  "direct_q": "When is Juneteenth observed and is school closed?"
+  "direct_q": "When is Juneteenth observed and is school closed?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -704,7 +736,8 @@
    "\\bno\\b",
    "Professional Development|PD"
   ],
-  "direct_q": "Is there school on Monday January 4?"
+  "direct_q": "Is there school on Monday January 4?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -724,7 +757,8 @@
    "\\bno\\b",
    "Professional Development|PD"
   ],
-  "direct_q": "Is there school on Monday January 4?"
+  "direct_q": "Is there school on Monday January 4?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -744,7 +778,8 @@
    "\\bJan[a-z]*\\.?\\s+21\\b",
    "6\\s*(PM|p\\.m\\.)?"
   ],
-  "direct_q": "When is the State of Nueva?"
+  "direct_q": "When is the State of Nueva?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -764,7 +799,8 @@
    "\\bJan[a-z]*\\.?\\s+21\\b",
    "6\\s*(PM|p\\.m\\.)?"
   ],
-  "direct_q": "When is the State of Nueva?"
+  "direct_q": "When is the State of Nueva?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -784,7 +820,8 @@
    "\\bMar[a-z]*\\.?\\s+3\\b",
    "9"
   ],
-  "direct_q": "When is the SAT at Nueva?"
+  "direct_q": "When is the SAT at Nueva?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -804,7 +841,8 @@
    "\\bMar[a-z]*\\.?\\s+3\\b",
    "9"
   ],
-  "direct_q": "When is the SAT at Nueva?"
+  "direct_q": "When is the SAT at Nueva?",
+  "holdout": false
  },
  {
   "category": "day_types",
@@ -833,7 +871,8 @@
   "expect": [
    "\\bA day\\b|\\bA-day"
   ],
-  "direct_q": "Is today an A day or a B day?"
+  "direct_q": "Is today an A day or a B day?",
+  "holdout": false
  },
  {
   "category": "day_types",
@@ -862,7 +901,8 @@
   "expect": [
    "\\bA day\\b|\\bA-day"
   ],
-  "direct_q": "Is today an A day or a B day?"
+  "direct_q": "Is today an A day or a B day?",
+  "holdout": false
  },
  {
   "category": "day_types",
@@ -889,7 +929,8 @@
   "expect": [
    "A['’]|A prime"
   ],
-  "direct_q": "Is tommrow a or b"
+  "direct_q": "Is tommrow a or b",
+  "holdout": false
  },
  {
   "category": "day_types",
@@ -916,7 +957,8 @@
   "expect": [
    "A['’]|A prime"
   ],
-  "direct_q": "Is tommrow a or b"
+  "direct_q": "Is tommrow a or b",
+  "holdout": false
  },
  {
   "category": "day_types",
@@ -937,7 +979,8 @@
   "expect": [
    "\\bA day\\b"
   ],
-  "direct_q": "What kind of day is Monday November 30?"
+  "direct_q": "What kind of day is Monday November 30?",
+  "holdout": false
  },
  {
   "category": "day_types",
@@ -958,7 +1001,8 @@
   "expect": [
    "\\bA day\\b"
   ],
-  "direct_q": "What kind of day is Monday November 30?"
+  "direct_q": "What kind of day is Monday November 30?",
+  "holdout": false
  },
  {
   "category": "day_types",
@@ -977,7 +1021,8 @@
   "expect": [
    "1,?\\s*2,?\\s*4,?\\s*3|A['’]"
   ],
-  "direct_q": "What is the block order on Thursday Nov 5?"
+  "direct_q": "What is the block order on Thursday Nov 5?",
+  "holdout": false
  },
  {
   "category": "day_types",
@@ -996,7 +1041,8 @@
   "expect": [
    "1,?\\s*2,?\\s*4,?\\s*3|A['’]"
   ],
-  "direct_q": "What is the block order on Thursday Nov 5?"
+  "direct_q": "What is the block order on Thursday Nov 5?",
+  "holdout": false
  },
  {
   "category": "day_types",
@@ -1018,7 +1064,8 @@
     "flip|swap|reverse|switch"
    ]
   ],
-  "direct_q": "What does the prime in A' day mean?"
+  "direct_q": "What does the prime in A' day mean?",
+  "holdout": false
  },
  {
   "category": "day_types",
@@ -1040,7 +1087,8 @@
     "flip|swap|reverse|switch"
    ]
   ],
-  "direct_q": "What does the prime in A' day mean?"
+  "direct_q": "What does the prime in A' day mean?",
+  "holdout": false
  },
  {
   "category": "day_types",
@@ -1060,7 +1108,8 @@
    "5",
    "8"
   ],
-  "direct_q": "Which blocks meet on B days?"
+  "direct_q": "Which blocks meet on B days?",
+  "holdout": false
  },
  {
   "category": "day_types",
@@ -1080,7 +1129,8 @@
    "5",
    "8"
   ],
-  "direct_q": "Which blocks meet on B days?"
+  "direct_q": "Which blocks meet on B days?",
+  "holdout": false
  },
  {
   "category": "day_types",
@@ -1102,7 +1152,8 @@
    "CSL Day",
    "(no|not|don't|do not|doesn't)[^.]{0,60}(regular|normal|blocks|A|B)"
   ],
-  "direct_q": "Is November 18 a normal A/B day?"
+  "direct_q": "Is November 18 a normal A/B day?",
+  "holdout": false
  },
  {
   "category": "day_types",
@@ -1124,7 +1175,8 @@
    "CSL Day",
    "(no|not|don't|do not|doesn't)[^.]{0,60}(regular|normal|blocks|A|B)"
   ],
-  "direct_q": "Is November 18 a normal A/B day?"
+  "direct_q": "Is November 18 a normal A/B day?",
+  "holdout": false
  },
  {
   "category": "day_types",
@@ -1146,7 +1198,8 @@
    "\\bno\\b",
    "(Nov(ember)? 27|break)"
   ],
-  "direct_q": "Is there school the day after Thanksgiving?"
+  "direct_q": "Is there school the day after Thanksgiving?",
+  "holdout": false
  },
  {
   "category": "day_types",
@@ -1168,7 +1221,8 @@
    "\\bno\\b",
    "(Nov(ember)? 27|break)"
   ],
-  "direct_q": "Is there school the day after Thanksgiving?"
+  "direct_q": "Is there school the day after Thanksgiving?",
+  "holdout": false
  },
  {
   "category": "day_types",
@@ -1188,7 +1242,8 @@
    "Internship",
    "(no|not)[^.]{0,60}(regular|blocks|classes)|special event"
   ],
-  "direct_q": "What is happening on December 9? Do we have classes?"
+  "direct_q": "What is happening on December 9? Do we have classes?",
+  "holdout": false
  },
  {
   "category": "day_types",
@@ -1208,7 +1263,8 @@
    "Internship",
    "(no|not)[^.]{0,60}(regular|blocks|classes)|special event"
   ],
-  "direct_q": "What is happening on December 9? Do we have classes?"
+  "direct_q": "What is happening on December 9? Do we have classes?",
+  "holdout": false
  },
  {
   "category": "day_types",
@@ -1227,7 +1283,8 @@
   "expect": [
    "A['’]|A prime"
   ],
-  "direct_q": "What day type is December 3?"
+  "direct_q": "What day type is December 3?",
+  "holdout": false
  },
  {
   "category": "day_types",
@@ -1246,7 +1303,8 @@
   "expect": [
    "A['’]|A prime"
   ],
-  "direct_q": "What day type is December 3?"
+  "direct_q": "What day type is December 3?",
+  "holdout": false
  },
  {
   "category": "bell_schedule",
@@ -1266,7 +1324,8 @@
    "10:15",
    "11:30"
   ],
-  "direct_q": "What time is Block 2?"
+  "direct_q": "What time is Block 2?",
+  "holdout": false
  },
  {
   "category": "bell_schedule",
@@ -1295,7 +1354,8 @@
    "10:15",
    "11:30"
   ],
-  "direct_q": "What time is Block 2?"
+  "direct_q": "What time is Block 2?",
+  "holdout": false
  },
  {
   "category": "bell_schedule",
@@ -1316,7 +1376,8 @@
    "3:10",
    "11:30"
   ],
-  "direct_q": "wats the day schedule"
+  "direct_q": "wats the day schedule",
+  "holdout": false
  },
  {
   "category": "bell_schedule",
@@ -1337,7 +1398,8 @@
    "3:10",
    "11:30"
   ],
-  "direct_q": "wats the day schedule"
+  "direct_q": "wats the day schedule",
+  "holdout": false
  },
  {
   "category": "bell_schedule",
@@ -1357,7 +1419,8 @@
    "8:55",
    "3:10"
   ],
-  "direct_q": "What time does school start and end for the upper school?"
+  "direct_q": "What time does school start and end for the upper school?",
+  "holdout": false
  },
  {
   "category": "bell_schedule",
@@ -1377,7 +1440,8 @@
    "8:55",
    "3:10"
   ],
-  "direct_q": "What time does school start and end for the upper school?"
+  "direct_q": "What time does school start and end for the upper school?",
+  "holdout": false
  },
  {
   "category": "bell_schedule",
@@ -1397,7 +1461,8 @@
    "11:30",
    "12:(00|30)"
   ],
-  "direct_q": "How long is lunch?"
+  "direct_q": "How long is lunch?",
+  "holdout": false
  },
  {
   "category": "bell_schedule",
@@ -1417,7 +1482,8 @@
    "11:30",
    "12:(00|30)"
   ],
-  "direct_q": "How long is lunch?"
+  "direct_q": "How long is lunch?",
+  "holdout": false
  },
  {
   "category": "bell_schedule",
@@ -1438,7 +1504,8 @@
    "1:50|1:55",
    "3:10"
   ],
-  "direct_q": "What time is Block 7?"
+  "direct_q": "What time is Block 7?",
+  "holdout": false
  },
  {
   "category": "bell_schedule",
@@ -1459,7 +1526,8 @@
    "1:50|1:55",
    "3:10"
   ],
-  "direct_q": "What time is Block 7?"
+  "direct_q": "What time is Block 7?",
+  "holdout": false
  },
  {
   "category": "bell_schedule",
@@ -1479,7 +1547,8 @@
    "12:35",
    "1:50"
   ],
-  "direct_q": "What time is Block 4 on an A' day?"
+  "direct_q": "What time is Block 4 on an A' day?",
+  "holdout": false
  },
  {
   "category": "bell_schedule",
@@ -1499,7 +1568,8 @@
    "12:35",
    "1:50"
   ],
-  "direct_q": "What time is Block 4 on an A' day?"
+  "direct_q": "What time is Block 4 on an A' day?",
+  "holdout": false
  },
  {
   "category": "bell_schedule",
@@ -1518,7 +1588,8 @@
   "expect": [
    "\\b(4|four)\\b"
   ],
-  "direct_q": "How many classes do upper school students have each day?"
+  "direct_q": "How many classes do upper school students have each day?",
+  "holdout": false
  },
  {
   "category": "bell_schedule",
@@ -1537,7 +1608,8 @@
   "expect": [
    "\\b(4|four)\\b"
   ],
-  "direct_q": "How many classes do upper school students have each day?"
+  "direct_q": "How many classes do upper school students have each day?",
+  "holdout": false
  },
  {
   "category": "bell_schedule",
@@ -1556,7 +1628,8 @@
   "expect": [
    "8:55"
   ],
-  "direct_q": "when does block 5 start on b day"
+  "direct_q": "when does block 5 start on b day",
+  "holdout": false
  },
  {
   "category": "bell_schedule",
@@ -1575,7 +1648,8 @@
   "expect": [
    "8:55"
   ],
-  "direct_q": "when does block 5 start on b day"
+  "direct_q": "when does block 5 start on b day",
+  "holdout": false
  },
  {
   "category": "bell_schedule",
@@ -1594,7 +1668,8 @@
   "expect": [
    "3:10"
   ],
-  "direct_q": "wat time do classes end"
+  "direct_q": "wat time do classes end",
+  "holdout": false
  },
  {
   "category": "bell_schedule",
@@ -1613,7 +1688,8 @@
   "expect": [
    "3:10"
   ],
-  "direct_q": "wat time do classes end"
+  "direct_q": "wat time do classes end",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -1638,7 +1714,8 @@
    "golf",
    "swim"
   ],
-  "direct_q": "What sports does Nueva offer?"
+  "direct_q": "What sports does Nueva offer?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -1663,7 +1740,8 @@
    "golf",
    "swim"
   ],
-  "direct_q": "What sports does Nueva offer?"
+  "direct_q": "What sports does Nueva offer?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -1686,7 +1764,8 @@
    "swim",
    "track"
   ],
-  "direct_q": "What varsity sports does Nueva offer in the spring?"
+  "direct_q": "What varsity sports does Nueva offer in the spring?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -1709,7 +1788,8 @@
    "swim",
    "track"
   ],
-  "direct_q": "What varsity sports does Nueva offer in the spring?"
+  "direct_q": "What varsity sports does Nueva offer in the spring?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -1729,7 +1809,8 @@
    "basketball",
    "soccer"
   ],
-  "direct_q": "What sports can I play in the winter?"
+  "direct_q": "What sports can I play in the winter?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -1749,7 +1830,8 @@
    "basketball",
    "soccer"
   ],
-  "direct_q": "What sports can I play in the winter?"
+  "direct_q": "What sports can I play in the winter?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -1770,7 +1852,8 @@
    "tennis",
    "cross.?country"
   ],
-  "direct_q": "What fall sports are there at the upper school?"
+  "direct_q": "What fall sports are there at the upper school?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -1791,7 +1874,8 @@
    "tennis",
    "cross.?country"
   ],
-  "direct_q": "What fall sports are there at the upper school?"
+  "direct_q": "What fall sports are there at the upper school?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -1812,7 +1896,8 @@
   "expect": [
    "flag football"
   ],
-  "direct_q": "Does Nueva have a football team?"
+  "direct_q": "Does Nueva have a football team?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -1833,7 +1918,8 @@
   "expect": [
    "flag football"
   ],
-  "direct_q": "Does Nueva have a football team?"
+  "direct_q": "Does Nueva have a football team?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -1854,7 +1940,8 @@
   "expect": [
    "(basketball|soccer|volleyball|tennis|golf|swim|track|cross)"
   ],
-  "direct_q": "Is there a baseball or softball team?"
+  "direct_q": "Is there a baseball or softball team?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -1875,7 +1962,8 @@
   "expect": [
    "(basketball|soccer|volleyball|tennis|golf|swim|track|cross)"
   ],
-  "direct_q": "Is there a baseball or softball team?"
+  "direct_q": "Is there a baseball or softball team?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -1895,7 +1983,8 @@
    "swim",
    "(spring|coed)"
   ],
-  "direct_q": "Does Nueva have a swim team?"
+  "direct_q": "Does Nueva have a swim team?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -1915,7 +2004,8 @@
    "swim",
    "(spring|coed)"
   ],
-  "direct_q": "Does Nueva have a swim team?"
+  "direct_q": "Does Nueva have a swim team?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -1940,7 +2030,8 @@
    "track",
    "tennis"
   ],
-  "direct_q": "What sports can I play in middle school?"
+  "direct_q": "What sports can I play in middle school?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -1965,7 +2056,8 @@
    "track",
    "tennis"
   ],
-  "direct_q": "What sports can I play in middle school?"
+  "direct_q": "What sports can I play in middle school?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -1984,7 +2076,8 @@
   "expect": [
    "Brett McCabe"
   ],
-  "direct_q": "Who is the athletic director?"
+  "direct_q": "Who is the athletic director?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2003,7 +2096,8 @@
   "expect": [
    "Brett McCabe"
   ],
-  "direct_q": "Who is the athletic director?"
+  "direct_q": "Who is the athletic director?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2022,7 +2116,8 @@
   "expect": [
    "Robert Lopez|Coach Lopez"
   ],
-  "direct_q": "Who coaches cross country?"
+  "direct_q": "Who coaches cross country?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2041,7 +2136,8 @@
   "expect": [
    "Robert Lopez|Coach Lopez"
   ],
-  "direct_q": "Who coaches cross country?"
+  "direct_q": "Who coaches cross country?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2061,7 +2157,8 @@
    "PSAL|Private School Athletic League",
    "WBAL|West Bay"
   ],
-  "direct_q": "What league do the upper school teams play in?"
+  "direct_q": "What league do the upper school teams play in?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2081,7 +2178,8 @@
    "PSAL|Private School Athletic League",
    "WBAL|West Bay"
   ],
-  "direct_q": "What league do the upper school teams play in?"
+  "direct_q": "What league do the upper school teams play in?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2101,7 +2199,8 @@
    "one semester",
    "(season|interscholastic|sport)"
   ],
-  "direct_q": "What is the PE requirement for upper schoolers?"
+  "direct_q": "What is the PE requirement for upper schoolers?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2121,7 +2220,8 @@
    "one semester",
    "(season|interscholastic|sport)"
   ],
-  "direct_q": "What is the PE requirement for upper schoolers?"
+  "direct_q": "What is the PE requirement for upper schoolers?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2141,7 +2241,8 @@
    "(certified )?athletic trainer",
    "full-time"
   ],
-  "direct_q": "Does the school have an athletic trainer?"
+  "direct_q": "Does the school have an athletic trainer?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2161,7 +2262,8 @@
    "(certified )?athletic trainer",
    "full-time"
   ],
-  "direct_q": "Does the school have an athletic trainer?"
+  "direct_q": "Does the school have an athletic trainer?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2181,7 +2283,8 @@
    "(five|5)",
    "Pre-participation|physical"
   ],
-  "direct_q": "What paperwork is needed before my child can join a team?"
+  "direct_q": "What paperwork is needed before my child can join a team?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2201,7 +2304,8 @@
    "(five|5)",
    "Pre-participation|physical"
   ],
-  "direct_q": "What paperwork is needed before my child can join a team?"
+  "direct_q": "What paperwork is needed before my child can join a team?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2222,7 +2326,8 @@
    "basketball",
    "varsity"
   ],
-  "direct_q": "is there varsity b-ball for girls"
+  "direct_q": "is there varsity b-ball for girls",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2243,7 +2348,8 @@
    "basketball",
    "varsity"
   ],
-  "direct_q": "is there varsity b-ball for girls"
+  "direct_q": "is there varsity b-ball for girls",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2262,7 +2368,8 @@
   "expect": [
    "PSAL|Private School Athletic League"
   ],
-  "direct_q": "What league is girls basketball in?"
+  "direct_q": "What league is girls basketball in?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2281,7 +2388,8 @@
   "expect": [
    "PSAL|Private School Athletic League"
   ],
-  "direct_q": "What league is girls basketball in?"
+  "direct_q": "What league is girls basketball in?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2300,7 +2408,8 @@
   "expect": [
    "golf"
   ],
-  "direct_q": "Does Nueva have a golf team?"
+  "direct_q": "Does Nueva have a golf team?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2319,7 +2428,8 @@
   "expect": [
    "golf"
   ],
-  "direct_q": "Does Nueva have a golf team?"
+  "direct_q": "Does Nueva have a golf team?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2338,7 +2448,8 @@
   "expect": [
    "(US Gym|gym)"
   ],
-  "direct_q": "Where do the Nueva basketball teams play their home games?"
+  "direct_q": "Where do the Nueva basketball teams play their home games?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2357,7 +2468,8 @@
   "expect": [
    "(US Gym|gym)"
   ],
-  "direct_q": "Where do the Nueva basketball teams play their home games?"
+  "direct_q": "Where do the Nueva basketball teams play their home games?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2377,7 +2489,8 @@
    "blue",
    "Maverick"
   ],
-  "direct_q": "What are Nueva's school colors and mascot?"
+  "direct_q": "What are Nueva's school colors and mascot?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2397,7 +2510,8 @@
    "blue",
    "Maverick"
   ],
-  "direct_q": "What are Nueva's school colors and mascot?"
+  "direct_q": "What are Nueva's school colors and mascot?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2417,7 +2531,8 @@
    "physical",
    "(concussion|Magnus)"
   ],
-  "direct_q": "What forms does my athlete need before the first practice?"
+  "direct_q": "What forms does my athlete need before the first practice?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2437,7 +2552,8 @@
    "physical",
    "(concussion|Magnus)"
   ],
-  "direct_q": "What forms does my athlete need before the first practice?"
+  "direct_q": "What forms does my athlete need before the first practice?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2458,7 +2574,8 @@
    "golf",
    "fall"
   ],
-  "direct_q": "Is there a girls golf team and what season is it?"
+  "direct_q": "Is there a girls golf team and what season is it?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2479,7 +2596,8 @@
    "golf",
    "fall"
   ],
-  "direct_q": "Is there a girls golf team and what season is it?"
+  "direct_q": "Is there a girls golf team and what season is it?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2499,7 +2617,8 @@
    "JV",
    "(yes|there is|has|have)"
   ],
-  "direct_q": "Does girls volleyball have a JV team?"
+  "direct_q": "Does girls volleyball have a JV team?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2519,7 +2638,8 @@
    "JV",
    "(yes|there is|has|have)"
   ],
-  "direct_q": "Does girls volleyball have a JV team?"
+  "direct_q": "Does girls volleyball have a JV team?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2538,7 +2658,8 @@
   "expect": [
    "Skyline"
   ],
-  "direct_q": "Where does the girls soccer team play its home games?"
+  "direct_q": "Where does the girls soccer team play its home games?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2557,7 +2678,8 @@
   "expect": [
    "Skyline"
   ],
-  "direct_q": "Where does the girls soccer team play its home games?"
+  "direct_q": "Where does the girls soccer team play its home games?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2577,7 +2699,8 @@
    "3:30",
    "(Monday|Mon\\b)"
   ],
-  "direct_q": "When does boys varsity basketball practice?"
+  "direct_q": "When does boys varsity basketball practice?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2597,7 +2720,8 @@
    "3:30",
    "(Monday|Mon\\b)"
   ],
-  "direct_q": "When does boys varsity basketball practice?"
+  "direct_q": "When does boys varsity basketball practice?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2617,7 +2741,8 @@
    "JV",
    "(volleyball|tennis|basketball)"
   ],
-  "direct_q": "Which upper school teams have a JV team?"
+  "direct_q": "Which upper school teams have a JV team?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2637,7 +2762,8 @@
    "JV",
    "(volleyball|tennis|basketball)"
   ],
-  "direct_q": "Which upper school teams have a JV team?"
+  "direct_q": "Which upper school teams have a JV team?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2656,7 +2782,8 @@
   "expect": [
    "PSAL|Private School Athletic League"
   ],
-  "direct_q": "What league is the cross country team in?"
+  "direct_q": "What league is the cross country team in?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2675,7 +2802,8 @@
   "expect": [
    "PSAL|Private School Athletic League"
   ],
-  "direct_q": "What league is the cross country team in?"
+  "direct_q": "What league is the cross country team in?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2695,7 +2823,8 @@
    "JV",
    "tennis"
   ],
-  "direct_q": "Is there a JV girls tennis team?"
+  "direct_q": "Is there a JV girls tennis team?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2715,7 +2844,8 @@
    "JV",
    "tennis"
   ],
-  "direct_q": "Is there a JV girls tennis team?"
+  "direct_q": "Is there a JV girls tennis team?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2734,7 +2864,8 @@
   "expect": [
    "Robert Lopez|Coach Lopez"
   ],
-  "direct_q": "Who coaches track and field?"
+  "direct_q": "Who coaches track and field?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -2753,7 +2884,8 @@
   "expect": [
    "Robert Lopez|Coach Lopez"
   ],
-  "direct_q": "Who coaches track and field?"
+  "direct_q": "Who coaches track and field?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -2779,7 +2911,8 @@
    "CSD Fremont",
    "7(:00)?\\s*(PM|p\\.m\\.)?"
   ],
-  "direct_q": "When is the first US varsity boys basketball game?"
+  "direct_q": "When is the first US varsity boys basketball game?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -2805,7 +2938,8 @@
    "CSD Fremont",
    "7(:00)?\\s*(PM|p\\.m\\.)?"
   ],
-  "direct_q": "When is the first US varsity boys basketball game?"
+  "direct_q": "When is the first US varsity boys basketball game?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -2829,7 +2963,8 @@
   "expect": [
    "Pinewood"
   ],
-  "direct_q": "Who do the varsity boys play on December 8?"
+  "direct_q": "Who do the varsity boys play on December 8?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -2853,7 +2988,8 @@
   "expect": [
    "Pinewood"
   ],
-  "direct_q": "Who do the varsity boys play on December 8?"
+  "direct_q": "Who do the varsity boys play on December 8?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -2878,7 +3014,8 @@
    "CSD Fremont",
    "5:30"
   ],
-  "direct_q": "Who is the JV boys basketball team playing on November 17 and what time?"
+  "direct_q": "Who is the JV boys basketball team playing on November 17 and what time?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -2903,7 +3040,8 @@
    "CSD Fremont",
    "5:30"
   ],
-  "direct_q": "Who is the JV boys basketball team playing on November 17 and what time?"
+  "direct_q": "Who is the JV boys basketball team playing on November 17 and what time?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -2929,7 +3067,8 @@
    "7",
    "home"
   ],
-  "direct_q": "Is there a home basketball game on December 14?"
+  "direct_q": "Is there a home basketball game on December 14?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -2955,7 +3094,8 @@
    "7",
    "home"
   ],
-  "direct_q": "Is there a home basketball game on December 14?"
+  "direct_q": "Is there a home basketball game on December 14?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -2980,7 +3120,8 @@
    "\\bJan[a-z]*\\.?\\s+11\\b",
    "\\bFeb[a-z]*\\.?\\s+11\\b"
   ],
-  "direct_q": "When does varsity boys basketball play Kehillah?"
+  "direct_q": "When does varsity boys basketball play Kehillah?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3005,7 +3146,8 @@
    "\\bJan[a-z]*\\.?\\s+11\\b",
    "\\bFeb[a-z]*\\.?\\s+11\\b"
   ],
-  "direct_q": "When does varsity boys basketball play Kehillah?"
+  "direct_q": "When does varsity boys basketball play Kehillah?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3029,7 +3171,8 @@
   "expect": [
    "7(:00)?\\s*(PM|p\\.m\\.)?"
   ],
-  "direct_q": "What time is the girls basketball game against Crystal Springs on December 18?"
+  "direct_q": "What time is the girls basketball game against Crystal Springs on December 18?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3053,7 +3196,8 @@
   "expect": [
    "7(:00)?\\s*(PM|p\\.m\\.)?"
   ],
-  "direct_q": "What time is the girls basketball game against Crystal Springs on December 18?"
+  "direct_q": "What time is the girls basketball game against Crystal Springs on December 18?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3077,7 +3221,8 @@
   "expect": [
    "San Mateo"
   ],
-  "direct_q": "Who do the boys varsity play December 1?"
+  "direct_q": "Who do the boys varsity play December 1?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3101,7 +3246,8 @@
   "expect": [
    "San Mateo"
   ],
-  "direct_q": "Who do the boys varsity play December 1?"
+  "direct_q": "Who do the boys varsity play December 1?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3122,7 +3268,8 @@
   "expect": [
    "5-2"
   ],
-  "direct_q": "What was the score of the girls tennis game against Priory?"
+  "direct_q": "What was the score of the girls tennis game against Priory?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3143,7 +3290,8 @@
   "expect": [
    "5-2"
   ],
-  "direct_q": "What was the score of the girls tennis game against Priory?"
+  "direct_q": "What was the score of the girls tennis game against Priory?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3171,7 +3319,8 @@
   "expect": [
    "(Woodside Priory|Sacred Heart|Harker|Episcopal)"
   ],
-  "direct_q": "When is the next MS boys basketball game?"
+  "direct_q": "When is the next MS boys basketball game?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3199,7 +3348,8 @@
   "expect": [
    "(Woodside Priory|Sacred Heart|Harker|Episcopal)"
   ],
-  "direct_q": "When is the next MS boys basketball game?"
+  "direct_q": "When is the next MS boys basketball game?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3224,7 +3374,8 @@
    "\\bNov[a-z]*\\.?\\s+19\\b",
    "\\bDec[a-z]*\\.?\\s+16\\b"
   ],
-  "direct_q": "When does girls basketball play Design Tech?"
+  "direct_q": "When does girls basketball play Design Tech?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3249,7 +3400,8 @@
    "\\bNov[a-z]*\\.?\\s+19\\b",
    "\\bDec[a-z]*\\.?\\s+16\\b"
   ],
-  "direct_q": "When does girls basketball play Design Tech?"
+  "direct_q": "When does girls basketball play Design Tech?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3284,7 +3436,8 @@
    "CSD Fremont",
    "5:30"
   ],
-  "direct_q": "What about JV?"
+  "direct_q": "What about JV?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3319,7 +3472,8 @@
    "CSD Fremont",
    "5:30"
   ],
-  "direct_q": "What about JV?"
+  "direct_q": "What about JV?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3341,7 +3495,8 @@
    "Summit Shasta",
    "(sweep|swept|beat|won|W 3|3-0|3-2)"
   ],
-  "direct_q": "Did the girls volleyball team beat Summit Shasta?"
+  "direct_q": "Did the girls volleyball team beat Summit Shasta?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3363,7 +3518,8 @@
    "Summit Shasta",
    "(sweep|swept|beat|won|W 3|3-0|3-2)"
   ],
-  "direct_q": "Did the girls volleyball team beat Summit Shasta?"
+  "direct_q": "Did the girls volleyball team beat Summit Shasta?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3387,7 +3543,8 @@
   "expect": [
    "3:30"
   ],
-  "direct_q": "What time is the girls soccer game against Eastside College Prep on December 3?"
+  "direct_q": "What time is the girls soccer game against Eastside College Prep on December 3?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3411,7 +3568,8 @@
   "expect": [
    "3:30"
   ],
-  "direct_q": "What time is the girls soccer game against Eastside College Prep on December 3?"
+  "direct_q": "What time is the girls soccer game against Eastside College Prep on December 3?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3436,7 +3594,8 @@
    "\\bDec[a-z]*\\.?\\s+1\\b",
    "5:30"
   ],
-  "direct_q": "When is the girls basketball game against Burlingame?"
+  "direct_q": "When is the girls basketball game against Burlingame?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3461,7 +3620,8 @@
    "\\bDec[a-z]*\\.?\\s+1\\b",
    "5:30"
   ],
-  "direct_q": "When is the girls basketball game against Burlingame?"
+  "direct_q": "When is the girls basketball game against Burlingame?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3487,7 +3647,8 @@
   "expect": [
    "(not (yet )?(posted|published)|no (game )?schedule|athletics@|spring)"
   ],
-  "direct_q": "When is the boys tennis schedule?"
+  "direct_q": "When is the boys tennis schedule?",
+  "holdout": false
  },
  {
   "category": "athletics_games",
@@ -3513,7 +3674,8 @@
   "expect": [
    "(not (yet )?(posted|published)|no (game )?schedule|athletics@|spring)"
   ],
-  "direct_q": "When is the boys tennis schedule?"
+  "direct_q": "When is the boys tennis schedule?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3534,7 +3696,8 @@
    "after school",
    "340"
   ],
-  "direct_q": "When does Chess Club meet?"
+  "direct_q": "When does Chess Club meet?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3564,7 +3727,8 @@
    "after school",
    "340"
   ],
-  "direct_q": "When does Chess Club meet?"
+  "direct_q": "When does Chess Club meet?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3589,6 +3753,7 @@
    "1202"
   ],
   "direct_q": "When does Chess Club meet?",
+  "holdout": false,
   "with": [
    "club-03"
   ]
@@ -3612,7 +3777,8 @@
    "Thursday",
    "Norgan"
   ],
-  "direct_q": "wen does pinball club meet and who advises it"
+  "direct_q": "wen does pinball club meet and who advises it",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3633,7 +3799,8 @@
    "Thursday",
    "Norgan"
   ],
-  "direct_q": "wen does pinball club meet and who advises it"
+  "direct_q": "wen does pinball club meet and who advises it",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3654,7 +3821,8 @@
    "after school",
    "1202"
   ],
-  "direct_q": "When does Ethics Bowl meet?"
+  "direct_q": "When does Ethics Bowl meet?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3675,7 +3843,8 @@
    "after school",
    "1202"
   ],
-  "direct_q": "When does Ethics Bowl meet?"
+  "direct_q": "When does Ethics Bowl meet?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3695,7 +3864,8 @@
    "Lindy Jensen",
    "Sushu Xia"
   ],
-  "direct_q": "Who is the faculty advisor for Mock Trial?"
+  "direct_q": "Who is the faculty advisor for Mock Trial?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3715,7 +3885,8 @@
    "Lindy Jensen",
    "Sushu Xia"
   ],
-  "direct_q": "Who is the faculty advisor for Mock Trial?"
+  "direct_q": "Who is the faculty advisor for Mock Trial?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3736,7 +3907,8 @@
    "lunch",
    "1103"
   ],
-  "direct_q": "when does MUN meet"
+  "direct_q": "when does MUN meet",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3757,7 +3929,8 @@
    "lunch",
    "1103"
   ],
-  "direct_q": "when does MUN meet"
+  "direct_q": "when does MUN meet",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3777,7 +3950,8 @@
    "Friday",
    "after school"
   ],
-  "direct_q": "When does the robotics team meet?"
+  "direct_q": "When does the robotics team meet?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3797,7 +3971,8 @@
    "Friday",
    "after school"
   ],
-  "direct_q": "When does the robotics team meet?"
+  "direct_q": "When does the robotics team meet?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3818,7 +3993,8 @@
    "lunch",
    "219"
   ],
-  "direct_q": "Is there a mahjong club?"
+  "direct_q": "Is there a mahjong club?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3839,7 +4015,8 @@
    "lunch",
    "219"
   ],
-  "direct_q": "Is there a mahjong club?"
+  "direct_q": "Is there a mahjong club?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3858,7 +4035,8 @@
   "expect": [
    "AI/ML Club"
   ],
-  "direct_q": "Are there any coding or AI clubs?"
+  "direct_q": "Are there any coding or AI clubs?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3877,7 +4055,8 @@
   "expect": [
    "AI/ML Club"
   ],
-  "direct_q": "Are there any coding or AI clubs?"
+  "direct_q": "Are there any coding or AI clubs?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3896,7 +4075,8 @@
   "expect": [
    "119"
   ],
-  "direct_q": "How many clubs does the upper school have?"
+  "direct_q": "How many clubs does the upper school have?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3915,7 +4095,8 @@
   "expect": [
    "119"
   ],
-  "direct_q": "How many clubs does the upper school have?"
+  "direct_q": "How many clubs does the upper school have?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3937,7 +4118,8 @@
    "lunch",
    "gym"
   ],
-  "direct_q": "Is there a rock climbing club?"
+  "direct_q": "Is there a rock climbing club?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3959,7 +4141,8 @@
    "lunch",
    "gym"
   ],
-  "direct_q": "Is there a rock climbing club?"
+  "direct_q": "Is there a rock climbing club?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -3980,7 +4163,8 @@
    "Tuesday",
    "after school"
   ],
-  "direct_q": "Does Nueva have flag football?"
+  "direct_q": "Does Nueva have flag football?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -4001,7 +4185,8 @@
    "Tuesday",
    "after school"
   ],
-  "direct_q": "Does Nueva have flag football?"
+  "direct_q": "Does Nueva have flag football?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -4021,7 +4206,8 @@
    "MUN|Model United Nations",
    "Film Club|Marine Conservation|Food Science|Miniatures"
   ],
-  "direct_q": "Which clubs meet on Tuesdays at lunch?"
+  "direct_q": "Which clubs meet on Tuesdays at lunch?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -4041,7 +4227,8 @@
    "MUN|Model United Nations",
    "Film Club|Marine Conservation|Food Science|Miniatures"
   ],
-  "direct_q": "Which clubs meet on Tuesdays at lunch?"
+  "direct_q": "Which clubs meet on Tuesdays at lunch?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -4061,7 +4248,8 @@
    "(form|application|proposal)",
    "advisor"
   ],
-  "direct_q": "How do I start a new club?"
+  "direct_q": "How do I start a new club?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -4081,7 +4269,8 @@
    "(form|application|proposal)",
    "advisor"
   ],
-  "direct_q": "How do I start a new club?"
+  "direct_q": "How do I start a new club?",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -4102,7 +4291,8 @@
    "Friday",
    "after school"
   ],
-  "direct_q": "do ya'll have a robotics club"
+  "direct_q": "do ya'll have a robotics club",
+  "holdout": false
  },
  {
   "category": "clubs_activities",
@@ -4123,7 +4313,8 @@
    "Friday",
    "after school"
   ],
-  "direct_q": "do ya'll have a robotics club"
+  "direct_q": "do ya'll have a robotics club",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4142,7 +4333,8 @@
   "expect": [
    "Norgan"
   ],
-  "direct_q": "Who teaches Mechanical Engineering?"
+  "direct_q": "Who teaches Mechanical Engineering?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4161,7 +4353,8 @@
   "expect": [
    "Norgan"
   ],
-  "direct_q": "Who teaches Mechanical Engineering?"
+  "direct_q": "Who teaches Mechanical Engineering?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4183,6 +4376,7 @@
    "Block 1"
   ],
   "direct_q": "Who teaches Mechanical Engineering?",
+  "holdout": false,
   "with": [
    "crs-09"
   ]
@@ -4205,7 +4399,8 @@
    "Zomber",
    "(block 6|Block 6)"
   ],
-  "direct_q": "Who teaches Intro to CAD and what block is it?"
+  "direct_q": "Who teaches Intro to CAD and what block is it?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4225,7 +4420,8 @@
    "Zomber",
    "(block 6|Block 6)"
   ],
-  "direct_q": "Who teaches Intro to CAD and what block is it?"
+  "direct_q": "Who teaches Intro to CAD and what block is it?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4249,7 +4445,8 @@
   "expect": [
    "(Block 2|block 2)"
   ],
-  "direct_q": "What block is Immunology?"
+  "direct_q": "What block is Immunology?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4273,7 +4470,8 @@
   "expect": [
    "(Block 2|block 2)"
   ],
-  "direct_q": "What block is Immunology?"
+  "direct_q": "What block is Immunology?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4294,7 +4492,8 @@
    "(teach|teacher)",
    "(Computer Vision|Software Engineering|CS)"
   ],
-  "direct_q": "Who is Wes Chao?"
+  "direct_q": "Who is Wes Chao?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4315,7 +4514,8 @@
    "(teach|teacher)",
    "(Computer Vision|Software Engineering|CS)"
   ],
-  "direct_q": "Who is Wes Chao?"
+  "direct_q": "Who is Wes Chao?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4334,7 +4534,8 @@
   "expect": [
    "Sound Experience"
   ],
-  "direct_q": "What other classes does Max Cowan teach?"
+  "direct_q": "What other classes does Max Cowan teach?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4353,7 +4554,8 @@
   "expect": [
    "Sound Experience"
   ],
-  "direct_q": "What other classes does Max Cowan teach?"
+  "direct_q": "What other classes does Max Cowan teach?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4372,7 +4574,8 @@
   "expect": [
    "650[-\\s.]?235[-\\s.]?7100"
   ],
-  "direct_q": "What is the front desk phone number at the San Mateo campus?"
+  "direct_q": "What is the front desk phone number at the San Mateo campus?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4391,7 +4594,8 @@
   "expect": [
    "650[-\\s.]?235[-\\s.]?7100"
   ],
-  "direct_q": "What is the front desk phone number at the San Mateo campus?"
+  "direct_q": "What is the front desk phone number at the San Mateo campus?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4410,7 +4614,8 @@
   "expect": [
    "650[-\\s.]?350[-\\s.]?4600"
   ],
-  "direct_q": "What's the main phone number for the Hillsborough campus?"
+  "direct_q": "What's the main phone number for the Hillsborough campus?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4429,7 +4634,8 @@
   "expect": [
    "650[-\\s.]?350[-\\s.]?4600"
   ],
-  "direct_q": "What's the main phone number for the Hillsborough campus?"
+  "direct_q": "What's the main phone number for the Hillsborough campus?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4448,7 +4654,8 @@
   "expect": [
    "nurse@nuevaschool\\.org"
   ],
-  "direct_q": "How do I contact the school nurse?"
+  "direct_q": "How do I contact the school nurse?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4467,7 +4674,8 @@
   "expect": [
    "nurse@nuevaschool\\.org"
   ],
-  "direct_q": "How do I contact the school nurse?"
+  "direct_q": "How do I contact the school nurse?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4486,7 +4694,8 @@
   "expect": [
    "Lee Fertig"
   ],
-  "direct_q": "Who is the head of school?"
+  "direct_q": "Who is the head of school?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4505,7 +4714,8 @@
   "expect": [
    "Lee Fertig"
   ],
-  "direct_q": "Who is the head of school?"
+  "direct_q": "Who is the head of school?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4526,6 +4736,7 @@
    "Liza Raynal"
   ],
   "direct_q": "Who is the head of school?",
+  "holdout": false,
   "with": [
    "staff-11"
   ]
@@ -4547,7 +4758,8 @@
   "expect": [
    "Liza Raynal"
   ],
-  "direct_q": "Who is the Upper School division head?"
+  "direct_q": "Who is the Upper School division head?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4566,7 +4778,8 @@
   "expect": [
    "Liza Raynal"
   ],
-  "direct_q": "Who is the Upper School division head?"
+  "direct_q": "Who is the Upper School division head?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4585,7 +4798,8 @@
   "expect": [
    "Jackee Bruno"
   ],
-  "direct_q": "Who is the dean of students?"
+  "direct_q": "Who is the dean of students?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4604,7 +4818,8 @@
   "expect": [
    "Jackee Bruno"
   ],
-  "direct_q": "Who is the dean of students?"
+  "direct_q": "Who is the dean of students?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4623,7 +4838,8 @@
   "expect": [
    "Hryekewicz"
   ],
-  "direct_q": "Who is the head strength and conditioning coach?"
+  "direct_q": "Who is the head strength and conditioning coach?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4642,7 +4858,8 @@
   "expect": [
    "Hryekewicz"
   ],
-  "direct_q": "Who is the head strength and conditioning coach?"
+  "direct_q": "Who is the head strength and conditioning coach?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4661,7 +4878,8 @@
   "expect": [
    "Zomber"
   ],
-  "direct_q": "who teaches CAD"
+  "direct_q": "who teaches CAD",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4680,7 +4898,8 @@
   "expect": [
    "Zomber"
   ],
-  "direct_q": "who teaches CAD"
+  "direct_q": "who teaches CAD",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4699,7 +4918,8 @@
   "expect": [
    "Tiegel"
   ],
-  "direct_q": "Who is the middle school head?"
+  "direct_q": "Who is the middle school head?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4718,7 +4938,8 @@
   "expect": [
    "Tiegel"
   ],
-  "direct_q": "Who is the middle school head?"
+  "direct_q": "Who is the middle school head?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4737,7 +4958,8 @@
   "expect": [
    "(BusinessOffice@nuevaschool\\.org|650-350-4530|Business Office)"
   ],
-  "direct_q": "Who do I contact about tuition billing?"
+  "direct_q": "Who do I contact about tuition billing?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4756,7 +4978,8 @@
   "expect": [
    "(BusinessOffice@nuevaschool\\.org|650-350-4530|Business Office)"
   ],
-  "direct_q": "Who do I contact about tuition billing?"
+  "direct_q": "Who do I contact about tuition billing?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4775,7 +4998,8 @@
   "expect": [
    "techhelp@nuevaschool\\.org"
   ],
-  "direct_q": "What is the email for IT help?"
+  "direct_q": "What is the email for IT help?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4794,7 +5018,8 @@
   "expect": [
    "techhelp@nuevaschool\\.org"
   ],
-  "direct_q": "What is the email for IT help?"
+  "direct_q": "What is the email for IT help?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4813,7 +5038,8 @@
   "expect": [
    "Melanie Le[oó]n"
   ],
-  "direct_q": "Who is the director of admissions?"
+  "direct_q": "Who is the director of admissions?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4832,7 +5058,8 @@
   "expect": [
    "Melanie Le[oó]n"
   ],
-  "direct_q": "Who is the director of admissions?"
+  "direct_q": "Who is the director of admissions?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4851,7 +5078,8 @@
   "expect": [
    "Dubreuil"
   ],
-  "direct_q": "Who is the 10th grade dean?"
+  "direct_q": "Who is the 10th grade dean?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4870,7 +5098,8 @@
   "expect": [
    "Dubreuil"
   ],
-  "direct_q": "Who is the 10th grade dean?"
+  "direct_q": "Who is the 10th grade dean?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4889,7 +5118,8 @@
   "expect": [
    "Zermani"
   ],
-  "direct_q": "Who is the registrar?"
+  "direct_q": "Who is the registrar?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4908,7 +5138,8 @@
   "expect": [
    "Zermani"
   ],
-  "direct_q": "Who is the registrar?"
+  "direct_q": "Who is the registrar?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4927,7 +5158,8 @@
   "expect": [
    "Jacobstein"
   ],
-  "direct_q": "Who is the upper school counselor?"
+  "direct_q": "Who is the upper school counselor?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4946,7 +5178,8 @@
   "expect": [
    "Jacobstein"
   ],
-  "direct_q": "Who is the upper school counselor?"
+  "direct_q": "Who is the upper school counselor?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4965,7 +5198,8 @@
   "expect": [
    "bus@nuevaschool\\.org"
   ],
-  "direct_q": "What email do I use for questions about the bus?"
+  "direct_q": "What email do I use for questions about the bus?",
+  "holdout": false
  },
  {
   "category": "staff_contacts",
@@ -4984,7 +5218,8 @@
   "expect": [
    "bus@nuevaschool\\.org"
   ],
-  "direct_q": "What email do I use for questions about the bus?"
+  "direct_q": "What email do I use for questions about the bus?",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5005,7 +5240,8 @@
    "(class|advisory)",
    "(passing|lunch)"
   ],
-  "direct_q": "What is the cell phone policy?"
+  "direct_q": "What is the cell phone policy?",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5026,7 +5262,8 @@
    "(class|advisory)",
    "(passing|lunch)"
   ],
-  "direct_q": "What is the cell phone policy?"
+  "direct_q": "What is the cell phone policy?",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5046,7 +5283,8 @@
    "(briefly|music)",
    "(lunch)"
   ],
-  "direct_q": "Can my child use their phone at lunch?"
+  "direct_q": "Can my child use their phone at lunch?",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5066,7 +5304,8 @@
    "(briefly|music)",
    "(lunch)"
   ],
-  "direct_q": "Can my child use their phone at lunch?"
+  "direct_q": "Can my child use their phone at lunch?",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5085,7 +5324,8 @@
   "expect": [
    "1\\s*(and|to|-)\\s*24 minutes"
   ],
-  "direct_q": "What counts as a tardy?"
+  "direct_q": "What counts as a tardy?",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5104,7 +5344,8 @@
   "expect": [
    "1\\s*(and|to|-)\\s*24 minutes"
   ],
-  "direct_q": "What counts as a tardy?"
+  "direct_q": "What counts as a tardy?",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5123,7 +5364,8 @@
   "expect": [
    "\\b3\\b|three"
   ],
-  "direct_q": "how many tardies equal an absence"
+  "direct_q": "how many tardies equal an absence",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5142,7 +5384,8 @@
   "expect": [
    "\\b3\\b|three"
   ],
-  "direct_q": "how many tardies equal an absence"
+  "direct_q": "how many tardies equal an absence",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5164,7 +5407,8 @@
    "(closed|not permitted|can't|cannot|no)",
    "(9|10|freshm|sophom)"
   ],
-  "direct_q": "Can freshmen leave campus for lunch?"
+  "direct_q": "Can freshmen leave campus for lunch?",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5186,7 +5430,8 @@
    "(closed|not permitted|can't|cannot|no)",
    "(9|10|freshm|sophom)"
   ],
-  "direct_q": "Can freshmen leave campus for lunch?"
+  "direct_q": "Can freshmen leave campus for lunch?",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5207,7 +5452,8 @@
    "(12|seniors)",
    "(permission|form)"
   ],
-  "direct_q": "Who has open campus privileges?"
+  "direct_q": "Who has open campus privileges?",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5228,7 +5474,8 @@
    "(12|seniors)",
    "(permission|form)"
   ],
-  "direct_q": "Who has open campus privileges?"
+  "direct_q": "Who has open campus privileges?",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5248,7 +5495,8 @@
    "respectful",
    "appropriate"
   ],
-  "direct_q": "What's the dress code?"
+  "direct_q": "What's the dress code?",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5268,7 +5516,8 @@
    "respectful",
    "appropriate"
   ],
-  "direct_q": "What's the dress code?"
+  "direct_q": "What's the dress code?",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5288,7 +5537,8 @@
    "(cite|citation)",
    "(by course|each course|teacher|course)"
   ],
-  "direct_q": "Can I use ChatGPT on homework?"
+  "direct_q": "Can I use ChatGPT on homework?",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5308,7 +5558,8 @@
    "(cite|citation)",
    "(by course|each course|teacher|course)"
   ],
-  "direct_q": "Can I use ChatGPT on homework?"
+  "direct_q": "Can I use ChatGPT on homework?",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5328,7 +5579,8 @@
    "(Assistant Head|conversation)",
    "famil"
   ],
-  "direct_q": "What is the plagiarism policy and what happens on a first incident?"
+  "direct_q": "What is the plagiarism policy and what happens on a first incident?",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5348,7 +5600,8 @@
    "(Assistant Head|conversation)",
    "famil"
   ],
-  "direct_q": "What is the plagiarism policy and what happens on a first incident?"
+  "direct_q": "What is the plagiarism policy and what happens on a first incident?",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5369,7 +5622,8 @@
   "expect": [
    "(academic integrity|plagiarism|honor)"
   ],
-  "direct_q": "What is Nueva's honor code?"
+  "direct_q": "What is Nueva's honor code?",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5390,7 +5644,8 @@
   "expect": [
    "(academic integrity|plagiarism|honor)"
   ],
-  "direct_q": "What is Nueva's honor code?"
+  "direct_q": "What is Nueva's honor code?",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5410,7 +5665,8 @@
    "one semester",
    "(sport|season|PE)"
   ],
-  "direct_q": "whats the pe req"
+  "direct_q": "whats the pe req",
+  "holdout": false
  },
  {
   "category": "policies_handbook",
@@ -5430,7 +5686,8 @@
    "one semester",
    "(sport|season|PE)"
   ],
-  "direct_q": "whats the pe req"
+  "direct_q": "whats the pe req",
+  "holdout": false
  },
  {
   "category": "lunch",
@@ -5455,7 +5712,8 @@
    "Chicken Parmesan",
    "Eggplant Parmesan"
   ],
-  "direct_q": "What's for lunch at San Mateo on November 12?"
+  "direct_q": "What's for lunch at San Mateo on November 12?",
+  "holdout": false
  },
  {
   "category": "lunch",
@@ -5480,7 +5738,8 @@
    "Chicken Parmesan",
    "Eggplant Parmesan"
   ],
-  "direct_q": "What's for lunch at San Mateo on November 12?"
+  "direct_q": "What's for lunch at San Mateo on November 12?",
+  "holdout": false
  },
  {
   "category": "lunch",
@@ -5505,7 +5764,8 @@
    "(Pepperoni|Pizza)",
    "Bahn Mi|Bánh Mì|Banh Mi|Vegan"
   ],
-  "direct_q": "What's for lunch on Nov 12?"
+  "direct_q": "What's for lunch on Nov 12?",
+  "holdout": false
  },
  {
   "category": "lunch",
@@ -5530,7 +5790,8 @@
    "(Pepperoni|Pizza)",
    "Bahn Mi|Bánh Mì|Banh Mi|Vegan"
   ],
-  "direct_q": "What's for lunch on Nov 12?"
+  "direct_q": "What's for lunch on Nov 12?",
+  "holdout": false
  },
  {
   "category": "lunch",
@@ -5558,7 +5819,8 @@
   "expect": [
    "lunch"
   ],
-  "direct_q": "Whats for lunch tommrow"
+  "direct_q": "Whats for lunch tommrow",
+  "holdout": false
  },
  {
   "category": "lunch",
@@ -5586,7 +5848,8 @@
   "expect": [
    "lunch"
   ],
-  "direct_q": "Whats for lunch tommrow"
+  "direct_q": "Whats for lunch tommrow",
+  "holdout": false
  },
  {
   "category": "lunch",
@@ -5614,7 +5877,8 @@
   "expect": [
    "lunch"
   ],
-  "direct_q": "What's for lunch today?"
+  "direct_q": "What's for lunch today?",
+  "holdout": false
  },
  {
   "category": "lunch",
@@ -5642,7 +5906,8 @@
   "expect": [
    "lunch"
   ],
-  "direct_q": "What's for lunch today?"
+  "direct_q": "What's for lunch today?",
+  "holdout": false
  },
  {
   "category": "lunch",
@@ -5664,7 +5929,8 @@
    "\\bno\\b",
    "(break|no school|no lunch|closed)"
   ],
-  "direct_q": "Is there lunch on Thanksgiving?"
+  "direct_q": "Is there lunch on Thanksgiving?",
+  "holdout": false
  },
  {
   "category": "lunch",
@@ -5686,7 +5952,8 @@
    "\\bno\\b",
    "(break|no school|no lunch|closed)"
   ],
-  "direct_q": "Is there lunch on Thanksgiving?"
+  "direct_q": "Is there lunch on Thanksgiving?",
+  "holdout": false
  },
  {
   "category": "lunch",
@@ -5705,7 +5972,8 @@
   "expect": [
    "11(:00)?\\s*(am|a\\.m\\.)?\\s*(-|to)\\s*1(:00)?\\s*(pm|p\\.m\\.)?"
   ],
-  "direct_q": "What are the cafe hours at San Mateo?"
+  "direct_q": "What are the cafe hours at San Mateo?",
+  "holdout": false
  },
  {
   "category": "lunch",
@@ -5724,7 +5992,8 @@
   "expect": [
    "11(:00)?\\s*(am|a\\.m\\.)?\\s*(-|to)\\s*1(:00)?\\s*(pm|p\\.m\\.)?"
   ],
-  "direct_q": "What are the cafe hours at San Mateo?"
+  "direct_q": "What are the cafe hours at San Mateo?",
+  "holdout": false
  },
  {
   "category": "lunch",
@@ -5749,7 +6018,8 @@
    "Pepperoni|Pizza",
    "(yes)?"
   ],
-  "direct_q": "Is there pizza at the middle school on November 12?"
+  "direct_q": "Is there pizza at the middle school on November 12?",
+  "holdout": false
  },
  {
   "category": "lunch",
@@ -5774,7 +6044,8 @@
    "Pepperoni|Pizza",
    "(yes)?"
   ],
-  "direct_q": "Is there pizza at the middle school on November 12?"
+  "direct_q": "Is there pizza at the middle school on November 12?",
+  "holdout": false
  },
  {
   "category": "events",
@@ -5799,7 +6070,8 @@
    "\\bDec[a-z]*\\.?\\s+10\\b",
    "6\\s*(PM|p\\.m\\.)?\\s*(-|to|\\u2013)\\s*8"
   ],
-  "direct_q": "When is Evening of the Arts?"
+  "direct_q": "When is Evening of the Arts?",
+  "holdout": false
  },
  {
   "category": "events",
@@ -5824,7 +6096,8 @@
    "\\bDec[a-z]*\\.?\\s+10\\b",
    "6\\s*(PM|p\\.m\\.)?\\s*(-|to|\\u2013)\\s*8"
   ],
-  "direct_q": "When is Evening of the Arts?"
+  "direct_q": "When is Evening of the Arts?",
+  "holdout": false
  },
  {
   "category": "events",
@@ -5850,7 +6123,8 @@
    "(Menlo Park)",
    "(bands|music)"
   ],
-  "direct_q": "What is Nueva Rocks the Guild?"
+  "direct_q": "What is Nueva Rocks the Guild?",
+  "holdout": false
  },
  {
   "category": "events",
@@ -5876,7 +6150,8 @@
    "(Menlo Park)",
    "(bands|music)"
   ],
-  "direct_q": "What is Nueva Rocks the Guild?"
+  "direct_q": "What is Nueva Rocks the Guild?",
+  "holdout": false
  },
  {
   "category": "events",
@@ -5901,7 +6176,8 @@
    "\\bDec[a-z]*\\.?\\s+3\\b",
    "6"
   ],
-  "direct_q": "When is the Class of 2028 parent college kickoff?"
+  "direct_q": "When is the Class of 2028 parent college kickoff?",
+  "holdout": false
  },
  {
   "category": "events",
@@ -5926,7 +6202,8 @@
    "\\bDec[a-z]*\\.?\\s+3\\b",
    "6"
   ],
-  "direct_q": "When is the Class of 2028 parent college kickoff?"
+  "direct_q": "When is the Class of 2028 parent college kickoff?",
+  "holdout": false
  },
  {
   "category": "events",
@@ -5951,7 +6228,8 @@
    "\\bFeb[a-z]*\\.?\\s+3\\b",
    "6"
   ],
-  "direct_q": "When is the US Trips Info Night?"
+  "direct_q": "When is the US Trips Info Night?",
+  "holdout": false
  },
  {
   "category": "events",
@@ -5976,7 +6254,8 @@
    "\\bFeb[a-z]*\\.?\\s+3\\b",
    "6"
   ],
-  "direct_q": "When is the US Trips Info Night?"
+  "direct_q": "When is the US Trips Info Night?",
+  "holdout": false
  },
  {
   "category": "events",
@@ -6004,7 +6283,8 @@
    ],
    "\\bDec[a-z]*\\.?\\s+14\\b"
   ],
-  "direct_q": "Is there a financial assistance workshop coming up?"
+  "direct_q": "Is there a financial assistance workshop coming up?",
+  "holdout": false
  },
  {
   "category": "events",
@@ -6032,7 +6312,8 @@
    ],
    "\\bDec[a-z]*\\.?\\s+14\\b"
   ],
-  "direct_q": "Is there a financial assistance workshop coming up?"
+  "direct_q": "Is there a financial assistance workshop coming up?",
+  "holdout": false
  },
  {
   "category": "events",
@@ -6057,7 +6338,8 @@
    "(coffee)",
    "8:30"
   ],
-  "direct_q": "What is the Parent Fika?"
+  "direct_q": "What is the Parent Fika?",
+  "holdout": false
  },
  {
   "category": "events",
@@ -6082,7 +6364,8 @@
    "(coffee)",
    "8:30"
   ],
-  "direct_q": "What is the Parent Fika?"
+  "direct_q": "What is the Parent Fika?",
+  "holdout": false
  },
  {
   "category": "events",
@@ -6106,7 +6389,8 @@
   "expect": [
    "\\bNov[a-z]*\\.?\\s+18\\b"
   ],
-  "direct_q": "When is CSL Day?"
+  "direct_q": "When is CSL Day?",
+  "holdout": false
  },
  {
   "category": "events",
@@ -6130,7 +6414,8 @@
   "expect": [
    "\\bNov[a-z]*\\.?\\s+18\\b"
   ],
-  "direct_q": "When is CSL Day?"
+  "direct_q": "When is CSL Day?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6149,7 +6434,8 @@
   "expect": [
    "ravenna-hub\\.com"
   ],
-  "direct_q": "How do I book a campus tour?"
+  "direct_q": "How do I book a campus tour?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6168,7 +6454,8 @@
   "expect": [
    "ravenna-hub\\.com"
   ],
-  "direct_q": "How do I book a campus tour?"
+  "direct_q": "How do I book a campus tour?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6187,7 +6474,8 @@
   "expect": [
    "\\$100"
   ],
-  "direct_q": "How much is the application fee?"
+  "direct_q": "How much is the application fee?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6206,7 +6494,8 @@
   "expect": [
    "\\$100"
   ],
-  "direct_q": "How much is the application fee?"
+  "direct_q": "How much is the application fee?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6225,7 +6514,8 @@
   "expect": [
    "\\bJan[a-z]*\\.?\\s+5\\b"
   ],
-  "direct_q": "What is the admissions application deadline?"
+  "direct_q": "What is the admissions application deadline?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6244,7 +6534,8 @@
   "expect": [
    "\\bJan[a-z]*\\.?\\s+5\\b"
   ],
-  "direct_q": "What is the admissions application deadline?"
+  "direct_q": "What is the admissions application deadline?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6265,6 +6556,7 @@
    "\\$100"
   ],
   "direct_q": "What is the admissions application deadline?",
+  "holdout": false,
   "with": [
    "adm-02"
   ]
@@ -6286,7 +6578,8 @@
   "expect": [
    "\\bMar[a-z]*\\.?\\s+12\\b"
   ],
-  "direct_q": "When are admissions decisions released?"
+  "direct_q": "When are admissions decisions released?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6305,7 +6598,8 @@
   "expect": [
    "\\bMar[a-z]*\\.?\\s+12\\b"
   ],
-  "direct_q": "When are admissions decisions released?"
+  "direct_q": "When are admissions decisions released?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6324,7 +6618,8 @@
   "expect": [
    "\\bMar[a-z]*\\.?\\s+19\\b"
   ],
-  "direct_q": "When do we have to respond to an admissions offer?"
+  "direct_q": "When do we have to respond to an admissions offer?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6343,7 +6638,8 @@
   "expect": [
    "\\bMar[a-z]*\\.?\\s+19\\b"
   ],
-  "direct_q": "When do we have to respond to an admissions offer?"
+  "direct_q": "When do we have to respond to an admissions offer?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6362,7 +6658,8 @@
   "expect": [
    "\\bFeb[a-z]*\\.?\\s+3\\b"
   ],
-  "direct_q": "When is the financial assistance application due?"
+  "direct_q": "When is the financial assistance application due?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6381,7 +6678,8 @@
   "expect": [
    "\\bFeb[a-z]*\\.?\\s+3\\b"
   ],
-  "direct_q": "When is the financial assistance application due?"
+  "direct_q": "When is the financial assistance application due?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6400,7 +6698,8 @@
   "expect": [
    "Clarity"
   ],
-  "direct_q": "Which platform does Nueva use for financial assistance applications?"
+  "direct_q": "Which platform does Nueva use for financial assistance applications?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6419,7 +6718,8 @@
   "expect": [
    "Clarity"
   ],
-  "direct_q": "Which platform does Nueva use for financial assistance applications?"
+  "direct_q": "Which platform does Nueva use for financial assistance applications?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6439,7 +6739,8 @@
    "Ravenna",
    "(Family Information Form|application fee)"
   ],
-  "direct_q": "How do I apply to Nueva?"
+  "direct_q": "How do I apply to Nueva?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6459,7 +6760,8 @@
    "Ravenna",
    "(Family Information Form|application fee)"
   ],
-  "direct_q": "How do I apply to Nueva?"
+  "direct_q": "How do I apply to Nueva?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6478,7 +6780,8 @@
   "expect": [
    "givecampus\\.com"
   ],
-  "direct_q": "How can I donate to Nueva?"
+  "direct_q": "How can I donate to Nueva?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6497,7 +6800,8 @@
   "expect": [
    "givecampus\\.com"
   ],
-  "direct_q": "How can I donate to Nueva?"
+  "direct_q": "How can I donate to Nueva?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6516,7 +6820,8 @@
   "expect": [
    "nuevaschool\\.org/nueva-store"
   ],
-  "direct_q": "Where can I buy Nueva spirit wear?"
+  "direct_q": "Where can I buy Nueva spirit wear?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6535,7 +6840,8 @@
   "expect": [
    "nuevaschool\\.org/nueva-store"
   ],
-  "direct_q": "Where can I buy Nueva spirit wear?"
+  "direct_q": "Where can I buy Nueva spirit wear?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6554,7 +6860,8 @@
   "expect": [
    "(48,785|65,065)"
   ],
-  "direct_q": "How much is tuition?"
+  "direct_q": "How much is tuition?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6573,7 +6880,8 @@
   "expect": [
    "(48,785|65,065)"
   ],
-  "direct_q": "How much is tuition?"
+  "direct_q": "How much is tuition?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6592,7 +6900,8 @@
   "expect": [
    "(48,785|65,065)"
   ],
-  "direct_q": "How much is tuition?"
+  "direct_q": "How much is tuition?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6611,7 +6920,8 @@
   "expect": [
    "(after.?care|extended day|homework club|enrichment|before and after)"
   ],
-  "direct_q": "Does Nueva offer after-school care?"
+  "direct_q": "Does Nueva offer after-school care?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6630,7 +6940,8 @@
   "expect": [
    "(after.?care|extended day|homework club|enrichment|before and after)"
   ],
-  "direct_q": "Does Nueva offer after-school care?"
+  "direct_q": "Does Nueva offer after-school care?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6649,7 +6960,8 @@
   "expect": [
    "150,000"
   ],
-  "direct_q": "Who qualifies for 100 percent financial assistance?"
+  "direct_q": "Who qualifies for 100 percent financial assistance?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6668,7 +6980,8 @@
   "expect": [
    "150,000"
   ],
-  "direct_q": "Who qualifies for 100 percent financial assistance?"
+  "direct_q": "Who qualifies for 100 percent financial assistance?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6688,7 +7001,8 @@
    "\\b(no|not)\\b",
    "(SSAT|ISEE|entrance test)"
   ],
-  "direct_q": "Do upper school applicants have to take the SSAT or ISEE?"
+  "direct_q": "Do upper school applicants have to take the SSAT or ISEE?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6708,7 +7022,8 @@
    "\\b(no|not)\\b",
    "(SSAT|ISEE|entrance test)"
   ],
-  "direct_q": "Do upper school applicants have to take the SSAT or ISEE?"
+  "direct_q": "Do upper school applicants have to take the SSAT or ISEE?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6727,7 +7042,8 @@
   "expect": [
    "40\\s*(-|to|–)\\s*45"
   ],
-  "direct_q": "How many students does Nueva admit into 9th grade?"
+  "direct_q": "How many students does Nueva admit into 9th grade?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6746,7 +7062,8 @@
   "expect": [
    "40\\s*(-|to|–)\\s*45"
   ],
-  "direct_q": "How many students does Nueva admit into 9th grade?"
+  "direct_q": "How many students does Nueva admit into 9th grade?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6766,7 +7083,8 @@
    "\\b5\\b",
    "September 1"
   ],
-  "direct_q": "How old does my child have to be to start kindergarten at Nueva?"
+  "direct_q": "How old does my child have to be to start kindergarten at Nueva?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6786,7 +7104,8 @@
    "\\b5\\b",
    "September 1"
   ],
-  "direct_q": "How old does my child have to be to start kindergarten at Nueva?"
+  "direct_q": "How old does my child have to be to start kindergarten at Nueva?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6806,7 +7125,8 @@
    "(yes|available)",
    "waiver"
   ],
-  "direct_q": "Is there a fee waiver for the application?"
+  "direct_q": "Is there a fee waiver for the application?",
+  "holdout": false
  },
  {
   "category": "admissions_parent",
@@ -6826,7 +7146,8 @@
    "(yes|available)",
    "waiver"
   ],
-  "direct_q": "Is there a fee waiver for the application?"
+  "direct_q": "Is there a fee waiver for the application?",
+  "holdout": false
  },
  {
   "category": "campus_logistics",
@@ -6846,7 +7167,8 @@
    "131 E(ast|\\.)? 28th",
    "San Mateo"
   ],
-  "direct_q": "Where is the upper school located?"
+  "direct_q": "Where is the upper school located?",
+  "holdout": false
  },
  {
   "category": "campus_logistics",
@@ -6866,7 +7188,8 @@
    "131 E(ast|\\.)? 28th",
    "San Mateo"
   ],
-  "direct_q": "Where is the upper school located?"
+  "direct_q": "Where is the upper school located?",
+  "holdout": false
  },
  {
   "category": "campus_logistics",
@@ -6889,6 +7212,7 @@
    "3:10"
   ],
   "direct_q": "Where is the upper school located?",
+  "holdout": false,
   "with": [
    "bell-03"
   ]
@@ -6911,7 +7235,8 @@
    "6565 Skyline",
    "Hillsborough"
   ],
-  "direct_q": "What is the address of the Hillsborough campus?"
+  "direct_q": "What is the address of the Hillsborough campus?",
+  "holdout": false
  },
  {
   "category": "campus_logistics",
@@ -6931,7 +7256,8 @@
    "6565 Skyline",
    "Hillsborough"
   ],
-  "direct_q": "What is the address of the Hillsborough campus?"
+  "direct_q": "What is the address of the Hillsborough campus?",
+  "holdout": false
  },
  {
   "category": "campus_logistics",
@@ -6950,7 +7276,8 @@
   "expect": [
    "Hillsborough"
   ],
-  "direct_q": "Which campus is for middle school?"
+  "direct_q": "Which campus is for middle school?",
+  "holdout": false
  },
  {
   "category": "campus_logistics",
@@ -6969,7 +7296,8 @@
   "expect": [
    "Hillsborough"
   ],
-  "direct_q": "Which campus is for middle school?"
+  "direct_q": "Which campus is for middle school?",
+  "holdout": false
  },
  {
   "category": "campus_logistics",
@@ -6988,7 +7316,8 @@
   "expect": [
    "(lost[- ]and[- ]found)"
   ],
-  "direct_q": "Where do I report a lost item?"
+  "direct_q": "Where do I report a lost item?",
+  "holdout": false
  },
  {
   "category": "campus_logistics",
@@ -7007,7 +7336,8 @@
   "expect": [
    "(lost[- ]and[- ]found)"
   ],
-  "direct_q": "Where do I report a lost item?"
+  "direct_q": "Where do I report a lost item?",
+  "holdout": false
  },
  {
   "category": "campus_logistics",
@@ -7026,7 +7356,8 @@
   "expect": [
    "(Locker Request Form|form)"
   ],
-  "direct_q": "How do I get a locker?"
+  "direct_q": "How do I get a locker?",
+  "holdout": false
  },
  {
   "category": "campus_logistics",
@@ -7045,7 +7376,8 @@
   "expect": [
    "(Locker Request Form|form)"
   ],
-  "direct_q": "How do I get a locker?"
+  "direct_q": "How do I get a locker?",
+  "holdout": false
  },
  {
   "category": "campus_logistics",
@@ -7064,7 +7396,8 @@
   "expect": [
    "(Parking Request Form|Gr\\. 11 & 12)"
   ],
-  "direct_q": "Can seniors park on campus?"
+  "direct_q": "Can seniors park on campus?",
+  "holdout": false
  },
  {
   "category": "campus_logistics",
@@ -7083,7 +7416,8 @@
   "expect": [
    "(Parking Request Form|Gr\\. 11 & 12)"
   ],
-  "direct_q": "Can seniors park on campus?"
+  "direct_q": "Can seniors park on campus?",
+  "holdout": false
  },
  {
   "category": "campus_logistics",
@@ -7103,7 +7437,8 @@
    "(yes|daily route)",
    "campus"
   ],
-  "direct_q": "Is there a bus between the two campuses?"
+  "direct_q": "Is there a bus between the two campuses?",
+  "holdout": false
  },
  {
   "category": "campus_logistics",
@@ -7123,7 +7458,8 @@
    "(yes|daily route)",
    "campus"
   ],
-  "direct_q": "Is there a bus between the two campuses?"
+  "direct_q": "Is there a bus between the two campuses?",
+  "holdout": false
  },
  {
   "category": "campus_logistics",
@@ -7143,7 +7479,8 @@
    "(six|6)",
    "(four|4)"
   ],
-  "direct_q": "How many bus routes does Nueva run?"
+  "direct_q": "How many bus routes does Nueva run?",
+  "holdout": false
  },
  {
   "category": "campus_logistics",
@@ -7163,7 +7500,8 @@
    "(six|6)",
    "(four|4)"
   ],
-  "direct_q": "How many bus routes does Nueva run?"
+  "direct_q": "How many bus routes does Nueva run?",
+  "holdout": false
  },
  {
   "category": "campus_logistics",
@@ -7183,7 +7521,8 @@
    "Go Pass",
    "(no additional cost|free)"
   ],
-  "direct_q": "Do upper school students get a free Caltrain pass?"
+  "direct_q": "Do upper school students get a free Caltrain pass?",
+  "holdout": false
  },
  {
   "category": "campus_logistics",
@@ -7203,7 +7542,8 @@
    "Go Pass",
    "(no additional cost|free)"
   ],
-  "direct_q": "Do upper school students get a free Caltrain pass?"
+  "direct_q": "Do upper school students get a free Caltrain pass?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7226,7 +7566,8 @@
    "Japanese",
    "Spanish"
   ],
-  "direct_q": "What languages can I study at Nueva?"
+  "direct_q": "What languages can I study at Nueva?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7249,7 +7590,8 @@
    "Japanese",
    "Spanish"
   ],
-  "direct_q": "What languages can I study at Nueva?"
+  "direct_q": "What languages can I study at Nueva?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7268,7 +7610,8 @@
   "expect": [
    "(3|three) consecutive years"
   ],
-  "direct_q": "What is the language graduation requirement?"
+  "direct_q": "What is the language graduation requirement?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7287,7 +7630,8 @@
   "expect": [
    "(3|three) consecutive years"
   ],
-  "direct_q": "What is the language graduation requirement?"
+  "direct_q": "What is the language graduation requirement?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7308,7 +7652,8 @@
    "Biology",
    "(3rd|third) year"
   ],
-  "direct_q": "What science classes do I need to graduate?"
+  "direct_q": "What science classes do I need to graduate?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7329,7 +7674,8 @@
    "Biology",
    "(3rd|third) year"
   ],
-  "direct_q": "What science classes do I need to graduate?"
+  "direct_q": "What science classes do I need to graduate?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7350,7 +7696,8 @@
    "English 10",
    "English 11"
   ],
-  "direct_q": "What English classes are required?"
+  "direct_q": "What English classes are required?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7371,7 +7718,8 @@
    "English 10",
    "English 11"
   ],
-  "direct_q": "What English classes are required?"
+  "direct_q": "What English classes are required?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7393,7 +7741,8 @@
    "(not designed|don't|do not|doesn't|does not|no)",
    "(AP exam|exams)"
   ],
-  "direct_q": "Does Nueva offer AP classes?"
+  "direct_q": "Does Nueva offer AP classes?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7415,7 +7764,8 @@
    "(not designed|don't|do not|doesn't|does not|no)",
    "(AP exam|exams)"
   ],
-  "direct_q": "Does Nueva offer AP classes?"
+  "direct_q": "Does Nueva offer AP classes?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7434,7 +7784,8 @@
   "expect": [
    "(Mechanical Engineering|Intro to CAD|Fabrication|Applied Eng|Software Engineering|Chemical Engineering)"
   ],
-  "direct_q": "Are there engineering classes for upper schoolers?"
+  "direct_q": "Are there engineering classes for upper schoolers?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7453,7 +7804,8 @@
   "expect": [
    "(Mechanical Engineering|Intro to CAD|Fabrication|Applied Eng|Software Engineering|Chemical Engineering)"
   ],
-  "direct_q": "Are there engineering classes for upper schoolers?"
+  "direct_q": "Are there engineering classes for upper schoolers?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7473,7 +7825,8 @@
    "Wes Chao|Chao",
    "Block 1"
   ],
-  "direct_q": "Who teaches Computer Vision and when does it meet?"
+  "direct_q": "Who teaches Computer Vision and when does it meet?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7493,7 +7846,8 @@
    "Wes Chao|Chao",
    "Block 1"
   ],
-  "direct_q": "Who teaches Computer Vision and when does it meet?"
+  "direct_q": "Who teaches Computer Vision and when does it meet?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7513,7 +7867,8 @@
    "Block 2",
    "1105"
   ],
-  "direct_q": "Which block is Software Engineering and where?"
+  "direct_q": "Which block is Software Engineering and where?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7533,7 +7888,8 @@
    "Block 2",
    "1105"
   ],
-  "direct_q": "Which block is Software Engineering and where?"
+  "direct_q": "Which block is Software Engineering and where?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7552,7 +7908,8 @@
   "expect": [
    "Consciousness"
   ],
-  "direct_q": "Is there a philosophy class about consciousness?"
+  "direct_q": "Is there a philosophy class about consciousness?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7571,7 +7928,8 @@
   "expect": [
    "Consciousness"
   ],
-  "direct_q": "Is there a philosophy class about consciousness?"
+  "direct_q": "Is there a philosophy class about consciousness?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7590,7 +7948,8 @@
   "expect": [
    "\\b(3|three)\\b"
   ],
-  "direct_q": "How many years of math do I need to graduate?"
+  "direct_q": "How many years of math do I need to graduate?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7609,7 +7968,8 @@
   "expect": [
    "\\b(3|three)\\b"
   ],
-  "direct_q": "How many years of math do I need to graduate?"
+  "direct_q": "How many years of math do I need to graduate?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7629,7 +7989,8 @@
    "\\b(3|three)\\b",
    "language"
   ],
-  "direct_q": "How many years of a foreign language are required?"
+  "direct_q": "How many years of a foreign language are required?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7649,7 +8010,8 @@
    "\\b(3|three)\\b",
    "language"
   ],
-  "direct_q": "How many years of a foreign language are required?"
+  "direct_q": "How many years of a foreign language are required?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7670,7 +8032,8 @@
    "(4 years|four years)",
    "(History|Science|Math)"
   ],
-  "direct_q": "What are the graduation requirements at Nueva?"
+  "direct_q": "What are the graduation requirements at Nueva?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7691,7 +8054,8 @@
    "(4 years|four years)",
    "(History|Science|Math)"
   ],
-  "direct_q": "What are the graduation requirements at Nueva?"
+  "direct_q": "What are the graduation requirements at Nueva?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7712,7 +8076,8 @@
    "Math",
    "(English|History)"
   ],
-  "direct_q": "What departments does the upper school have?"
+  "direct_q": "What departments does the upper school have?",
+  "holdout": false
  },
  {
   "category": "courses_academics",
@@ -7733,7 +8098,8 @@
    "Math",
    "(English|History)"
   ],
-  "direct_q": "What departments does the upper school have?"
+  "direct_q": "What departments does the upper school have?",
+  "holdout": false
  },
  {
   "category": "advisory",
@@ -7758,7 +8124,8 @@
    "Jen Paull",
    "1102"
   ],
-  "direct_q": "Who are the advisors for advisory 11.1 and what room?"
+  "direct_q": "Who are the advisors for advisory 11.1 and what room?",
+  "holdout": false
  },
  {
   "category": "advisory",
@@ -7783,7 +8150,8 @@
    "Jen Paull",
    "1102"
   ],
-  "direct_q": "Who are the advisors for advisory 11.1 and what room?"
+  "direct_q": "Who are the advisors for advisory 11.1 and what room?",
+  "holdout": false
  },
  {
   "category": "advisory",
@@ -7804,7 +8172,8 @@
    "Lauren O.Donnell",
    "240"
   ],
-  "direct_q": "who advises 9.5 and where do they meet"
+  "direct_q": "who advises 9.5 and where do they meet",
+  "holdout": false
  },
  {
   "category": "advisory",
@@ -7825,7 +8194,8 @@
    "Lauren O.Donnell",
    "240"
   ],
-  "direct_q": "who advises 9.5 and where do they meet"
+  "direct_q": "who advises 9.5 and where do they meet",
+  "holdout": false
  },
  {
   "category": "advisory",
@@ -7844,7 +8214,8 @@
   "expect": [
    "Rosenberg"
   ],
-  "direct_q": "Where does intergrade Group A meet?"
+  "direct_q": "Where does intergrade Group A meet?",
+  "holdout": false
  },
  {
   "category": "advisory",
@@ -7863,7 +8234,8 @@
   "expect": [
    "Rosenberg"
   ],
-  "direct_q": "Where does intergrade Group A meet?"
+  "direct_q": "Where does intergrade Group A meet?",
+  "holdout": false
  },
  {
   "category": "advisory",
@@ -7884,7 +8256,8 @@
    "Ryan Sawtell",
    "1105"
   ],
-  "direct_q": "Who are the 12.3 advisors?"
+  "direct_q": "Who are the 12.3 advisors?",
+  "holdout": false
  },
  {
   "category": "advisory",
@@ -7905,7 +8278,8 @@
    "Ryan Sawtell",
    "1105"
   ],
-  "direct_q": "Who are the 12.3 advisors?"
+  "direct_q": "Who are the 12.3 advisors?",
+  "holdout": false
  },
  {
   "category": "nexus_other",
@@ -7924,7 +8298,8 @@
   "expect": [
    "(myschoolapp\\.com|nuevaschool\\.org/nexus)"
   ],
-  "direct_q": "How do I log in to the Nexus?"
+  "direct_q": "How do I log in to the Nexus?",
+  "holdout": false
  },
  {
   "category": "nexus_other",
@@ -7943,7 +8318,8 @@
   "expect": [
    "(myschoolapp\\.com|nuevaschool\\.org/nexus)"
   ],
-  "direct_q": "How do I log in to the Nexus?"
+  "direct_q": "How do I log in to the Nexus?",
+  "holdout": false
  },
  {
   "category": "nexus_other",
@@ -7963,7 +8339,8 @@
    "(sign up|sign-up|schedul)",
    "(teacher)"
   ],
-  "direct_q": "How do I schedule a tutorial with a teacher?"
+  "direct_q": "How do I schedule a tutorial with a teacher?",
+  "holdout": false
  },
  {
   "category": "nexus_other",
@@ -7983,7 +8360,8 @@
    "(sign up|sign-up|schedul)",
    "(teacher)"
   ],
-  "direct_q": "How do I schedule a tutorial with a teacher?"
+  "direct_q": "How do I schedule a tutorial with a teacher?",
+  "holdout": false
  },
  {
   "category": "nexus_other",
@@ -8003,7 +8381,8 @@
    "office[- ]hours",
    "(teacher)"
   ],
-  "direct_q": "What is a tutorial?"
+  "direct_q": "What is a tutorial?",
+  "holdout": false
  },
  {
   "category": "nexus_other",
@@ -8023,7 +8402,8 @@
    "office[- ]hours",
    "(teacher)"
   ],
-  "direct_q": "What is a tutorial?"
+  "direct_q": "What is a tutorial?",
+  "holdout": false
  },
  {
   "category": "nexus_other",
@@ -8042,7 +8422,8 @@
   "expect": [
    "(Attendance Reporting Form)"
   ],
-  "direct_q": "How do I report my child's absence?"
+  "direct_q": "How do I report my child's absence?",
+  "holdout": false
  },
  {
   "category": "nexus_other",
@@ -8061,7 +8442,8 @@
   "expect": [
    "(Attendance Reporting Form)"
   ],
-  "direct_q": "How do I report my child's absence?"
+  "direct_q": "How do I report my child's absence?",
+  "holdout": false
  },
  {
   "category": "nexus_other",
@@ -8080,7 +8462,8 @@
   "expect": [
    "(Blackbaud)"
   ],
-  "direct_q": "How do I submit my course requests?"
+  "direct_q": "How do I submit my course requests?",
+  "holdout": false
  },
  {
   "category": "nexus_other",
@@ -8099,7 +8482,8 @@
   "expect": [
    "(Blackbaud)"
   ],
-  "direct_q": "How do I submit my course requests?"
+  "direct_q": "How do I submit my course requests?",
+  "holdout": false
  },
  {
   "category": "nexus_other",
@@ -8118,7 +8502,8 @@
   "expect": [
    "(work permit)"
   ],
-  "direct_q": "How do I request a work permit?"
+  "direct_q": "How do I request a work permit?",
+  "holdout": false
  },
  {
   "category": "nexus_other",
@@ -8137,7 +8522,8 @@
   "expect": [
    "(work permit)"
   ],
-  "direct_q": "How do I request a work permit?"
+  "direct_q": "How do I request a work permit?",
+  "holdout": false
  },
  {
   "category": "traps",
@@ -8158,7 +8544,8 @@
   "expect": [
    "(basketball|soccer|volleyball|tennis|golf|swim|track|cross)"
   ],
-  "direct_q": "Does Nueva have a hockey team?"
+  "direct_q": "Does Nueva have a hockey team?",
+  "holdout": false
  },
  {
   "category": "traps",
@@ -8179,7 +8566,8 @@
   "expect": [
    "(basketball|soccer|volleyball|tennis|golf|swim|track|cross)"
   ],
-  "direct_q": "Does Nueva have a hockey team?"
+  "direct_q": "Does Nueva have a hockey team?",
+  "holdout": false
  },
  {
   "category": "traps",
@@ -8198,7 +8586,8 @@
   "expect": [
    "(no|closed|break)"
   ],
-  "direct_q": "Is school open on Christmas Day?"
+  "direct_q": "Is school open on Christmas Day?",
+  "holdout": false
  },
  {
   "category": "traps",
@@ -8217,7 +8606,8 @@
   "expect": [
    "(no|closed|break)"
   ],
-  "direct_q": "Is school open on Christmas Day?"
+  "direct_q": "Is school open on Christmas Day?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -8236,7 +8626,8 @@
   "expect": [
    "\\b(no|not|doesn't|does not)\\b"
   ],
-  "direct_q": "Does Nueva have an ice hockey team?"
+  "direct_q": "Does Nueva have an ice hockey team?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -8255,7 +8646,8 @@
   "expect": [
    "\\b(no|not|doesn't|does not)\\b"
   ],
-  "direct_q": "Does Nueva have an ice hockey team?"
+  "direct_q": "Does Nueva have an ice hockey team?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -8277,7 +8669,8 @@
    "\\b(no|not|isn't|doesn't|does not)\\b",
    "softball"
   ],
-  "direct_q": "MaxPreps lists a Nueva girls softball team, is that right?"
+  "direct_q": "MaxPreps lists a Nueva girls softball team, is that right?",
+  "holdout": false
  },
  {
   "category": "athletics_teams",
@@ -8299,7 +8692,8 @@
    "\\b(no|not|isn't|doesn't|does not)\\b",
    "softball"
   ],
-  "direct_q": "MaxPreps lists a Nueva girls softball team, is that right?"
+  "direct_q": "MaxPreps lists a Nueva girls softball team, is that right?",
+  "holdout": false
  },
  {
   "category": "multi_part_follow_up",
@@ -8320,7 +8714,8 @@
    "3:10",
    "11:30"
   ],
-  "direct_q": "What time does school start, end, and when is lunch?"
+  "direct_q": "What time does school start, end, and when is lunch?",
+  "holdout": false
  },
  {
   "category": "multi_part_follow_up",
@@ -8341,7 +8736,8 @@
    "3:10",
    "11:30"
   ],
-  "direct_q": "What time does school start, end, and when is lunch?"
+  "direct_q": "What time does school start, end, and when is lunch?",
+  "holdout": false
  },
  {
   "category": "multi_part_follow_up",
@@ -8361,7 +8757,8 @@
    "Zomber",
    "112"
   ],
-  "direct_q": "Who teaches Intro to CAD and what room is it in?"
+  "direct_q": "Who teaches Intro to CAD and what room is it in?",
+  "holdout": false
  },
  {
   "category": "multi_part_follow_up",
@@ -8390,7 +8787,8 @@
    "Zomber",
    "112"
   ],
-  "direct_q": "Who teaches Intro to CAD and what room is it in?"
+  "direct_q": "Who teaches Intro to CAD and what room is it in?",
+  "holdout": false
  },
  {
   "category": "multi_part_follow_up",
@@ -8410,7 +8808,8 @@
    "\\bno\\b",
    "(Nov(ember)? 30)"
   ],
-  "direct_q": "Is there school on November 27 and when do classes resume?"
+  "direct_q": "Is there school on November 27 and when do classes resume?",
+  "holdout": false
  },
  {
   "category": "multi_part_follow_up",
@@ -8430,7 +8829,8 @@
    "\\bno\\b",
    "(Nov(ember)? 30)"
   ],
-  "direct_q": "Is there school on November 27 and when do classes resume?"
+  "direct_q": "Is there school on November 27 and when do classes resume?",
+  "holdout": false
  },
  {
   "category": "multi_part_follow_up",
@@ -8459,7 +8859,8 @@
    "(Block 1|block 1)",
    "112"
   ],
-  "direct_q": "Which block and room?"
+  "direct_q": "Which block and room?",
+  "holdout": false
  },
  {
   "category": "multi_part_follow_up",
@@ -8488,7 +8889,8 @@
    "(Block 1|block 1)",
    "112"
   ],
-  "direct_q": "Which block and room?"
+  "direct_q": "Which block and room?",
+  "holdout": false
  },
  {
   "category": "multi_part_follow_up",
@@ -8518,7 +8920,8 @@
    "after school",
    "I-Lab|Norgan"
   ],
-  "direct_q": "When does it meet?"
+  "direct_q": "When does it meet?",
+  "holdout": false
  },
  {
   "category": "multi_part_follow_up",
@@ -8548,7 +8951,8 @@
    "after school",
    "I-Lab|Norgan"
   ],
-  "direct_q": "When does it meet?"
+  "direct_q": "When does it meet?",
+  "holdout": false
  },
  {
   "category": "multi_part_follow_up",
@@ -8576,7 +8980,8 @@
   "expect": [
    "(flag football|cross.?country|soccer|basketball)"
   ],
-  "direct_q": "what about middle school?"
+  "direct_q": "what about middle school?",
+  "holdout": false
  },
  {
   "category": "multi_part_follow_up",
@@ -8604,7 +9009,8 @@
   "expect": [
    "(flag football|cross.?country|soccer|basketball)"
   ],
-  "direct_q": "what about middle school?"
+  "direct_q": "what about middle school?",
+  "holdout": false
  },
  {
   "category": "multi_part_follow_up",
@@ -8624,7 +9030,8 @@
    "131 E",
    "650[-\\s.]?235[-\\s.]?7100"
   ],
-  "direct_q": "Where is the upper school and what's the front desk number?"
+  "direct_q": "Where is the upper school and what's the front desk number?",
+  "holdout": false
  },
  {
   "category": "multi_part_follow_up",
@@ -8644,7 +9051,8 @@
    "131 E",
    "650[-\\s.]?235[-\\s.]?7100"
   ],
-  "direct_q": "Where is the upper school and what's the front desk number?"
+  "direct_q": "Where is the upper school and what's the front desk number?",
+  "holdout": false
  },
  {
   "category": "multi_part_follow_up",
@@ -8672,7 +9080,8 @@
   "expect": [
    "Amy Hunt|leader"
   ],
-  "direct_q": "who leads it"
+  "direct_q": "who leads it",
+  "holdout": false
  },
  {
   "category": "multi_part_follow_up",
@@ -8700,7 +9109,8 @@
   "expect": [
    "Amy Hunt|leader"
   ],
-  "direct_q": "who leads it"
+  "direct_q": "who leads it",
+  "holdout": false
  },
  {
   "category": "multi_part_follow_up",
@@ -8720,7 +9130,8 @@
    "1:55",
    "3:10"
   ],
-  "direct_q": "wat time is blok 3 on A' day"
+  "direct_q": "wat time is blok 3 on A' day",
+  "holdout": false
  },
  {
   "category": "multi_part_follow_up",
@@ -8740,7 +9151,8 @@
    "1:55",
    "3:10"
   ],
-  "direct_q": "wat time is blok 3 on A' day"
+  "direct_q": "wat time is blok 3 on A' day",
+  "holdout": false
  },
  {
   "category": "campus_logistics",
@@ -8760,7 +9172,8 @@
    "8:10",
    "3:15"
   ],
-  "direct_q": "What time does middle school start and end?"
+  "direct_q": "What time does middle school start and end?",
+  "holdout": false
  },
  {
   "category": "campus_logistics",
@@ -8780,7 +9193,8 @@
    "8:10",
    "3:15"
   ],
-  "direct_q": "What time does middle school start and end?"
+  "direct_q": "What time does middle school start and end?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -8800,7 +9214,8 @@
    "\\bMar[a-z]*\\.?\\s+18\\b",
    "(?<![\\d:])21(?![\\d:])"
   ],
-  "direct_q": "When is the MS musical?"
+  "direct_q": "When is the MS musical?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -8820,7 +9235,8 @@
    "\\bMar[a-z]*\\.?\\s+18\\b",
    "(?<![\\d:])21(?![\\d:])"
   ],
-  "direct_q": "When is the MS musical?"
+  "direct_q": "When is the MS musical?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -8839,7 +9255,8 @@
   "expect": [
    "\\bJun[a-z]*\\.?\\s+2\\b"
   ],
-  "direct_q": "When is Step Up Day?"
+  "direct_q": "When is Step Up Day?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -8858,7 +9275,8 @@
   "expect": [
    "\\bJun[a-z]*\\.?\\s+2\\b"
   ],
-  "direct_q": "When is Step Up Day?"
+  "direct_q": "When is Step Up Day?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -8878,7 +9296,8 @@
    "\\bMay[a-z]*\\.?\\s+11\\b",
    "(?<![\\d:])20(?![\\d:])"
   ],
-  "direct_q": "When is the 8th grade trip?"
+  "direct_q": "When is the 8th grade trip?",
+  "holdout": false
  },
  {
   "category": "calendar_schedules",
@@ -8898,7 +9317,8 @@
    "\\bMay[a-z]*\\.?\\s+11\\b",
    "(?<![\\d:])20(?![\\d:])"
   ],
-  "direct_q": "When is the 8th grade trip?"
+  "direct_q": "When is the 8th grade trip?",
+  "holdout": false
  },
  {
   "category": "events",
@@ -8918,7 +9338,8 @@
    "\\bMar[a-z]*\\.?\\s+11\\b",
    "\\bMay[a-z]*\\.?\\s+27\\b"
   ],
-  "direct_q": "When is the 7th grade Shakespeare performance?"
+  "direct_q": "When is the 7th grade Shakespeare performance?",
+  "holdout": false
  },
  {
   "category": "events",
@@ -8938,7 +9359,1601 @@
    "\\bMar[a-z]*\\.?\\s+11\\b",
    "\\bMay[a-z]*\\.?\\s+27\\b"
   ],
-  "direct_q": "When is the 7th grade Shakespeare performance?"
+  "direct_q": "When is the 7th grade Shakespeare performance?",
+  "holdout": false
+ },
+ {
+  "category": "calendar_schedules",
+  "persona": "current_parent",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "cal-01~h1",
+  "source_id": "cal-01",
+  "phrasing": "casual",
+  "q": "what days do we have off for thanksgiving",
+  "history": [],
+  "expect": [
+   "\\bNov[a-z]*\\.?\\s+23\\b",
+   "(?<![\\d:])27(?![\\d:])"
+  ],
+  "direct_q": "When is Thanksgiving break this year?",
+  "holdout": true
+ },
+ {
+  "category": "calendar_schedules",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "cal-02~h1",
+  "source_id": "cal-02",
+  "phrasing": "casual",
+  "q": "when does christmas break start and when's the first day back",
+  "history": [],
+  "expect": [
+   "\\bDec[a-z]*\\.?\\s+21\\b",
+   [
+    "\\bJan[a-z]*\\.?\\s+4\\b",
+    "\\bJan[a-z]*\\.?\\s+5\\b"
+   ]
+  ],
+  "direct_q": "When does winter break start and when do we come back?",
+  "holdout": true
+ },
+ {
+  "category": "calendar_schedules",
+  "persona": "current_parent",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "cal-03~h1",
+  "source_id": "cal-03",
+  "phrasing": "indirect",
+  "q": "what's the final day of classes before summer",
+  "history": [],
+  "expect": [
+   "\\bJun[a-z]*\\.?\\s+4\\b"
+  ],
+  "direct_q": "What is the last day of school this year?",
+  "holdout": true
+ },
+ {
+  "category": "calendar_schedules",
+  "persona": "prospective_family",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "cal-04~h1",
+  "source_id": "cal-04",
+  "phrasing": "casual",
+  "q": "when do seniors graduate",
+  "history": [],
+  "expect": [
+   "\\bJun[a-z]*\\.?\\s+6\\b",
+   "2\\s*(PM|p\\.m\\.)|2:00"
+  ],
+  "direct_q": "When is graduation?",
+  "holdout": true
+ },
+ {
+  "category": "calendar_schedules",
+  "persona": "current_parent",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "cal-06~h1",
+  "source_id": "cal-06",
+  "phrasing": "parent",
+  "q": "Which week is spring break? Trying to plan a trip.",
+  "history": [],
+  "expect": [
+   "\\bMar[a-z]*\\.?\\s+29\\b",
+   [
+    "\\bApr[a-z]*\\.?\\s+2\\b",
+    "(?<![\\d:])2(?![\\d:])"
+   ]
+  ],
+  "direct_q": "When is spring break?",
+  "holdout": true
+ },
+ {
+  "category": "calendar_schedules",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "cal-09~h1",
+  "source_id": "cal-09",
+  "phrasing": "slang",
+  "q": "winter formal when??",
+  "history": [],
+  "expect": [
+   "\\bJan[a-z]*\\.?\\s+29\\b",
+   "7\\s*(PM|p\\.m\\.)?\\s*(-|to)\\s*9:30"
+  ],
+  "direct_q": "when's winter formal",
+  "holdout": true
+ },
+ {
+  "category": "calendar_schedules",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "cal-10~h1",
+  "source_id": "cal-10",
+  "phrasing": "indirect",
+  "q": "is prom in april or may, and what time",
+  "history": [],
+  "expect": [
+   "\\bApr[a-z]*\\.?\\s+24\\b",
+   "6\\s*(PM)?\\s*(-|to)\\s*11"
+  ],
+  "direct_q": "when is prom",
+  "holdout": true
+ },
+ {
+  "category": "calendar_schedules",
+  "persona": "current_parent",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "cal-13~h1",
+  "source_id": "cal-13",
+  "phrasing": "casual",
+  "q": "what week is intersession this year",
+  "history": [],
+  "expect": [
+   "\\bJan[a-z]*\\.?\\s+5\\b",
+   "(?<![\\d:])8(?![\\d:])"
+  ],
+  "direct_q": "When is Intersession for the upper school?",
+  "holdout": true
+ },
+ {
+  "category": "calendar_schedules",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "cal-18~h1",
+  "source_id": "cal-18",
+  "phrasing": "casual",
+  "q": "is jan 4 a school day",
+  "history": [],
+  "expect": [
+   "\\bno\\b",
+   "Professional Development|PD"
+  ],
+  "direct_q": "Is there school on Monday January 4?",
+  "holdout": true
+ },
+ {
+  "category": "day_types",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [
+   "A['’]|B day"
+  ],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "day-03~h1",
+  "source_id": "day-03",
+  "phrasing": "casual",
+  "q": "what kind of day is it on november 30th",
+  "history": [],
+  "expect": [
+   "\\bA day\\b"
+  ],
+  "direct_q": "What kind of day is Monday November 30?",
+  "holdout": true
+ },
+ {
+  "category": "day_types",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "day-06~h1",
+  "source_id": "day-06",
+  "phrasing": "casual",
+  "q": "which blocks do we have on b days",
+  "history": [],
+  "expect": [
+   "5",
+   "8"
+  ],
+  "direct_q": "Which blocks meet on B days?",
+  "holdout": true
+ },
+ {
+  "category": "day_types",
+  "persona": "current_parent",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": [
+   "November 27, 2026 - No classes"
+  ],
+  "id": "day-08~h1",
+  "source_id": "day-08",
+  "phrasing": "casual",
+  "q": "are we off the day after thanksgiving",
+  "history": [],
+  "expect": [
+   "\\bno\\b",
+   "(Nov(ember)? 27|break)"
+  ],
+  "direct_q": "Is there school the day after Thanksgiving?",
+  "holdout": true
+ },
+ {
+  "category": "day_types",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "day-12~h1",
+  "source_id": "day-12",
+  "phrasing": "abbrev",
+  "q": "12/3 a or b day?",
+  "history": [],
+  "expect": [
+   "A['’]|A prime"
+  ],
+  "direct_q": "What day type is December 3?",
+  "holdout": true
+ },
+ {
+  "category": "bell_schedule",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "bell-01~h1",
+  "source_id": "bell-01",
+  "phrasing": "casual",
+  "q": "block 2 is from when to when",
+  "history": [],
+  "expect": [
+   "10:15",
+   "11:30"
+  ],
+  "direct_q": "What time is Block 2?",
+  "holdout": true
+ },
+ {
+  "category": "bell_schedule",
+  "persona": "current_parent",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "bell-03~h1",
+  "source_id": "bell-03",
+  "phrasing": "casual",
+  "q": "what time do i have to be at school and when is it over",
+  "history": [],
+  "expect": [
+   "8:55",
+   "3:10"
+  ],
+  "direct_q": "What time does school start and end for the upper school?",
+  "holdout": true
+ },
+ {
+  "category": "bell_schedule",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "bell-04~h1",
+  "source_id": "bell-04",
+  "phrasing": "casual",
+  "q": "how long is lunch break",
+  "history": [],
+  "expect": [
+   "11:30",
+   "12:(00|30)"
+  ],
+  "direct_q": "How long is lunch?",
+  "holdout": true
+ },
+ {
+  "category": "bell_schedule",
+  "persona": "prospective_family",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "bell-07~h1",
+  "source_id": "bell-07",
+  "phrasing": "casual",
+  "q": "how many classes do we have per day",
+  "history": [],
+  "expect": [
+   "\\b(4|four)\\b"
+  ],
+  "direct_q": "How many classes do upper school students have each day?",
+  "holdout": true
+ },
+ {
+  "category": "athletics_teams",
+  "persona": "prospective_family",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "ath-01~h1",
+  "source_id": "ath-01",
+  "phrasing": "casual",
+  "q": "which sports can you do at nueva",
+  "history": [],
+  "expect": [
+   "cross.?country",
+   "volleyball",
+   "basketball",
+   "soccer",
+   "tennis",
+   "golf",
+   "swim"
+  ],
+  "direct_q": "What sports does Nueva offer?",
+  "holdout": true
+ },
+ {
+  "category": "athletics_teams",
+  "persona": "prospective_family",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "ath-03~h1",
+  "source_id": "ath-03",
+  "phrasing": "casual",
+  "q": "what can i play this winter",
+  "history": [],
+  "expect": [
+   "basketball",
+   "soccer"
+  ],
+  "direct_q": "What sports can I play in the winter?",
+  "holdout": true
+ },
+ {
+  "category": "athletics_teams",
+  "persona": "community_member",
+  "campus": null,
+  "behavior": "no_such_thing",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": [
+   "Flag Football"
+  ],
+  "id": "ath-05~h1",
+  "source_id": "ath-05",
+  "phrasing": "casual",
+  "q": "is there a football team here",
+  "history": [],
+  "expect": [
+   "flag football"
+  ],
+  "direct_q": "Does Nueva have a football team?",
+  "holdout": true
+ },
+ {
+  "category": "athletics_teams",
+  "persona": "current_parent",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "ath-11~h1",
+  "source_id": "ath-11",
+  "phrasing": "casual",
+  "q": "who's in charge of sports at nueva",
+  "history": [],
+  "expect": [
+   "Brett McCabe"
+  ],
+  "direct_q": "Who is the athletic director?",
+  "holdout": true
+ },
+ {
+  "category": "athletics_teams",
+  "persona": "current_parent",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "ath-13~h1",
+  "source_id": "ath-13",
+  "phrasing": "abbrev",
+  "q": "what league is nueva in",
+  "history": [],
+  "expect": [
+   "PSAL|Private School Athletic League",
+   "WBAL|West Bay"
+  ],
+  "direct_q": "What league do the upper school teams play in?",
+  "holdout": true
+ },
+ {
+  "category": "athletics_teams",
+  "persona": "prospective_family",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "ath-16~h1",
+  "source_id": "ath-16",
+  "phrasing": "casual",
+  "q": "do we have a trainer for injuries",
+  "history": [],
+  "expect": [
+   "(certified )?athletic trainer",
+   "full-time"
+  ],
+  "direct_q": "Does the school have an athletic trainer?",
+  "holdout": true
+ },
+ {
+  "category": "athletics_teams",
+  "persona": "community_member",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "cov-17~h1",
+  "source_id": "cov-17",
+  "phrasing": "casual",
+  "q": "what's the nueva mascot",
+  "history": [],
+  "expect": [
+   "blue",
+   "Maverick"
+  ],
+  "direct_q": "What are Nueva's school colors and mascot?",
+  "holdout": true
+ },
+ {
+  "category": "athletics_teams",
+  "persona": "current_parent",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "sp-09~h1",
+  "source_id": "sp-09",
+  "phrasing": "casual",
+  "q": "which teams have a jv squad",
+  "history": [],
+  "expect": [
+   "JV",
+   "(volleyball|tennis|basketball)"
+  ],
+  "direct_q": "Which upper school teams have a JV team?",
+  "holdout": true
+ },
+ {
+  "category": "athletics_teams",
+  "persona": "current_parent",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "sp-05~h1",
+  "source_id": "sp-05",
+  "phrasing": "casual",
+  "q": "where are girls soccer home games played",
+  "history": [],
+  "expect": [
+   "Skyline"
+  ],
+  "direct_q": "Where does the girls soccer team play its home games?",
+  "holdout": true
+ },
+ {
+  "category": "athletics_games",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": {
+   "as_of": "2026-11-11",
+   "valid_through": "2026-12-07",
+   "resolver": null,
+   "note": ""
+  },
+  "verified": true,
+  "retr": null,
+  "id": "gm-03~h1",
+  "source_id": "gm-03",
+  "phrasing": "casual",
+  "q": "varsity boys basketball dec 8 who do they play",
+  "history": [],
+  "expect": [
+   "Pinewood"
+  ],
+  "direct_q": "Who do the varsity boys play on December 8?",
+  "holdout": true
+ },
+ {
+  "category": "athletics_games",
+  "persona": "current_parent",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": {
+   "as_of": "2026-11-11",
+   "valid_through": "2026-11-16",
+   "resolver": null,
+   "note": ""
+  },
+  "verified": true,
+  "retr": null,
+  "id": "gm-05~h1",
+  "source_id": "gm-05",
+  "phrasing": "casual",
+  "q": "who's jv boys basketball playing on nov 17, what time",
+  "history": [],
+  "expect": [
+   "CSD Fremont",
+   "5:30"
+  ],
+  "direct_q": "Who is the JV boys basketball team playing on November 17 and what time?",
+  "holdout": true
+ },
+ {
+  "category": "athletics_games",
+  "persona": "ms_student",
+  "campus": "hillsborough",
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": {
+   "as_of": "2026-11-11",
+   "valid_through": "2026-11-11",
+   "resolver": {
+    "type": "next_event",
+    "match": "Boys' Basketball",
+    "kind": "game"
+   },
+   "note": ""
+  },
+  "verified": true,
+  "retr": null,
+  "id": "gm-12~h1",
+  "source_id": "gm-12",
+  "phrasing": "casual",
+  "q": "next middle school boys basketball game?",
+  "history": [],
+  "expect": [
+   "(Woodside Priory|Sacred Heart|Harker|Episcopal)"
+  ],
+  "direct_q": "When is the next MS boys basketball game?",
+  "holdout": true
+ },
+ {
+  "category": "athletics_games",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": {
+   "as_of": "2026-11-11",
+   "valid_through": "2026-11-18",
+   "resolver": null,
+   "note": ""
+  },
+  "verified": true,
+  "retr": null,
+  "id": "gm-17~h1",
+  "source_id": "gm-17",
+  "phrasing": "casual",
+  "q": "what dates does girls basketball play design tech",
+  "history": [],
+  "expect": [
+   "\\bNov[a-z]*\\.?\\s+19\\b",
+   "\\bDec[a-z]*\\.?\\s+16\\b"
+  ],
+  "direct_q": "When does girls basketball play Design Tech?",
+  "holdout": true
+ },
+ {
+  "category": "athletics_games",
+  "persona": "current_parent",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": {
+   "as_of": "2026-11-11",
+   "valid_through": "2026-11-30",
+   "resolver": null,
+   "note": ""
+  },
+  "verified": true,
+  "retr": null,
+  "id": "sp-12~h1",
+  "source_id": "sp-12",
+  "phrasing": "casual",
+  "q": "girls basketball vs burlingame, when is that",
+  "history": [],
+  "expect": [
+   "\\bDec[a-z]*\\.?\\s+1\\b",
+   "5:30"
+  ],
+  "direct_q": "When is the girls basketball game against Burlingame?",
+  "holdout": true
+ },
+ {
+  "category": "clubs_activities",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "club-01~h1",
+  "source_id": "club-01",
+  "phrasing": "casual",
+  "q": "what day is chess club and where",
+  "history": [],
+  "expect": [
+   "Wednesday",
+   "after school",
+   "340"
+  ],
+  "direct_q": "When does Chess Club meet?",
+  "holdout": true
+ },
+ {
+  "category": "clubs_activities",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "club-04~h1",
+  "source_id": "club-04",
+  "phrasing": "casual",
+  "q": "who's the teacher for mock trial",
+  "history": [],
+  "expect": [
+   "Lindy Jensen",
+   "Sushu Xia"
+  ],
+  "direct_q": "Who is the faculty advisor for Mock Trial?",
+  "holdout": true
+ },
+ {
+  "category": "clubs_activities",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "club-05~h1",
+  "source_id": "club-05",
+  "phrasing": "abbrev",
+  "q": "MUN meeting day and room?",
+  "history": [],
+  "expect": [
+   "Tuesday",
+   "lunch",
+   "1103"
+  ],
+  "direct_q": "when does MUN meet",
+  "holdout": true
+ },
+ {
+  "category": "clubs_activities",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "club-07~h1",
+  "source_id": "club-07",
+  "phrasing": "casual",
+  "q": "is mahjong club a thing",
+  "history": [],
+  "expect": [
+   "Friday",
+   "lunch",
+   "219"
+  ],
+  "direct_q": "Is there a mahjong club?",
+  "holdout": true
+ },
+ {
+  "category": "clubs_activities",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "club-15~h1",
+  "source_id": "club-15",
+  "phrasing": "casual",
+  "q": "what's the process for starting a club",
+  "history": [],
+  "expect": [
+   "(form|application|proposal)",
+   "advisor"
+  ],
+  "direct_q": "How do I start a new club?",
+  "holdout": true
+ },
+ {
+  "category": "staff_contacts",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "staff-01~h1",
+  "source_id": "staff-01",
+  "phrasing": "casual",
+  "q": "who do i have for mechanical engineering",
+  "history": [],
+  "expect": [
+   "Norgan"
+  ],
+  "direct_q": "Who teaches Mechanical Engineering?",
+  "holdout": true
+ },
+ {
+  "category": "staff_contacts",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "staff-06~h1",
+  "source_id": "staff-06",
+  "phrasing": "casual",
+  "q": "what does max cowan teach besides that",
+  "history": [],
+  "expect": [
+   "Sound Experience"
+  ],
+  "direct_q": "What other classes does Max Cowan teach?",
+  "holdout": true
+ },
+ {
+  "category": "staff_contacts",
+  "persona": "community_member",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "staff-07~h1",
+  "source_id": "staff-07",
+  "phrasing": "casual",
+  "q": "phone number for the upper school office",
+  "history": [],
+  "expect": [
+   "650[-\\s.]?235[-\\s.]?7100"
+  ],
+  "direct_q": "What is the front desk phone number at the San Mateo campus?",
+  "holdout": true
+ },
+ {
+  "category": "staff_contacts",
+  "persona": "current_parent",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "staff-09~h1",
+  "source_id": "staff-09",
+  "phrasing": "casual",
+  "q": "what's the nurse's email",
+  "history": [],
+  "expect": [
+   "nurse@nuevaschool\\.org"
+  ],
+  "direct_q": "How do I contact the school nurse?",
+  "holdout": true
+ },
+ {
+  "category": "staff_contacts",
+  "persona": "current_parent",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "staff-11~h1",
+  "source_id": "staff-11",
+  "phrasing": "casual",
+  "q": "who's the head of the upper school",
+  "history": [],
+  "expect": [
+   "Liza Raynal"
+  ],
+  "direct_q": "Who is the Upper School division head?",
+  "holdout": true
+ },
+ {
+  "category": "staff_contacts",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "cov-23~h1",
+  "source_id": "cov-23",
+  "phrasing": "casual",
+  "q": "my laptop won't connect, who do i contact",
+  "history": [],
+  "expect": [
+   "techhelp@nuevaschool\\.org"
+  ],
+  "direct_q": "What is the email for IT help?",
+  "holdout": true
+ },
+ {
+  "category": "staff_contacts",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "cov-27~h1",
+  "source_id": "cov-27",
+  "phrasing": "casual",
+  "q": "who do i ask for a transcript",
+  "history": [],
+  "expect": [
+   "Zermani"
+  ],
+  "direct_q": "Who is the registrar?",
+  "holdout": true
+ },
+ {
+  "category": "policies_handbook",
+  "persona": "prospective_family",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "pol-01~h1",
+  "source_id": "pol-01",
+  "phrasing": "casual",
+  "q": "are we allowed to use phones during class",
+  "history": [],
+  "expect": [
+   "(put|stored|kept) away|away",
+   "(class|advisory)",
+   "(passing|lunch)"
+  ],
+  "direct_q": "What is the cell phone policy?",
+  "holdout": true
+ },
+ {
+  "category": "policies_handbook",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "pol-05~h1",
+  "source_id": "pol-05",
+  "phrasing": "casual",
+  "q": "at what point am i counted tardy",
+  "history": [],
+  "expect": [
+   "1\\s*(and|to|-)\\s*24 minutes"
+  ],
+  "direct_q": "What counts as a tardy?",
+  "holdout": true
+ },
+ {
+  "category": "policies_handbook",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "pol-09~h1",
+  "source_id": "pol-09",
+  "phrasing": "casual",
+  "q": "can juniors and seniors go off campus",
+  "history": [],
+  "expect": [
+   "(11|juniors)",
+   "(12|seniors)",
+   "(permission|form)"
+  ],
+  "direct_q": "Who has open campus privileges?",
+  "holdout": true
+ },
+ {
+  "category": "policies_handbook",
+  "persona": "prospective_family",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "pol-10~h1",
+  "source_id": "pol-10",
+  "phrasing": "casual",
+  "q": "what's nueva's dress code like",
+  "history": [],
+  "expect": [
+   "respectful",
+   "appropriate"
+  ],
+  "direct_q": "What's the dress code?",
+  "holdout": true
+ },
+ {
+  "category": "policies_handbook",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "pol-11~h1",
+  "source_id": "pol-11",
+  "phrasing": "casual",
+  "q": "are we allowed to use chatgpt for schoolwork",
+  "history": [],
+  "expect": [
+   "(cite|citation)",
+   "(by course|each course|teacher|course)"
+  ],
+  "direct_q": "Can I use ChatGPT on homework?",
+  "holdout": true
+ },
+ {
+  "category": "lunch",
+  "persona": "us_student",
+  "campus": "san_mateo",
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": {
+   "as_of": "2026-11-11",
+   "valid_through": "2026-11-30",
+   "resolver": null,
+   "note": ""
+  },
+  "verified": true,
+  "retr": null,
+  "id": "lun-01~h1",
+  "source_id": "lun-01",
+  "phrasing": "casual",
+  "q": "san mateo lunch on nov 12?",
+  "history": [],
+  "expect": [
+   "Chicken Parmesan",
+   "Eggplant Parmesan"
+  ],
+  "direct_q": "What's for lunch at San Mateo on November 12?",
+  "holdout": true
+ },
+ {
+  "category": "lunch",
+  "persona": "us_student",
+  "campus": "san_mateo",
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "lun-07~h1",
+  "source_id": "lun-07",
+  "phrasing": "casual",
+  "q": "what time does the san mateo cafe open and close",
+  "history": [],
+  "expect": [
+   "11(:00)?\\s*(am|a\\.m\\.)?\\s*(-|to)\\s*1(:00)?\\s*(pm|p\\.m\\.)?"
+  ],
+  "direct_q": "What are the cafe hours at San Mateo?",
+  "holdout": true
+ },
+ {
+  "category": "events",
+  "persona": "community_member",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": {
+   "as_of": "2026-11-11",
+   "valid_through": "2026-12-09",
+   "resolver": null,
+   "note": ""
+  },
+  "verified": true,
+  "retr": null,
+  "id": "ev-01~h1",
+  "source_id": "ev-01",
+  "phrasing": "casual",
+  "q": "evening of the arts is when?",
+  "history": [],
+  "expect": [
+   "\\bDec[a-z]*\\.?\\s+10\\b",
+   "6\\s*(PM|p\\.m\\.)?\\s*(-|to|\\u2013)\\s*8"
+  ],
+  "direct_q": "When is Evening of the Arts?",
+  "holdout": true
+ },
+ {
+  "category": "events",
+  "persona": "current_parent",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": {
+   "as_of": "2026-11-11",
+   "valid_through": "2027-02-02",
+   "resolver": null,
+   "note": ""
+  },
+  "verified": true,
+  "retr": null,
+  "id": "ev-04~h1",
+  "source_id": "ev-04",
+  "phrasing": "casual",
+  "q": "what night is the us trips info session",
+  "history": [],
+  "expect": [
+   "\\bFeb[a-z]*\\.?\\s+3\\b",
+   "6"
+  ],
+  "direct_q": "When is the US Trips Info Night?",
+  "holdout": true
+ },
+ {
+  "category": "admissions_parent",
+  "persona": "prospective_family",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "adm-01~h1",
+  "source_id": "adm-01",
+  "phrasing": "casual",
+  "q": "how can i tour the school",
+  "history": [],
+  "expect": [
+   "ravenna-hub\\.com"
+  ],
+  "direct_q": "How do I book a campus tour?",
+  "holdout": true
+ },
+ {
+  "category": "admissions_parent",
+  "persona": "prospective_family",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "adm-02~h1",
+  "source_id": "adm-02",
+  "phrasing": "casual",
+  "q": "what's the fee for applying",
+  "history": [],
+  "expect": [
+   "\\$100"
+  ],
+  "direct_q": "How much is the application fee?",
+  "holdout": true
+ },
+ {
+  "category": "admissions_parent",
+  "persona": "prospective_family",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "adm-04~h1",
+  "source_id": "adm-04",
+  "phrasing": "casual",
+  "q": "when will we know if my kid got in",
+  "history": [],
+  "expect": [
+   "\\bMar[a-z]*\\.?\\s+12\\b"
+  ],
+  "direct_q": "When are admissions decisions released?",
+  "holdout": true
+ },
+ {
+  "category": "admissions_parent",
+  "persona": "community_member",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "adm-09~h1",
+  "source_id": "adm-09",
+  "phrasing": "casual",
+  "q": "where do i donate",
+  "history": [],
+  "expect": [
+   "givecampus\\.com"
+  ],
+  "direct_q": "How can I donate to Nueva?",
+  "holdout": true
+ },
+ {
+  "category": "admissions_parent",
+  "persona": "prospective_family",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "adm-11~h1",
+  "source_id": "adm-11",
+  "phrasing": "parent",
+  "q": "What does a year at Nueva cost?",
+  "history": [],
+  "expect": [
+   "(48,785|65,065)"
+  ],
+  "direct_q": "How much is tuition?",
+  "holdout": true
+ },
+ {
+  "category": "campus_logistics",
+  "persona": "community_member",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "camp-01~h1",
+  "source_id": "camp-01",
+  "phrasing": "casual",
+  "q": "what's the high school's address",
+  "history": [],
+  "expect": [
+   "131 E(ast|\\.)? 28th",
+   "San Mateo"
+  ],
+  "direct_q": "Where is the upper school located?",
+  "holdout": true
+ },
+ {
+  "category": "campus_logistics",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "camp-06~h1",
+  "source_id": "camp-06",
+  "phrasing": "casual",
+  "q": "where do i sign up for a locker",
+  "history": [],
+  "expect": [
+   "(Locker Request Form|form)"
+  ],
+  "direct_q": "How do I get a locker?",
+  "holdout": true
+ },
+ {
+  "category": "campus_logistics",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "cov-33~h1",
+  "source_id": "cov-33",
+  "phrasing": "casual",
+  "q": "is caltrain free for students",
+  "history": [],
+  "expect": [
+   "Go Pass",
+   "(no additional cost|free)"
+  ],
+  "direct_q": "Do upper school students get a free Caltrain pass?",
+  "holdout": true
+ },
+ {
+  "category": "courses_academics",
+  "persona": "prospective_family",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [
+   "\\bFrench (1|I)\\b"
+  ],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "crs-01~h1",
+  "source_id": "crs-01",
+  "phrasing": "casual",
+  "q": "which languages can i take",
+  "history": [],
+  "expect": [
+   "Chinese",
+   "Japanese",
+   "Spanish"
+  ],
+  "direct_q": "What languages can I study at Nueva?",
+  "holdout": true
+ },
+ {
+  "category": "courses_academics",
+  "persona": "prospective_family",
+  "campus": null,
+  "behavior": "no_such_thing",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": [
+   "explicitly not designed to prepare students for AP exams"
+  ],
+  "id": "crs-05~h1",
+  "source_id": "crs-05",
+  "phrasing": "casual",
+  "q": "does nueva do ap courses",
+  "history": [],
+  "expect": [
+   "(not designed|don't|do not|doesn't|does not|no)",
+   "(AP exam|exams)"
+  ],
+  "direct_q": "Does Nueva offer AP classes?",
+  "holdout": true
+ },
+ {
+  "category": "courses_academics",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "crs-10~h1",
+  "source_id": "crs-10",
+  "phrasing": "casual",
+  "q": "software engineering - which block and room",
+  "history": [],
+  "expect": [
+   "Block 2",
+   "1105"
+  ],
+  "direct_q": "Which block is Software Engineering and where?",
+  "holdout": true
+ },
+ {
+  "category": "courses_academics",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "cov-34~h1",
+  "source_id": "cov-34",
+  "phrasing": "casual",
+  "q": "how many years of math are required",
+  "history": [],
+  "expect": [
+   "\\b(3|three)\\b"
+  ],
+  "direct_q": "How many years of math do I need to graduate?",
+  "holdout": true
+ },
+ {
+  "category": "advisory",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [
+   "room 345",
+   "Ting Zhang",
+   "McCabe"
+  ],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "adv-01~h1",
+  "source_id": "adv-01",
+  "phrasing": "casual",
+  "q": "advisory 11.1 - who and which room",
+  "history": [],
+  "expect": [
+   "Alexa Hart",
+   "Jen Paull",
+   "1102"
+  ],
+  "direct_q": "Who are the advisors for advisory 11.1 and what room?",
+  "holdout": true
+ },
+ {
+  "category": "nexus_other",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "nx-01~h1",
+  "source_id": "nx-01",
+  "phrasing": "casual",
+  "q": "where do i log into nexus",
+  "history": [],
+  "expect": [
+   "(myschoolapp\\.com|nuevaschool\\.org/nexus)"
+  ],
+  "direct_q": "How do I log in to the Nexus?",
+  "holdout": true
+ },
+ {
+  "category": "nexus_other",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "nx-07~h1",
+  "source_id": "nx-07",
+  "phrasing": "casual",
+  "q": "where's the work permit form",
+  "history": [],
+  "expect": [
+   "(work permit)"
+  ],
+  "direct_q": "How do I request a work permit?",
+  "holdout": true
+ },
+ {
+  "category": "multi_part_follow_up",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "mp-05~h1",
+  "source_id": "mp-05",
+  "phrasing": "follow_up",
+  "q": "which block, and where is it",
+  "history": [
+   {
+    "role": "user",
+    "content": "who teaches mechanical engineering"
+   },
+   {
+    "role": "assistant",
+    "content": "Dan Norgan teaches it."
+   }
+  ],
+  "expect": [
+   "(Block 1|block 1)",
+   "112"
+  ],
+  "direct_q": "Which block and room?",
+  "holdout": true
+ },
+ {
+  "category": "athletics_games",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": {
+   "as_of": "2026-11-11",
+   "valid_through": "2026-11-16",
+   "resolver": null,
+   "note": ""
+  },
+  "verified": true,
+  "retr": null,
+  "id": "gm-18~h1",
+  "source_id": "gm-18",
+  "phrasing": "follow_up",
+  "q": "ok and the jv team?",
+  "history": [
+   {
+    "role": "user",
+    "content": "when is the first varsity boys basketball game"
+   },
+   {
+    "role": "assistant",
+    "content": "The varsity opener is at home against CSD Fremont."
+   }
+  ],
+  "expect": [
+   "JV",
+   "CSD Fremont",
+   "5:30"
+  ],
+  "direct_q": "What about JV?",
+  "holdout": true
+ },
+ {
+  "category": "multi_part_follow_up",
+  "persona": "us_student",
+  "campus": null,
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "mp-12~h1",
+  "source_id": "mp-12",
+  "phrasing": "follow_up",
+  "q": "who's in charge of it",
+  "history": [
+   {
+    "role": "user",
+    "content": "when does ethics bowl meet"
+   },
+   {
+    "role": "assistant",
+    "content": "Mondays after school."
+   }
+  ],
+  "expect": [
+   "Amy Hunt|leader"
+  ],
+  "direct_q": "who leads it",
+  "holdout": true
+ },
+ {
+  "category": "campus_logistics",
+  "persona": "ms_student",
+  "campus": "hillsborough",
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "ms-01~h1",
+  "source_id": "ms-01",
+  "phrasing": "casual",
+  "q": "middle school hours?",
+  "history": [],
+  "expect": [
+   "8:10",
+   "3:15"
+  ],
+  "direct_q": "What time does middle school start and end?",
+  "holdout": true
+ },
+ {
+  "category": "calendar_schedules",
+  "persona": "ms_student",
+  "campus": "hillsborough",
+  "behavior": "answer",
+  "forbid": [],
+  "dynamic": null,
+  "verified": true,
+  "retr": null,
+  "id": "ms-03~h1",
+  "source_id": "ms-03",
+  "phrasing": "casual",
+  "q": "what days is the middle school musical on",
+  "history": [],
+  "expect": [
+   "\\bMar[a-z]*\\.?\\s+18\\b",
+   "(?<![\\d:])21(?![\\d:])"
+  ],
+  "direct_q": "When is the MS musical?",
+  "holdout": true
  },
  {
   "persona": "us_student",

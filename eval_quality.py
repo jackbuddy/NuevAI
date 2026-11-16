@@ -698,7 +698,10 @@ def main() -> int:
     ap.add_argument("--regrade", default="", help="re-grade the stored answers of an earlier llm report with the CURRENT grader (free: retrieval only, no tokens)")
     ap.add_argument("--self-test", action="store_true")
     ap.add_argument("--no-fail", action="store_true", help="always exit 0")
+    ap.add_argument("--natural", action="store_true", help="use eval/natural_set.json (natural rewordings; see eval_natural.py) instead of the golden set")
     a = ap.parse_args()
+    if a.natural:
+        a.file = str(HERE / "eval" / "natural_set.json")
     if a.self_test:
         return self_test()
     if a.regrade:

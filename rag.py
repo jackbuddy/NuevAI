@@ -124,6 +124,7 @@ SYNONYMS = {
     r"\b(spots?|openings?|seats?)\b.{0,40}\b(grade|freshm[ae]n|9th|kindergarten)\b|\b(freshm[ae]n|9th grade|kindergarten)\b.{0,30}\b(spots?|openings?|admit\w*|accepted)\b|\bhow many (kids|students|people) (get|are) (in|admitted|accepted)\b": "openings admit entry points Grade 9 new students each year",
     r"\b(i'?m|i am|im|kid is|child is|son is|daughter is|feeling|get|gets|got|stay(ing)? home|if) sick\b|\bsick\b.{0,30}\b(what|how|who|tell|email)\b|\bcall\w* (my |our )?(kid|child|son|daughter|student) in\b": "attendance reporting form absence reporting US Attendance Reporting Form absent",
     r"\b(drop|dropping|switch|switching|change|changing|swap|swapping)\b.{0,20}\b(a |my |the |out of )?(class|classes|course|courses|elective|schedule)\b": "add/drop schedule change course change request",
+    r"\b(need|needed|have|has|required?|takes?) to graduate\b|\bin order to graduate\b": "Upper School graduation requirements 2026-27 years required English History Science Math",
     r"(?-i:\bAPs\b)": "AP exams advanced placement courses not designed to prepare students for AP exams",
     r"\bfull (ride|financial (aid|assistance)|scholarship|tuition)\b|\bfree tuition\b|\bwho (gets|qualifies)\b.{0,30}\b(aid|assistance)\b": "financial assistance 100% of tuition family income qualifies",
 }
@@ -168,7 +169,7 @@ def expand_query(q: str, more: list[str] | None = None) -> str:
     extra = [w for rx, w in SYNONYMS.items() if w and re.search(rx, q, re.I)]
     # "admissions director" is filed as "Director of Admissions": add the title the way the school writes it
     extra += [f"{m.group(2)} of {m.group(1)}" for m in ROLE_INVERT.finditer(q) if m.group(1).lower() not in STOP and not re.search(r"\b(the|is|who|our|your|what|which)$", m.group(1), re.I)][:2]
-    extra += list(more or [])
+    extra += [m for m in (more or []) if m not in extra]
     return f"{q} ({' '.join(extra)})" if extra else q
 
 
@@ -972,6 +973,8 @@ class Retriever:
             link_rows = []
             _dep("links", e)
             print(f"link lookup failed: {e}", flush=True)
+        if (ip.vague_schedule or ip.sport or (intent and intent.kind == "game")) and not re.search(r"\b(tour|visit|register|registration|sign[- ]?up|rsvp|book|apply|tickets?|pay|donat\w*|buy)\b", resolved, re.I):
+            link_rows = []          # "the varsity schedule" is a games question: the word "schedule" must not pull the tour-booking cards
         try:
             events = f_cal.result(timeout=12)
         except Exception as e:
@@ -1036,7 +1039,7 @@ class Retriever:
                 docs = [d for d in docs if (d.get("metadata") or {}).get("source") not in ("calendar", "calendar_sheet") or (d.get("metadata") or {}).get("kind") == "game"]
         elif ents:
             structured = "entity"
-        elif any((p.get("metadata") or {}).get("source") in ("school_clubs", "school_advisory") for p in pinned):
+        elif any((p.get("metadata") or {}).get("source") in ("school_clubs", "school_advisory") for p in pinned) and (CLUB_Q.search(resolved) or ADVISORY_NO.search(resolved)):
             structured = "record"
         # trim only when the structured block is what was asked for (a when / where / who-do-we-play / which-block question), never for
         # a question about something else that merely names a team or a date (league, coach, forms, cost, results)
@@ -1121,7 +1124,10 @@ def select_events(events: list[dict], intent, query: str, max_events: int = 14, 
         return sum(qnorm.idf(t) for t in q & words)
     scored = [(score(e), i, e) for i, e in enumerate(events)]
     top = sorted((x for x in scored if x[0] > 0), key=lambda x: (-x[0], x[1]))[:max_events]
-    chosen = {id(x[2]) for x in top}
+    # the day record of a named holiday date ("the day after Thanksgiving" -> Nov 27) is what was asked for: never crowded out
+    hol = {d.isoformat() for d in (intent.holiday_dates if intent else [])}
+    must = [e for e in events if (e.get("metadata") or {}).get("source") in ("calendar_day", "school_day") and (e.get("metadata") or {}).get("event_date") in hol]
+    chosen = {id(e) for e in must} | {id(x[2]) for x in top[:max_events - len(must)]}
     for _, i, e in scored:                      # fill the rest in date order
         if len(chosen) >= max_events:
             break
