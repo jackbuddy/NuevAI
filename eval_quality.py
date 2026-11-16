@@ -362,7 +362,7 @@ def resolve_dynamic(item: dict, today: date, sb) -> tuple[list | None, str]:
         opp = re.search(r"Game\s+(.+?)\s+-\s+(Home|Away)\s*$", m.get("summary", ""))
         if opp:
             exp.append(re.escape(opp.group(1)))
-        return exp + [re.escape(r["match"])], f"{m['event_date']} {m.get('summary', '')[:60]}"
+        return exp, f"{m['event_date']} {m.get('summary', '')[:60]}"
     if kind == "day_type":
         d = today + timedelta(days=r.get("offset", 0))
         if "weekday" in r:              # "friday": the next such weekday (today counts)

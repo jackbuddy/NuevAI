@@ -72,6 +72,10 @@ def run_item(env, it: dict, n: int, today: date, sb, vocab) -> dict:
     if ok is None:                      # safety / redirect items: only a deterministic reply can be judged for free
         return {**rec, "status": "na", "route": route}
     hay = prep["context"]
+    for rx in it.get("ctx_expect") or []:           # patterns shaped like the context ("US Boys Basketball Varsity - Game"), never used to grade an answer
+        if not re.search(rx, hay):
+            ok = False
+            missing.append("not in context: " + rx[:60])
     for rx in it.get("retr_forbid") or []:
         if re.search(rx, hay):
             ok = False

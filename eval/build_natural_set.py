@@ -351,22 +351,22 @@ HOLDOUT = {
 # `retr_forbid`: patterns that must NOT be in the context (the wrong division's games shown for an Upper School question).
 LOG_ITEMS = [
     {"id": "log-01", "category": "athletics_games", "phrasing": "log", "behavior": "answer", "q": "When is boys basketball's first game",
-     "expect": [], "dynamic": {"resolver": {"type": "first_event", "match": r"US Boys Basketball Varsity - Game", "kind": "game"}},
+     "expect": [r"varsity"], "ctx_expect": [r"US Boys Basketball Varsity - Game"], "dynamic": {"resolver": {"type": "first_event", "match": r"US Boys Basketball Varsity - Game", "kind": "game"}},
      "retr_forbid": [r"(?s)SCHOOL CALENDAR[^\n]*\n(?:- [^\n]*\n){0,2}?- [^\n]*MS \("],
      "verify": ["US Boys Basketball Varsity - Game"], "notes": "default = Upper School varsity opener; the MS games must not lead the calendar block"},
     {"id": "log-02", "category": "multi_part_follow_up", "phrasing": "follow_up", "behavior": "answer", "q": "Only varsity US boys",
      "history": h("When is boys basketball's first game", "Middle School boys basketball plays Monday; the US JV boys play Tuesday at 5:30 PM."),
-     "expect": [], "dynamic": {"resolver": {"type": "first_event", "match": r"US Boys Basketball Varsity - Game", "kind": "game"}},
+     "expect": [r"varsity"], "ctx_expect": [r"US Boys Basketball Varsity - Game"], "dynamic": {"resolver": {"type": "first_event", "match": r"US Boys Basketball Varsity - Game", "kind": "game"}},
      "retr_forbid": [r"(?s)SCHOOL CALENDAR[^\n]*\n(?:- [^\n]*\n){0,2}?- [^\n]*(MS \(|Basketball JV)"],
      "verify": ["US Boys Basketball Varsity - Game"], "notes": "refinement follow-up keeps the topic (first game) and narrows to varsity"},
     {"id": "log-03", "category": "athletics_games", "phrasing": "log", "behavior": "answer", "q": "When is the first US boys basketball game",
-     "expect": [r"US Boys Basketball JV - Game"], "dynamic": {"resolver": {"type": "first_event", "match": r"US Boys Basketball Varsity - Game", "kind": "game"}},
+     "expect": [r"varsity", r"JV|junior varsity"], "ctx_expect": [r"US Boys Basketball Varsity - Game", r"US Boys Basketball JV - Game"], "dynamic": {"resolver": {"type": "first_event", "match": r"US Boys Basketball Varsity - Game", "kind": "game"}},
      "verify": ["US Boys Basketball Varsity - Game", "US Boys Basketball JV - Game"], "notes": "varsity opener present, JV present too"},
     {"id": "log-04", "category": "athletics_games", "phrasing": "log", "behavior": "ambiguous", "q": "Do you have the varsity shedule",
-     "expect": [r"US (Boys|Girls) (Basketball|Soccer)[^\n]*- Game"], "retr_forbid": [r"ravenna-hub\.com"],
+     "expect": [r"varsity", r"basketball|soccer"], "ctx_expect": [r"US (Boys|Girls) (Basketball|Soccer)[^\n]*- Game"], "retr_forbid": [r"ravenna-hub\.com"],
      "verify": ["US Boys Basketball Varsity - Game"], "notes": "typo + no sport: the in-season varsity games, not booking links"},
     {"id": "log-05", "category": "courses_academics", "phrasing": "log", "behavior": "ambiguous", "q": "who is in block 4",
-     "expect": [r"Block 4[^\n]*offerings"], "verify": ["Block 4"], "notes": "ambiguous: the Block 4 offerings list (all departments)"},
+     "expect": [r"Block\s*4"], "ctx_expect": [r"Block 4[^\n]*offerings"], "verify": ["Block 4"], "notes": "ambiguous: the Block 4 offerings list (all departments)"},
     {"id": "log-06", "category": "staff_contacts", "phrasing": "log", "behavior": "ambiguous", "q": "what blocks does alex teach",
      "expect": "ALEX", "verify": [], "notes": "several teachers are called Alex: every one must be in the context"},
     {"id": "log-07", "category": "traps", "phrasing": "log", "behavior": "answer", "q": "whats lee fertigs favorite color", "route": "canned",
@@ -413,7 +413,7 @@ def _live_expectations(sb, today):
     ev = sb.table(T).select("metadata").eq("metadata->>source", "calendar").gte("metadata->>event_date", today.isoformat()).limit(1000).execute().data or []
     dances = sorted(((r["metadata"].get("event_date"), r["metadata"].get("summary")) for r in ev if re.search(r"\b(dance|formal|prom)\b", r["metadata"].get("summary") or "", re.I)
                      and not re.search(r"dance (class|concert|show|performance|rehears)|formal (attire|dress)", r["metadata"].get("summary") or "", re.I)))
-    out["DANCE"] = ([re.escape(dances[0][1][:24])] if dances else None, f"next dances: {dances[:3]}")
+    out["DANCE"] = ([re.escape(re.sub(r"^[A-Z]{2}:?\s*", "", dances[0][1])[:24])] if dances else None, f"next dances: {dances[:3]}")
     gm = sb.table(T).select("metadata").in_("metadata->>source", ["calendar", "calendar_sheet"]).eq("metadata->>event_date", today.isoformat()).eq("metadata->>kind", "game").limit(50).execute().data or []
     out["GAMES_TODAY"] = (None, f"games today: {len(gm)} (dynamic by day; not scored)")
     for tok, rx in (("DROP", r"(add/drop|drop a (class|course)|dropping a (class|course)|add or drop)"), ("SWITCH", r"(schedule change|change (a|your|their) (class|course|schedule)|add/drop)")):
