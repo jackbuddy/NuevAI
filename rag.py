@@ -387,6 +387,87 @@ def window(content: str, q_terms: set[str], body_max: int = BODY_MAX) -> str:
     return (head + "\n\n" if head else "") + text
 
 
+NO_PASSAGE_SOURCES = ("calendar", "calendar_sheet", "calendar_day", "school_day", "link_registry")
+PASSAGE_MAX = 420
+
+
+def _short_title(t: str, n: int = 80) -> str:
+    t = t.strip()
+    return t if len(t) <= n else t[:n].rsplit(" ", 1)[0].rstrip(",;:(") + "..."
+
+
+def best_passages(docs: list[dict], query: str, rare=(), k: int = 3, max_chars: int = PASSAGE_MAX, per_doc: int = 2) -> list[dict]:
+    """The 1-k most relevant passages of the retrieved documents, quoted as they are written (no model, nothing generated). Used when the
+    model cannot write the answer. A passage is a run of whole sentences / lines / list items of one document that carries at least half of
+    the question's weight (idf of its stemmed words) and one distinctive word; windows are query-centred like `window`, scrubbed like the
+    context. -> [{"title", "url", "text", "stale", "chunk_id"}] best first; [] when nothing in the documents scores."""
+    terms = {qnorm.stem(t) for t in tokens(query)} | {qnorm.stem(t) for t in rare}
+    if not terms:
+        return []
+    weight = {t: qnorm.idf(t) for t in terms}
+    total = sum(weight.values())
+    if len(terms) == 1 and total < 5.0:
+        return []                                  # one common word ("finals") matches anything: better to say nothing than quote a stray line
+    found: list[tuple[float, int, dict]] = []
+    seen_text: set[frozenset] = set()
+    for rank, d in enumerate(docs):
+        m = d.get("metadata") or {}
+        if m.get("source") in NO_PASSAGE_SOURCES:
+            continue
+        head, sep, body = (d.get("content") or "").partition("\n\n")
+        if not sep:
+            body = d.get("content") or ""
+        cuts = [0] + [x.end() for x in re.finditer(r"(?<=[.!?])\s+|\n+", body)] + [len(body)]
+        spans = [(a, b) for a, b in zip(cuts, cuts[1:]) if body[a:b].strip()]
+        hdr = [bool(re.match(r"\s*(Source|Title|Section|Applies to)\s*:", body[a:b])) for a, b in spans]     # metadata lines are never part of a passage
+        unit_terms = [set() if hdr[i] else set(stokens(body[a:b])) & terms for i, (a, b) in enumerate(spans)]
+        wins = []
+        for i, (a, _b) in enumerate(spans):
+            if not unit_terms[i]:
+                continue                          # a passage starts on a line that matches
+            j, last, got = i, i, set(unit_terms[i])
+            while j + 1 < len(spans) and j - i < 3 and not hdr[j + 1] and spans[j + 1][1] - a <= max_chars:
+                j += 1
+                if unit_terms[j]:
+                    last = j                      # the window ends on its last matching line (the lines in between stay, as they read together)
+                    got |= unit_terms[j]
+            j = last
+            score = sum(weight[t] for t in got)
+            if score / total >= 0.5 and max(weight[t] for t in got) >= 3.5:
+                wins.append((score, -i, i, j))
+        wins.sort(reverse=True)                   # best score first; a tie goes to the earliest start (the definition before the exceptions)
+        taken: list[tuple[int, int]] = []
+        for score, _neg, i, j in wins:
+            if len(taken) >= per_doc:
+                break
+            if any(not (j < x or i > y) for x, y in taken):
+                continue
+            taken.append((i, j))
+            a, b = spans[i][0], spans[j][1]
+            text = body[a:b].strip()
+            if len(text) > max_chars:             # one long run-on line: cut around the first matching word
+                pos = next((mm.start() for mm in re.finditer(r"\w+", text) if qnorm.stem(mm.group().lower()) in terms), 0)
+                lo = max(0, pos - max_chars // 3)
+                lo = text.rfind(" ", 0, lo) + 1 if lo else 0
+                hi = min(len(text), lo + max_chars)
+                hi = text.rfind(" ", lo, hi) if hi < len(text) and " " in text[lo:hi] else hi
+                text = ("... " if lo else "") + text[lo:hi].strip() + (" ..." if hi < len(text) else "")
+            words = frozenset(re.sub(r"\W+", " ", text.lower()).split())
+            title_l = (m.get("title") or "").lower()
+            if len(text) < 40 or words <= frozenset(re.sub(r"\W+", " ", title_l).split()) or (title_l[:40] and text.lower().startswith(title_l[:40]) and len(text) < len(title_l) + 40):
+                continue                          # a bare title line says nothing
+            if any(len(words & w) / max(1, len(words | w)) > 0.6 for w in seen_text):
+                continue                          # the handbook is indexed in overlapping chunks: one copy of a passage
+            seen_text.add(words)
+            text = guard.scrub_context(text).strip()
+            if text:
+                url = m.get("source_url") if str(m.get("source_url", "")).startswith("http") else None
+                found.append((score, rank, {"title": _short_title(m.get("title") or "School document"), "url": url, "text": text,
+                                            "stale": bool(freshness.meta_of(d)["stale"]), "chunk_id": d.get("chunk_id", "")}))
+    found.sort(key=lambda x: (-x[0], x[1]))
+    return [x[2] for x in found[:k]]
+
+
 class Retriever:
     def __init__(self, get_supabase):
         self.sb = get_supabase

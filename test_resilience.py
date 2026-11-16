@@ -110,12 +110,12 @@ body = text_of(evs)
 done = [d for e, d in evs if e == "done"]
 check("429 all models: stream is 200 with degraded answer", r.status_code == 200 and done and done[0].get("degraded") is True, r.text[:200])
 check("429 all models: tried every model in the chain", len(fake.calls) >= 3, str(fake.calls))
-check("429 all models: answer shows retrieved calendar facts", "November" in body and "trouble writing" in body, body[:200])
+check("429 all models: answer shows retrieved calendar facts", "November" in body and "AI service is busy" in body, body[:200])
 check("429 all models: no error event", not [1 for e, _ in evs if e == "error"])
 check("429 all models: degraded answer is not cached", qs.answer_cache.stats()["items"] == 0)
 r2 = client.post("/api/chat", json={"query": Q_DOC})
 j = r2.json()
-check("429 all models: /api/chat returns 200 degraded with links/titles", r2.status_code == 200 and j.get("degraded") and j["sources"] and "Related pages" in j["answer"], r2.text[:200])
+check("429 all models: /api/chat returns 200 degraded with links/titles", r2.status_code == 200 and j.get("degraded") and j["sources"] and "AI service is busy" in j["answer"] and "Open the document" in j["answer"], r2.text[:200])
 check("429 all models: fast (<5 s with no waits)", time.time() - t < 5, f"{time.time()-t:.1f}s")
 
 # ---------------------------------------------------------------- 2. Groq timeout / connection error
