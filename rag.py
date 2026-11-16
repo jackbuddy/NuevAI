@@ -21,8 +21,9 @@ import guard
 import lunch_lookup
 import qnorm
 import settings
+import understand
 from cache import TTLCache
-from followup import apply_grade, rewrite_followup, valid_grade
+from followup import apply_grade, resolve as resolve_followup, rewrite_followup, valid_grade
 from intent import DATE_HINT, SPORTS as SPORTS_WORDS, CalendarIntent, LunchIntent, parse_intent, parse_lunch
 
 CANDIDATES = 32
@@ -49,6 +50,10 @@ LINK_GENERIC = set("book booking schedule reserve register registration sign up 
 LIST_WORDS = re.compile(r"\b(list|all|every|which|what (courses?|classes|electives?|sports|clubs|departments?)|offered|options|available|are there (any|some)|is there (any|a) (list|club))\b", re.I)
 MONEY_Q = re.compile(r"\bhow much\b|\bcosts?\b|\bprices?\b|\bfees?\b|\btuition\b|\bhow expensive\b", re.I)
 CLUB_Q = re.compile(r"\bclubs?\b|\baffinity\b", re.I)
+# two questions in one message ("... and how much are tickets", "... and who do I contact"): the second half usually needs the documents
+STRUCT_OTHER = re.compile(r"\b(leagues?|coach\w*|forms?|paperwork|physicals?|cost|costs|fee|fees|price|tickets?|uniforms?|rosters?|tryouts?|try out|require\w*|records?|scores?|results?|won|win|wins|lose|lost|beat|"
+                          r"trainer|bus|buses|transport\w*|why|how|rules?|polic\w+|eligib\w+|sign ?up|join|prereq\w*|prerequisites?|description|about|credit|credits|grade levels?|season|seasons|offered|offer)\b", re.I)
+MULTI_PART = re.compile(r"\b(?:and|also|plus)\s+(?:who|what|when|where|how|why|which|is|are|do|does|can)\b|\?.+\?|;", re.I)
 
 LINK_INTENTS = [
     ("booking", re.compile(r"\b(book|booking|schedule|reserve|register|registration|sign[- ]?up|rsvp|tour|visit|open house|info(rmation)? session|admissions event)\b", re.I)),
@@ -58,7 +63,7 @@ LINK_INTENTS = [
     ("payment", re.compile(r"\bapplication fee\b|\bfee to apply\b|\bapply(?:ing)? fee\b", re.I)),
 ]
 
-BELL_Q = re.compile(r"\bbl(o|a)c?ks?\b|\bblocks?\b|\bbell\b|\blunch\b|\bperiods?\b|\bschool day\b|\b(when|what time) (does|do|is) (school|class\w*|the day|the school day) (start|end|begin|over|out|finish)|\bclasses (per|a|each) day\b|\bhow (long|many)\b.*\b(class|classes|block|blocks|lessons?)\b|\bprime\b|\b[ab]['\u2019] ?day\b|\bstart of school\b|\bend of (the )?(school )?day\b|\bschool (start|end)s?\b", re.I)
+BELL_Q = re.compile(r"\bbl(o|a)c?ks?\b|\bblocks?\b|\bbell\b|\blunch\b|\bperiods?\b|\bschool day\b|\b(when|what time) (does|do|is) (school|class\w*|the day|the school day) (start|end|begin|over|out|finish)|\bclasses (per|a|each) day\b|\bhow (long|many)\b.*\b(class|classes|block|blocks|lessons?)\b|\bprime\b|\b[ab]['\u2019] ?day\b|\bstart of school\b|\bend of (the )?(school )?day\b|\bschool (start|end)s?\b|\bget out( of school)?\b(?! for)|\bschool (gets?|lets?) out\b(?! for)|\bdismissal\b", re.I)
 CAMPUS_Q = re.compile(r"\bphone\b|\bcall\b|\baddress\b|\bwhere (is|are)\b|\blocated\b|\blocation\b|\bfront desk\b|\bmain office\b|\bcampus(es)?\b|\bdirections\b|\bcontact\b|\bhillsborough\b|\bsan mateo\b", re.I)
 ADVISORY_NO = re.compile(r"\b(9|10|11|12)\.\d{1,2}\b")
 CLUB_GENERIC = set("club clubs team nueva group society association the and of for at in to a an".split())
@@ -111,6 +116,17 @@ SYNONYMS = {
     r"\bpre-?participation\b|\bsports physical\b|\bpaperwork\b.{0,40}\b(team|sport|athlet\w*)\b|\b(team|sport|athlet\w*)\b.{0,40}\b(paperwork|forms?|physical)\b": "pre-participation physical athletics forms clearance",
     r"\b(is|are) there\b.{0,40}\b(team|teams|sports?|varsity|jv|baseball|softball|football|hockey|wrestling|cheer\w*|lacrosse|rugby|basketball|b-?ball)\b|\b(do|does) (we|nueva|the school|you)( even)? (have|offer)\b.{0,40}\b(team|teams|sport|sports|baseball|softball|football|hockey|wrestling|cheer\w*|lacrosse|rugby|golf|swim\w*|track|tennis|volleyball|badminton|fencing)\b|\bwhat sports\b|\bsports (offered|available|does nueva)\b": "varsity offerings by season athletics teams no-cut limited-roster teams Fall Winter Spring",
     r"\bbus\b|\bbuses\b|\bshuttle\b|\bkidzjet\b|\bcaltrain\b": "transportation bus shuttle Kidzjet routes timetable ridership",
+    # everyday wording (natural-language pass, QUALITY_AUDIT "Natural-language understanding"): what people say -> what the documents say
+    r"\b(get|gets|getting|let|lets) out for (the )?summer\b|\bsummer (break|vacation) (start|begin)\w*\b|\bwhen does summer (start|begin)\b|\bend of the (school )?year\b|\b(school|the year|the school year) ends?\b(?! (today|tomorrow|at|on))": "last day of school 2026-27 school year first day last day",
+    r"\b(off|out|break|vacation) (in|during|for|over) december\b|\bdecember (break|vacation)\b|\bchristmas (break|vacation)\b|\bholiday break\b": "Winter Break no school",
+    r"\bsubject areas?\b|\bwhat subjects\b|\bacademic (areas|departments)\b": "departments Upper School course catalog Computer Science Economics English History Math Science",
+    r"\b(pick|choose|select|sign up for|register for|request)\b.{0,25}\b(classes|courses|electives)\b|\bcourse (selection|sign[- ]?up|registration)\b": "course requests Blackbaud Course Request Tutorial",
+    r"\b(spots?|openings?|seats?)\b.{0,40}\b(grade|freshm[ae]n|9th|kindergarten)\b|\b(freshm[ae]n|9th grade|kindergarten)\b.{0,30}\b(spots?|openings?|admit\w*|accepted)\b|\bhow many (kids|students|people) (get|are) (in|admitted|accepted)\b": "openings admit entry points Grade 9 new students each year",
+    r"\b(i'?m|i am|im|kid is|child is|son is|daughter is|feeling|get|gets|got|stay(ing)? home|if) sick\b|\bsick\b.{0,30}\b(what|how|who|tell|email)\b|\bcall\w* (my |our )?(kid|child|son|daughter|student) in\b": "attendance reporting form absence reporting US Attendance Reporting Form absent",
+    r"\b(drop|dropping|switch|switching|change|changing|swap|swapping)\b.{0,20}\b(a |my |the |out of )?(class|classes|course|courses|elective|schedule)\b": "add/drop schedule change course change request",
+    r"\b(need|needed|have|has|required?|takes?) to graduate\b|\bin order to graduate\b": "Upper School graduation requirements 2026-27 years required English History Science Math",
+    r"(?-i:\bAPs\b)": "AP exams advanced placement courses not designed to prepare students for AP exams",
+    r"\bfull (ride|financial (aid|assistance)|scholarship|tuition)\b|\bfree tuition\b|\bwho (gets|qualifies)\b.{0,30}\b(aid|assistance)\b": "financial assistance 100% of tuition family income qualifies",
 }
 
 
@@ -119,7 +135,12 @@ DOMAIN_WORDS = ["labor", "thanksgiving", "memorial", "veterans", "juneteenth", "
                 "softball", "lacrosse", "badminton", "swimming", "wrestling", "tutorial", "advisory", "chemistry", "calculus"]
 
 
-KNOWN_TERMS = frozenset(set(SPORTS_WORDS) | set(DOMAIN_WORDS) | {"meche", "baseball", "softball", "lacrosse", "hockey", "cheer", "cheerleading", "football", "rugby", "pickleball", "fencing", "archery"})
+# casual words and student shorthand the typo fixer must leave alone ("merch" is not a misspelt "march"); understand.normalize / the alias
+# tables turn the ones that matter into index wording
+CASUAL_WORDS = set("""merch apps app info admin prof profs dept frosh soph hoop hoops vball bball sesh convo prereq prereqs reqs gonna wanna kinda yall lemme dunno legit
+lowkey highkey vibe vibes deets pics promo collab compsci meche orgo precalc calc stats econ psych chem phys trig aftercare tryout tryouts signup signups
+whens wheres hows thats gotta kiddo kiddos grader graders plagiarize plagiarized plagiarizing tech dtech""".split())
+KNOWN_TERMS = frozenset(set(SPORTS_WORDS) | set(DOMAIN_WORDS) | CASUAL_WORDS | {"meche", "baseball", "softball", "lacrosse", "hockey", "cheer", "cheerleading", "football", "rugby", "pickleball", "fencing", "archery"})
 
 
 def fix_typos(q: str) -> str:
@@ -136,12 +157,26 @@ def fix_typos(q: str) -> str:
     return re.sub(r"[A-Za-z]+", fix, q)
 
 
-def expand_query(q: str) -> str:
+def normalize_query(q: str) -> str:
+    """Shorthand first (so 'vball' is not 'corrected' into another word), typo repair, then shorthand again on the repaired text."""
+    return understand.normalize(fix_typos(understand.normalize(q)))
+
+
+ROLE_INVERT = re.compile(r"\b([a-z]{4,}(?: [a-z]{4,})?) (director|dean|head|coordinator|counselor|coach|chair|manager)\b", re.I)
+
+
+def expand_query(q: str, more: list[str] | None = None) -> str:
     extra = [w for rx, w in SYNONYMS.items() if w and re.search(rx, q, re.I)]
+    # "admissions director" is filed as "Director of Admissions": add the title the way the school writes it
+    extra += [f"{m.group(2)} of {m.group(1)}" for m in ROLE_INVERT.finditer(q) if m.group(1).lower() not in STOP and not re.search(r"\b(the|is|who|our|your|what|which)$", m.group(1), re.I)][:2]
+    extra += [m for m in (more or []) if m not in extra]
     return f"{q} ({' '.join(extra)})" if extra else q
 
 
 _pool = ThreadPoolExecutor(max_workers=6)
+_pool2 = ThreadPoolExecutor(max_workers=3)          # the second (filler-free) vector query; its own pool so it can never starve the main lookups
+MULTI_QUERY = os.getenv("MULTI_QUERY", "1") != "0"
+STRUCT_DOCS = int(os.getenv("STRUCT_DOCS", "2"))    # documents kept next to a confident structured answer (calendar rows, teaching records, a club record)
 
 
 STOP = set("""a an the is are was were be been do does did can could will would should what when where which who whom how why of for on in at to from
@@ -194,6 +229,12 @@ def _fuzzy_last(first: str, last: str, tokens_q: list[str]) -> bool:
             if len(nxt) >= 5 and len(last) >= 5 and difflib.SequenceMatcher(None, nxt, last).ratio() >= 0.75:
                 return True
     return False
+
+
+def _first_name_phrase(name: str, qn: str) -> bool:
+    """True when `name` sits where a person's name does in a teacher question: 'does alex teach', 'mr lee', 'alex's class', 'who is max'."""
+    n = re.escape(name)
+    return bool(re.search(rf"\b(?:does|do|did|with|by|mr|ms|mrs|dr|coach|prof|professor|where is|who is|whos)\s+{n}\b|\b{n}\s+(?:teach\w*|taught)\b|\b{n}\s+s\s+(?:class\w*|room|office|blocks?|courses?)\b", qn))
 
 
 def _course_loose_match(qcontent: set[str], course_key: str) -> bool:
@@ -558,6 +599,36 @@ class Retriever:
         self.calendar_cache.set(key, rows)
         return rows
 
+    def calendar_vocab(self) -> dict[str, int]:
+        """Word -> number of calendar event titles that contain it (stemmed), cached for 30 minutes. Lets a wordy question keep only
+        the words that can match an event title: 'We're booking flights for my daughter's graduation' -> ['graduation']."""
+        hit = self.calendar_cache.get("calvocab")
+        if hit is None:
+            hit, off = {}, 0
+            while off < 4000:
+                rows = self.sb().table(settings.CHUNKS_TABLE).select("s:metadata->>summary").in_("metadata->>source", ["calendar", "calendar_sheet"]).range(off, off + 999).execute().data or []
+                for r in rows:
+                    for w in {qnorm.stem(t) for t in re.findall(r"[a-z][a-z'-]{2,}", (r.get("s") or "").lower())}:
+                        hit[w] = hit.get(w, 0) + 1
+                off += 1000
+                if len(rows) < 1000:
+                    break
+            self.calendar_cache.set("calvocab", hit, ttl=1800)
+        return hit
+
+    def calendar_keywords(self, words: list[str]) -> list[str]:
+        """Of the question's candidate keywords, the ones that occur in some event title (rarest first, at most two). When none does,
+        the original list is returned unchanged (the lookup then reports that nothing matched, as before)."""
+        vocab = self.calendar_vocab()
+        if not vocab:
+            return words
+        known = [(vocab[qnorm.stem(w.lower())], i, w) for i, w in enumerate(words) if qnorm.stem(w.lower()) in vocab]
+        if not known:
+            return words[:3]
+        known.sort()
+        keep = {w for _, _, w in known[:2]}
+        return [qnorm.stem(w.lower()) if len(qnorm.stem(w.lower())) >= 4 else w for w in words if w in keep]
+
     def keyword_events(self, terms: list[str], today: date) -> list[dict]:
         """Calendar rows whose title contains a name the question carries ('Nueva Rocks the Guild', 'Priory', 'Fika') when the question has
         no date or sport signal for the structured lookup. A handful of exact hits is shown as the calendar block."""
@@ -612,15 +683,23 @@ class Retriever:
         hit = self.calendar_cache.get("entities")
         if hit is None:
             hit = self.sb().table(settings.CHUNKS_TABLE).select("chunk_id,content,metadata").eq("metadata->>source", "school_courses") \
-                .in_("metadata->>kind", ["teacher", "course"]).limit(1000).execute().data or []
+                .in_("metadata->>kind", ["teacher", "course", "block"]).limit(1000).execute().data or []
             hit = [r for r in hit if not (r.get("metadata") or {}).get("superseded")]      # records the current workbooks no longer produce
             self.calendar_cache.set("entities", hit, ttl=1800)
         return hit
 
     def entity_chunks(self, query: str, today: date) -> list[dict]:
-        """Direct lookup for 'who teaches Chemistry', 'what does Wes Chao teach', 'which room is Mr. Lee in'.
-        Matches teacher names and course names against the question, so it never depends on semantic search."""
+        return self.entity_lookup(query, today)[0]
+
+    def entity_lookup(self, query: str, today: date) -> tuple[list[dict], list[str]]:
+        """Direct lookup for 'who teaches Chemistry', 'what does Wes Chao teach', 'which room is Mr. Lee in', 'what blocks does alex
+        teach' (first name), 'who is in block 4' (the block's offerings). Matches teacher names and course names against the question, so
+        it never depends on semantic search. -> (records, notes): a note names the other teachers a first name could mean."""
         qn = _alias_expand(norm_words(query))
+        notes: list[str] = []
+        first_hits: dict[str, list[dict]] = {}
+        near_first: set[str] = set()
+        cur_fall = today.month >= 8
         tokens_q = set(qn.split())
         tok_list = qn.split()
         cue = bool(TEACH_CUE.search(query))
@@ -638,6 +717,14 @@ class Retriever:
                 ok = ok or (len(parts) >= 2 and _fuzzy_last(parts[0], parts[-1], tok_list))
                 if ok:
                     hits.append((0, r))
+                elif len(parts) >= 2 and cue:
+                    # a first name on its own ("what blocks does alex teach"): only in a teacher-shaped phrase, never a stray common word
+                    for t in tokens_q:
+                        if len(t) >= 3 and t not in STOP and t not in COURSE_NOISE and _first_name_phrase(t, qn):
+                            if parts[0] == t:
+                                first_hits.setdefault(m.get("teacher", ""), []).append(r)
+                            elif len(t) >= 4 and parts[0].startswith(t):
+                                near_first.add(m.get("teacher", ""))
             elif m.get("kind") == "course":
                 ck = m.get("course_key", "")
                 if len(ck) >= 5 and f" {ck} " in f" {qn} ":
@@ -646,9 +733,26 @@ class Retriever:
                     hits.append((2, r))
         def sem_rank(r):
             sem = (r.get("metadata") or {}).get("semester", "")
-            return 0 if (("Fall" in sem) == (today.month >= 8)) else 1
+            return 0 if (("Fall" in sem) == cur_fall) else 1
+        if not any(k == 0 for k, _ in hits) and first_hits:
+            # nobody matched by full or last name: the first name decides; several teachers share it -> all are shown and named
+            for name, rows in first_hits.items():
+                hits += [(0, r) for r in sorted(rows, key=sem_rank)[:1 if len(first_hits) > 1 else 2]]
+            others = sorted((set(first_hits) | near_first) - ({next(iter(first_hits))} if len(first_hits) == 1 else set()))
+            if len(first_hits) > 1:
+                notes.append("several teachers have that first name (" + ", ".join(sorted(first_hits)) + "): answer for each in one line, or the one the conversation is about")
+            elif others:
+                notes.append(f"read as {next(iter(first_hits))}; a similar name is " + ", ".join(others))
+        # "who is in block 4", "what's offered block 4": the block's offerings record for the current semester
+        bm = re.search(r"\bblock\s*([1-8])\b", qn)
+        if bm and not hits and re.search(r"\b(who|whos|what|which|list|offered|offerings|classes|courses|teachers?)\b", qn) and not re.search(r"\b(time|start|end|long|when|bell|order)\b", qn):
+            blk = [r for r in self._entities() if (r.get("metadata") or {}).get("kind") == "block" and re.search(rf"\bBlock {bm.group(1)}\b", (r.get("metadata") or {}).get("title", ""))]
+            cur = [r for r in blk if sem_rank(r) == 0] or blk
+            hits += [(3, r) for r in sorted(cur, key=lambda r: r.get("chunk_id", ""))[:3]]        # a long block list is stored in two or three parts
+            if blk:
+                notes.append(f"'block {bm.group(1)}' is read as the courses and teachers scheduled in Block {bm.group(1)} this semester: summarise them by department, and say the asker can name a subject or teacher")
         hits.sort(key=lambda x: (x[0], sem_rank(x[1]), -len((x[1].get("metadata") or {}).get("course_key", ""))))
-        return [r for _, r in hits][:6]
+        return [r for _, r in hits][:6], notes
 
     # ---- pinned facts, advisory numbers, clubs -----------------------------
     def _by_source(self, source: str, kinds: list[str] | None = None) -> list[dict]:
@@ -722,25 +826,45 @@ class Retriever:
                  campus: str | None = None) -> dict:
         t0 = time.time()
         today = today or datetime.now().date()
-        history = history or []
-        query = fix_typos(query)
+        raw_query = query
+        # typos, then shorthand ("when's", "vball", "the AD", "an a day"): every lookup below sees the words the index uses
+        query = normalize_query(query)
+        history = [({**m, "content": normalize_query(m.get("content") or "")} if m.get("role") == "user" else m) for m in (history or [])]
         prev_user = next((m["content"] for m in reversed(history) if m.get("role") == "user"), "")
-        # follow-ups ("what about JV?", "who teaches it?") become standalone questions for every lookup below
-        standalone = rewrite_followup(query, history)
+        # follow-ups ("what about JV?", "only varsity", "no i mean the teachers", "who teaches it?") become standalone questions for every lookup below
+        standalone, follow_kind = resolve_followup(query, history)
         resolved = apply_grade(standalone, valid_grade(grade))
         followed = resolved != query
+        ip = understand.interpret(resolved, lunch_lookup.valid_campus(campus), valid_grade(grade), follow_kind, original=raw_query)
         # the cafe's lunch menu is an exact lookup of the day record(s) for the campus: no vector search, no calendar block
         try:
             li = parse_lunch(resolved, today, lunch_lookup.valid_campus(campus), prev_user)
             if li:
                 data = lunch_data(self.sb(), li, today)
                 return {"pinned": [], "docs": [], "events": [], "intent": None, "timings": {"retrieve_ms": round((time.time() - t0) * 1000)},
-                        "candidates": 0, "entities": [], "degraded": False, "resolved": standalone, "lunch": data}
+                        "candidates": 0, "entities": [], "degraded": False, "resolved": standalone, "lunch": data, "interp": ip, "today": today}
         except Exception as e:
             print(f"lunch lookup failed: {type(e).__name__}: {str(e)[:120]}", flush=True)
         # short follow-ups ("what about tomorrow?") borrow the previous question for search
-        search_q = expand_query(resolved if followed else f"{prev_user} {query}" if prev_user and len(query.split()) <= 6 else query)
+        search_q = expand_query(resolved if followed else f"{prev_user} {query}" if prev_user and len(query.split()) <= 6 else query, ip.expand)
         intent = (parse_intent(resolved, today, prev_user) if followed else None) or parse_intent(query, today, prev_user)
+        # the interpretation shapes the structured lookup: "first game" = season opener, "the varsity schedule" = a games lookup,
+        # an unspecified division defaults to the asker's (Upper School unless the saved campus is Hillsborough)
+        intent = understand.apply_to_intent(ip, intent, today)
+        alias_kw = understand.calendar_alias(resolved)
+        if alias_kw and (intent is None or not (intent.sport or intent.kind or intent.category or intent.dayinfo or intent.date_given)):
+            # "the next dance", "when do we hear back": the event is on the calendar under another title
+            intent = intent or CalendarIntent(today, today + timedelta(days=300), label="upcoming")
+            intent.keywords, intent.kw_all = alias_kw, []
+        if intent and intent.keywords and not intent.sport and not intent.category:
+            try:
+                if intent.kw_all:
+                    intent.keywords = self.calendar_keywords(intent.kw_all)
+            except Exception as e:
+                print(f"calendar vocabulary unavailable: {type(e).__name__}", flush=True)
+        # a second, filler-free wording of the same question for the vector search ("hey quick question do you know when ... thanks")
+        clean_q = understand.clean_query(resolved)
+        clean_q = expand_query(clean_q, ip.expand) if MULTI_QUERY and set(tokens(clean_q)) != set(tokens(resolved if followed else query)) and len(tokens(clean_q)) >= 2 else ""
         division = query_division(resolved, campus, valid_grade(grade))
         rare = qnorm.rare_terms(resolved, STOP)
         timings = {}
@@ -750,18 +874,35 @@ class Retriever:
             n = type(e).__name__.lower()
             dep_errors.append({"dep": dep, "kind": "timeout" if "timeout" in n else "connection" if "connect" in n else "error", "err": type(e).__name__[:40]})
 
+        def vec2_task():
+            return self.vector_search(self.embed(clean_q))
+
         def vec_task():
+            f2 = _pool2.submit(vec2_task) if clean_q else None
             t = time.time()
             qv = self.embed(search_q)
             timings["embed_ms"] = round((time.time() - t) * 1000)
             t = time.time()
             rows = self.vector_search(qv)
             timings["vector_ms"] = round((time.time() - t) * 1000)
+            if f2 is not None:          # rank fusion: a chunk either wording found is a candidate, with its better similarity
+                try:
+                    have = {r["chunk_id"]: r for r in rows}
+                    for r in f2.result(timeout=6):
+                        if r["chunk_id"] in have:
+                            have[r["chunk_id"]]["similarity"] = max(have[r["chunk_id"]].get("similarity", 0.0), r.get("similarity", 0.0))
+                        else:
+                            rows.append(r)
+                    timings["mq"] = 1
+                except Exception:
+                    pass
             return rows
 
         # names the question carries in capitals ("Nueva Rocks the Guild", "Priory", "HoCo") that no date/sport signal covers
         orig_words = re.findall(r"[A-Za-z][A-Za-z0-9']+", resolved)
         kw_terms = [w.lower() for i, w in enumerate(orig_words) if i > 0 and not w.islower() and w.lower() in set(rare)][:2]
+
+        alt_events: list[dict] = []
 
         def cal_task():
             nonlocal intent
@@ -772,12 +913,34 @@ class Retriever:
                     intent = CalendarIntent(today, today + timedelta(days=365), keywords=list(kw_terms), label="events matching " + " / ".join(kw_terms))
                     timings["calendar_ms"] = round((time.time() - t) * 1000)
                 return rows
-            rows = self.calendar_events(intent)
+            # "when do we play Kehillah": a name in a game question is an opponent; look across the whole season and keep its games
+            opp = [n for n in rare if qnorm.df(n) <= 60 and n not in SPORTS_WORDS and len(n) >= 4] if intent.kind == "game" else []
+            if opp and not intent.date_given:
+                intent.end = max(intent.end, today + timedelta(days=240))
+            for attempt in (0, 1):          # a reused connection the server closed ("Server disconnected") works on the second try
+                try:
+                    rows = self.calendar_events(intent)
+                    break
+                except Exception as e:
+                    if attempt or not re.search(r"disconnect|closed|reset", f"{type(e).__name__} {e}", re.I):
+                        raise
+            if opp:
+                vs = [r for r in rows if any(n in ((r.get("metadata") or {}).get("summary") or "").lower() for n in opp)]
+                rows = vs or rows
+            # team questions: keep the level that was asked for, and the asker's division first (the other division is named, not mixed in)
+            if (intent.sport or intent.kind == "game") and intent.kind != "practice" and not intent.category:
+                rows = understand.filter_level(list(rows), ip)
+                rows, other = understand.split_division(rows, ip)
+                tday = today.isoformat()
+                alt_events.extend([r for r in other if (r.get("metadata") or {}).get("kind") == "game" and (r["metadata"].get("event_date") or "") >= tday][:1])
             timings["calendar_ms"] = round((time.time() - t) * 1000)
             return rows
 
         try:
-            ents = self.entity_chunks(resolved, today)
+            ents, ent_notes = self.entity_lookup(resolved, today)
+            ip.notes += ent_notes
+            if ent_notes:
+                ip.confidence = min(ip.confidence, 0.6)
         except Exception as e:
             ents = []
             print(f"entity lookup failed: {e}", flush=True)
@@ -810,6 +973,8 @@ class Retriever:
             link_rows = []
             _dep("links", e)
             print(f"link lookup failed: {e}", flush=True)
+        if (ip.vague_schedule or ip.sport or (intent and intent.kind == "game")) and not re.search(r"\b(tour|visit|register|registration|sign[- ]?up|rsvp|book|apply|tickets?|pay|donat\w*|buy)\b", resolved, re.I):
+            link_rows = []          # "the varsity schedule" is a games question: the word "schedule" must not pull the tour-booking cards
         try:
             events = f_cal.result(timeout=12)
         except Exception as e:
@@ -864,8 +1029,29 @@ class Retriever:
             events, intent = [], None      # "Biology Research Teams 2" is a course, not a sports-team question: no team overview
         pin_ids = {p["chunk_id"] for p in pinned}
         docs = [d for d in docs if d["chunk_id"] not in ent_ids | pin_ids]
+        # A confident structured answer (the calendar rows for a team / date / day-type question, a teaching record, a club record) needs
+        # little else: fewer documents = fewer tokens and a faster, more direct answer. Links and the best documents stay.
+        structured = None
+        if events and intent and (intent.sport or intent.kind or intent.dayinfo or (intent.date_given and intent.short_range())):
+            structured = "calendar"
+            if intent.kind == "game" and not understand.NOTE_RX.search(resolved):
+                # schedule notes ("First Day of Contests", "CCS First Round") are not games: they answered "when is the first game" wrongly
+                docs = [d for d in docs if (d.get("metadata") or {}).get("source") not in ("calendar", "calendar_sheet") or (d.get("metadata") or {}).get("kind") == "game"]
+        elif ents:
+            structured = "entity"
+        elif any((p.get("metadata") or {}).get("source") in ("school_clubs", "school_advisory") for p in pinned) and (CLUB_Q.search(resolved) or ADVISORY_NO.search(resolved)):
+            structured = "record"
+        # trim only when the structured block is what was asked for (a when / where / who-do-we-play / which-block question), never for
+        # a question about something else that merely names a team or a date (league, coach, forms, cost, results)
+        asks_other = bool(STRUCT_OTHER.search(resolved)) or MULTI_PART.search(resolved) or ip.qtype in ("how", "howmuch", "list", "statement")
+        if structured and STRUCT_DOCS > 0 and not asks_other:
+            names = {t for t in rare if qnorm.df(t) <= 60}
+            rest = [d for d in docs if d["chunk_id"] not in link_ids]
+            keep = rest[:STRUCT_DOCS] + [d for d in rest[STRUCT_DOCS:] if names & set(tokens(f"{(d.get('metadata') or {}).get('title', '')} {d['content']}"))]     # a row with the question's own name (an opponent, a person) stays
+            docs = [d for d in docs if d["chunk_id"] in link_ids or d in keep]
+            timings["trim"] = 1
         return {"pinned": pinned, "docs": docs, "events": events, "intent": intent, "timings": timings, "candidates": len(rows), "entities": ents, "degraded": degraded, "resolved": standalone, "dep_errors": dep_errors,
-                "division": division, "rare": rare}
+                "division": division, "rare": rare, "interp": ip, "today": today, "alt_events": alt_events, "structured": structured}
 
 
 def fmt_event(r: dict, detail: bool = False) -> str:
@@ -915,13 +1101,18 @@ def practice_overview(events: list[dict]) -> str:
     return "PRACTICE SCHEDULE (one line per team; times can differ by day):\n" + "\n".join(lines[:30])
 
 
-def select_events(events: list[dict], intent, query: str, max_events: int = 14) -> list[dict]:
+def select_events(events: list[dict], intent, query: str, max_events: int = 14, ip=None, today: date | None = None) -> list[dict]:
     """Which calendar rows to show when there are more than fit: the ones whose summary matches the question's words come first
     (the 7th-grade Shakespeare performance is not the first of 31 arts events by date), then the earliest dates; shown in date order.
-    'Next game' questions skip rows that are not games (First Day of Practice, tryouts) before taking the first few."""
-    if intent and intent.next_only and intent.kind == "game":
+    'First / next game' questions skip rows that are not games (First Day of Practice, tryouts) and show each team's game, varsity
+    before JV; one team alone gets its next three. 'The varsity schedule' (no sport) gets two games per team."""
+    if intent and intent.kind == "game" and (intent.next_only or (ip is not None and ip.vague_schedule and not intent.date_given)):
         games = [e for e in events if (e.get("metadata") or {}).get("kind") == "game"] or events
-        return games[:3]
+        teams = {understand.team_of(e) for e in games}
+        vague = ip is not None and ip.vague_schedule
+        if len(teams) <= 1 and not (ip is not None and ip.first):
+            return games[:3]
+        return understand.lead_games(games, ip, today or date.today(), per_team=2 if (vague or len(teams) <= 1) else 1, limit=8 if vague else 5)
     if len(events) <= max_events:
         return events
     q = set(tokens(query)) | {k.lower() for k in (intent.keywords if intent else [])}
@@ -933,7 +1124,10 @@ def select_events(events: list[dict], intent, query: str, max_events: int = 14) 
         return sum(qnorm.idf(t) for t in q & words)
     scored = [(score(e), i, e) for i, e in enumerate(events)]
     top = sorted((x for x in scored if x[0] > 0), key=lambda x: (-x[0], x[1]))[:max_events]
-    chosen = {id(x[2]) for x in top}
+    # the day record of a named holiday date ("the day after Thanksgiving" -> Nov 27) is what was asked for: never crowded out
+    hol = {d.isoformat() for d in (intent.holiday_dates if intent else [])}
+    must = [e for e in events if (e.get("metadata") or {}).get("source") in ("calendar_day", "school_day") and (e.get("metadata") or {}).get("event_date") in hol]
+    chosen = {id(e) for e in must} | {id(x[2]) for x in top[:max_events - len(must)]}
     for _, i, e in scored:                      # fill the rest in date order
         if len(chosen) >= max_events:
             break
@@ -956,11 +1150,16 @@ def build_context(result: dict, max_events: int = 14, query: str = "") -> tuple[
         shown = []
         sources.append({"chunk_id": "calendar-practices", "title": "Practice schedule", "type": "calendar"})
     elif events:
-        shown = select_events(events, intent, query or result.get("resolved") or "", max_events)
+        ip = result.get("interp")
+        shown = select_events(events, intent, query or result.get("resolved") or "", max_events, ip, result.get("today"))
         more = f"\n(+{len(events) - len(shown)} more matching events not shown)" if len(events) > len(shown) else ""
         label = f"{intent.label}" if intent else ""
-        parts.append(f"SCHOOL CALENDAR ({label}, sorted by date; today is accurate to this list):\n"
-                     + "\n".join(fmt_event(e, detail=len(shown) <= 4) for e in shown) + more)
+        alt = result.get("alt_events") or []
+        other = ("\n(Other division, not asked for: next " + fmt_event(alt[0]).lstrip("- ") + ")") if alt else ""
+        order = "the next two games of each team" if ip is not None and ip.vague_schedule and intent and not intent.date_given else \
+            "varsity before JV, then by date" if ip is not None and "varsity first" in ip.defaults else "sorted by date"
+        parts.append(f"SCHOOL CALENDAR ({label}, {order}; today is accurate to this list):\n"
+                     + "\n".join(fmt_event(e, detail=len(shown) <= 4) for e in shown) + more + other)
         for e in shown[:5]:
             m = e.get("metadata") or {}
             sources.append({"chunk_id": e["chunk_id"], "title": m.get("summary") or m.get("title"), "type": "calendar"})
@@ -1006,6 +1205,9 @@ def build_context(result: dict, max_events: int = 14, query: str = "") -> tuple[
         label, explicit = DIV_NAME[div[0]], div[1]
         parts.insert(0, f"AUDIENCE: the question is about the {label}" + ("." if explicit else
                      " (assumed: the asker did not say which division). Answer for the " + label + "; if a document written for another division says something different, add one short sentence naming that difference."))
+    # how the question was read (defaults applied, alternatives): query_server puts it in the prompt next to the date, outside the
+    # CONTEXT block (it is our own instruction, not retrieved text)
+    result["interp_line"] = understand.line(result.get("interp")) if parts else ""
     # retrieved text is data, never instructions: drop lines that try to command the model
     return guard.scrub_context("\n\n---\n\n".join(parts)), sources
 

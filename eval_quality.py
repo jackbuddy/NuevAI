@@ -349,8 +349,24 @@ def resolve_dynamic(item: dict, today: date, sb) -> tuple[list | None, str]:
     if not r:
         return None, ""
     kind = r["type"]
+    if kind == "first_event":       # the season opener: the earliest matching row of this school year, whether or not it has been played
+        q = sb.table("document_chunks_v2").select("content,metadata").in_("metadata->>source", ["calendar", "calendar_sheet"]).ilike("metadata->>summary", f"%{r['match'][:40]}%").limit(1000)
+        if r.get("kind"):
+            q = q.eq("metadata->>kind", r["kind"])
+        rows = [x for x in q.execute().data if re.search(r["match"], (x["metadata"] or {}).get("summary", ""), re.I) and not (x["metadata"] or {}).get("superseded")]
+        rows.sort(key=lambda x: ((x["metadata"] or {}).get("event_date", ""), (x["metadata"] or {}).get("start_time") or ""))
+        if not rows:
+            return None, "no matching event"
+        m = rows[0]["metadata"]
+        exp = [_md(date.fromisoformat(m["event_date"]))]
+        opp = re.search(r"Game\s+(.+?)\s+-\s+(Home|Away)\s*$", m.get("summary", ""))
+        if opp:
+            exp.append(re.escape(opp.group(1)))
+        return exp, f"{m['event_date']} {m.get('summary', '')[:60]}"
     if kind == "day_type":
         d = today + timedelta(days=r.get("offset", 0))
+        if "weekday" in r:              # "friday": the next such weekday (today counts)
+            d = today + timedelta(days=(r["weekday"] - today.weekday()) % 7)
         rows = sb.table("document_chunks_v2").select("content,metadata").eq("metadata->>source", "school_day").eq("metadata->>event_date", d.isoformat()).execute().data
         if not rows:
             return None, f"no day record for {d}"
@@ -413,8 +429,9 @@ class Env:
         """-> {kind: canned|rag|error, answer?, msgs?, context, system, result, sources}"""
         qs = self.qs
         req = self.request(item, n)
-        if (canned := qs.smalltalk(req.query)) is not None:
-            return {"kind": "canned", "answer": canned, "context": "", "system": "", "msgs": [], "sources": [], "result": {}}
+        quick = qs.quick_reply(req.query) if hasattr(qs, "quick_reply") else ((qs.smalltalk(req.query), "smalltalk") if qs.smalltalk(req.query) is not None else None)
+        if quick is not None:
+            return {"kind": "canned", "answer": quick[0], "context": "", "system": "", "msgs": [], "sources": [], "result": {}}
         try:
             msgs, sources, result, now = qs._prepare(req)
         except Exception as e:
@@ -681,7 +698,10 @@ def main() -> int:
     ap.add_argument("--regrade", default="", help="re-grade the stored answers of an earlier llm report with the CURRENT grader (free: retrieval only, no tokens)")
     ap.add_argument("--self-test", action="store_true")
     ap.add_argument("--no-fail", action="store_true", help="always exit 0")
+    ap.add_argument("--natural", action="store_true", help="use eval/natural_set.json (natural rewordings; see eval_natural.py) instead of the golden set")
     a = ap.parse_args()
+    if a.natural:
+        a.file = str(HERE / "eval" / "natural_set.json")
     if a.self_test:
         return self_test()
     if a.regrade:

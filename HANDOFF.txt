@@ -289,3 +289,18 @@ Google Cloud project "NuevAI Ingest" (id nuevai-ingest) owned by nuevai.updates@
 Checked: token refresh + Drive listing succeed (0 files shared at the time). Not yet checked with a real shared Sheet/Doc: share one with nuevai.updates@gmail.com and run the
 "Email ingest" workflow (README: Auto-ingestion from nuevai.updates@gmail.com). If a run ever says the token was revoked/expired: run
 `python scripts/google_auth_setup.py` again (signed in as that account) and update GOOGLE_OAUTH_REFRESH_TOKEN. Do not set the app back to "Testing".
+
+======================================================================================================================
+15. NATURAL-LANGUAGE UNDERSTANDING (15 Nov 2026, branch worktree-agent-ac5a7839ca8b13f5a; NOT merged, NOT deployed)
+======================================================================================================================
+understand.py (new, deterministic, no LLM) runs before every lookup in rag.Retriever.retrieve: shorthand ("when's", "vball", "the AD", "apps due", "an a day"), an
+interpretation (question type, sport/gender/level/division, first vs next, vague schedule, offering question, confidence), defaults (Upper School unless the question or
+the saved campus says otherwise, the other division named in one line; "first game" = season opener; varsity before JV; a named level filters), calendar keywords limited
+to words in event titles + phrase aliases, teacher first names, block-number questions, and an INTERPRETATION line in the prompt. followup.resolve handles refinements
+("only varsity US boys"), corrections ("no i mean ...") and "the other one". query_server.personal_decline answers personal trivia about a named person without a model
+call (guard.py unchanged, runs first). chat_answered gets `iu` {qt,it,conf,rw,fu,dflt,alt,st}. Env switches: MULTI_QUERY=0, STRUCT_DOCS=0.
+Measure: python eval_natural.py (free; natural rewordings of verified golden items + log questions), --holdout (wordings never tuned on), --build, --today, --compare;
+python eval_quality.py --natural --mode llm --ids ... for real answers. Numbers and what is still weak: QUALITY_AUDIT.md section 11. Tests: test_quality_fixes.py
+(interpretation, defaults, follow-ups, aliases), eval_retrieval.py (18 new cases).
+Known: golden items gm-01 / gm-21 expect Nov 18 but the shared basketball sheet moved the varsity opener to Nov 17 on Nov 14 (stale expectation, not fixed here: owner
+decision). The Groq key has no small general model (only allam-2-7b), so no LLM query-rewrite step exists; see section 11.5 before adding one.

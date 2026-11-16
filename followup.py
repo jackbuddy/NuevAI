@@ -32,7 +32,9 @@ DATE_PHRASE = re.compile(
     r"(?:mon|tues|wednes|thurs|fri|satur|sun)day|"
     r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.? \d{1,2}(?:st|nd|rd|th)?|\d{1,2}/\d{1,2})\b", re.I)
 RELDAY = re.compile(r"\b(the )?(next|following) day\b|\bday after( that)?\b|\b(the )?(previous|day before)\b", re.I)
-ATTR_ONLY = re.compile(r"^\s*(?:what|which|where|when|who)(?:'s| is| are)?(?: the)?\s*(?:room|block|blocks|time|day|days|date|advisor|advisors|leader|leaders|teacher|teachers|prereqs?|prerequisites?|cost|deadline)?\s*(?:is it|is that|then)?\s*\??\s*$", re.I)
+_ATTR = r"(?:room|rooms|block|blocks|time|times|day|days|date|dates|advisor|advisors|leader|leaders|teacher|teachers|prereqs?|prerequisites?|cost|deadline|location|place)"
+# "what room?", "who is the advisor?", and pairs: "which block and room?", "what block and where", "when and where"
+ATTR_ONLY = re.compile(rf"^\s*(?:what|which|where|when|who)(?:'s| is| are)?(?: the)?\s*{_ATTR}?(?:\s*(?:and|&|,)\s*(?:(?:what|which|where|when|who)(?:'s| is| are)?(?: the)?\s*)?{_ATTR}?)*\s*(?:is it|is that|then)?\s*\??\s*$", re.I)
 
 
 def _words(q: str) -> list[str]:
@@ -51,20 +53,41 @@ def subject_of(prev: str) -> str:
     return s or prev.strip().rstrip("?.! ")
 
 
-FILLER = {"the", "team", "teams", "game", "games", "schedule", "one", "ones", "instead", "only", "what", "about", "how", "and", "also", "then", "for", "just", "level", "side", "version"}
+FILLER = {"the", "team", "teams", "game", "games", "schedule", "one", "ones", "instead", "only", "what", "about", "how", "and", "also", "then", "for", "just", "level", "side", "version",
+          "no", "nah", "nope", "not", "i", "mean", "meant", "actually", "sorry", "wait", "ok", "okay", "please", "pls", "show", "me", "but", "is", "are", "its", "it", "s", "now", "though", "specifically"}
+# what people type for a variant -> the canonical variant word ('US boys' = upper school boys in a short refinement)
+VARIANT_ALIAS = {"us": "upper school", "hs": "upper school", "high school": "upper school", "ms": "middle school", "ls": "lower school", "junior varsity": "jv",
+                 "guys": "boys", "mens": "boys", "men's": "boys", "womens": "girls", "women's": "girls", "sm": "san mateo", "hb": "hillsborough"}
+CORRECTION = re.compile(r"^\s*(?:(?:no|nah|nope|not that|sorry|wait|oops)\b[\s,.!]*)?(?:(?:i|we) (?:mean|meant|was asking about|am asking about|was talking about)|i'?m (?:asking|talking) about|as in)\b[\s,:]*(?P<body>.+)$"
+                        r"|^\s*(?:no|nah|nope|not that)\b[\s,.!]+(?P<body2>.+)$", re.I)
+OTHER_ONE = re.compile(r"^\s*(?:and |what about |how about |no,? )?(?:the )?other (?:one|ones|team|teams|campus|level|side|division)\s*\??\s*$", re.I)
+BINARY = [("boys", "girls"), ("varsity", "jv"), ("home", "away"), ("san mateo", "hillsborough"), ("upper school", "middle school"), ("fall", "spring")]
+
+
+def _other_one(prev: str) -> str | None:
+    """'the other one' after a question that names exactly one side of a pair (boys/girls, varsity/JV, a campus): the other side."""
+    hits = [(a, b) for a, b in BINARY if bool(re.search(rf"\b{a}\b", prev, re.I)) != bool(re.search(rf"\b{b}\b", prev, re.I))]
+    if len(hits) != 1:
+        return None
+    a, b = hits[0]
+    old, new = (a, b) if re.search(rf"\b{a}\b", prev, re.I) else (b, a)
+    return re.sub(rf"\b{old}\b", VARIANT_WORDS.get(new, new), prev, count=1, flags=re.I)
 
 
 def _variant_swap(q: str, prev: str) -> str | None:
     """'what about JV?' after 'when is the next varsity game' -> 'when is the next JV game'. Several at once work too:
-    'and the varsity girls?' after a boys' JV question swaps both level and gender."""
+    'and the varsity girls?' after a boys' JV question swaps both level and gender; 'only varsity US boys' narrows the previous
+    question to those variants (the ones it already has stay, the missing ones are added)."""
     ql = re.sub(r"[?.!,]", " ", q.lower())
     ql = re.sub(r"\s+", " ", ql).strip()
     found = []
-    for key in sorted(VARIANT_WORDS, key=len, reverse=True):          # longest first: 'junior varsity' before 'varsity'
+    for key in sorted(set(VARIANT_WORDS) | set(VARIANT_ALIAS), key=len, reverse=True):          # longest first: 'junior varsity' before 'varsity'
         if re.search(rf"\b{re.escape(key)}\b", ql):
-            found.append(key)
+            canon = VARIANT_ALIAS.get(key, key)
+            if canon not in found:
+                found.append(canon)
             ql = re.sub(rf"\b{re.escape(key)}\b", " ", ql)
-    rest = [w for w in ql.split() if w not in FILLER]
+    rest = [w for w in re.findall(r"[a-z0-9']+", ql) if w not in FILLER]
     if not found or rest:
         return None
     out = prev
@@ -102,21 +125,37 @@ def _date_swap(q: str, prev: str) -> str | None:
 
 def rewrite_followup(query: str, history: list[dict] | None) -> str:
     """Returns a standalone version of `query`, or `query` unchanged when it already stands on its own."""
+    return resolve(query, history)[0]
+
+
+def resolve(query: str, history: list[dict] | None) -> tuple[str, str | None]:
+    """-> (standalone question, kind). kind: refine ('only varsity', 'and the girls?'), correct ('no i mean the teachers'), swap ('the
+    other one'), date ('and tomorrow?'), pronoun ('who teaches it?'), attr ('what room?'), subject ('and Block 4?'), or None when the
+    message already stands on its own."""
     users = [m.get("content", "") for m in (history or []) if m.get("role") == "user" and m.get("content")]
     if not users:
-        return query
+        return query, None
     prev = users[-1]
-    if len(users) >= 2 and len(_words(prev)) <= 6 and (not SELF_CONTAINED.match(prev) or PRONOUN.search(prev)):
-        prev = rewrite_followup(prev, [{"role": "user", "content": u} for u in users[:-1]])     # chain of follow-ups
+    if len(users) >= 2 and (len(_words(prev)) <= 6 and (not SELF_CONTAINED.match(prev) or PRONOUN.search(prev)) or OTHER_ONE.match(prev)
+                            or (CORRECTION.match(prev) and len(_words(prev)) <= 9)):
+        prev = resolve(prev, [{"role": "user", "content": u} for u in users[:-1]])[0]     # chain of follow-ups
     q = query.strip()
     words = _words(q)
     if not words or len(words) > 9 or RELDAY.search(q):
-        return query          # "the next day" is resolved against the previous date in intent.py
+        return query, None          # "the next day" is resolved against the previous date in intent.py
 
     if out := _variant_swap(q, prev):
-        return out
+        return out, "refine"
+    if OTHER_ONE.match(q) and (out := _other_one(prev)):
+        return out, "swap"
     if out := _date_swap(q, prev):
-        return out
+        return out, "date"
+    cm = CORRECTION.match(q)
+    if cm:
+        body = (cm.group("body") or cm.group("body2") or "").strip(" ?.!")
+        if body and len(_words(body)) <= 7 and not SELF_CONTAINED.match(body):
+            # a correction re-reads the previous question with the missing piece: "why is history so terrible" + "no i mean the teachers"
+            return f"{prev.rstrip('?. ')} ({body})", "correct"
 
     lead = LEAD_FOLLOW.match(q)
     body = q[lead.end():] if lead else q
@@ -124,7 +163,7 @@ def rewrite_followup(query: str, history: list[dict] | None) -> str:
     subj = subject_of(prev)
     stand_alone = SELF_CONTAINED.match(body_s) and not PRONOUN.search(body_s) and not ATTR_ONLY.match(body_s)
     if stand_alone:
-        return query
+        return query, None
 
     # pronoun reference: "who teaches it?" / "what room is that in?" / "when do they meet?"
     if PRONOUN.search(body_s):
@@ -132,11 +171,11 @@ def rewrite_followup(query: str, history: list[dict] | None) -> str:
         out = re.sub(r"\b(?:it|that|this|them|they|those|these|there)\b", repl, body_s, count=1, flags=re.I)
         out = re.sub(r"\b(?:its|his|her)\b", repl + "'s", out, count=1, flags=re.I) if out == body_s else out
         out = re.sub(r"\b(?:he|she|him)\b", repl, out, count=1, flags=re.I) if out == body_s else out
-        return out if out != body_s else f"{body_s} ({subj})"
+        return (out if out != body_s else f"{body_s} ({subj})"), "pronoun"
 
     # attribute only: "what room?", "who is the advisor?"
     if ATTR_ONLY.match(body_s):
-        return f"{subj}: {body_s}"
+        return f"{subj}: {body_s}", "attr"
 
     # "and Block 4?" / "what about Intro to Film?": same question, new subject
     if lead and body_s and len(_words(body_s)) <= 6 and not re.match(r"the (one|next|previous|other|last)\b", body_s, re.I):
@@ -144,9 +183,9 @@ def rewrite_followup(query: str, history: list[dict] | None) -> str:
         if fm and fm.end() < len(prev.strip().rstrip("?. ")):
             tail = TRAIL_VERB.search(prev.strip().rstrip("?. !"))
             suffix = tail.group(0) if tail else ""
-            return f"{prev.strip()[:fm.end()]}{body_s.rstrip('?. !')}{suffix}?".replace("  ", " ")
-        return f"{body_s.rstrip('?')} ({subj})"
-    return query
+            return f"{prev.strip()[:fm.end()]}{body_s.rstrip('?. !')}{suffix}?".replace("  ", " "), "subject"
+        return f"{body_s.rstrip('?')} ({subj})", "subject"
+    return query, None
 
 
 # ------------------------------------------------------------------ grade (client-side preference)
