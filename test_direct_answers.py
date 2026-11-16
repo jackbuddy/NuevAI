@@ -150,7 +150,7 @@ def ask(q, ents, history=None, campus=None, grade=None, notes=None, conf=1.0):
 
 
 d = ask("Who teaches Biology?", [BIO_FALL, BIO_SPRING, BIO_RES])
-check("direct teach: 'Who teaches Biology?' answers from the current-semester course record", d and d["kind"] == "teach" and "Biology (Fall 2026) is offered in these sections" in d["answer"]
+check("direct teach: 'Who teaches Biology?' answers from the current-semester course record", d and d["kind"] == "teach" and "Biology (Fall 2026) is taught by Lindy Jensen and Mara Ballmer." in d["answer"] and "Sections:" in d["answer"]
       and "Spring 2027" not in d["answer"], str(d))
 check("direct teach: the unconfirmed-entry caveat is reproduced per line and summarised", d and f"Lindy Jensen {CAVEAT}" in d["answer"] and "not confirmed by the master schedule" in d["answer"], str(d))
 check("direct teach: sources named, similar course names offered", d and d["sources"][0]["type"] == "schedule" and "Source: The Sheet - Master Schedule 2026-27" in d["answer"]
@@ -287,7 +287,9 @@ done = [d_ for e, d_ in evs if e == "done"][0]
 text = "".join(d_["t"] for e, d_ in evs if e == "delta")
 check("server stream: events are meta, delta..., done", kinds[0] == "meta" and kinds[-1] == "done" and "delta" in kinds and r.status_code == 200, str(kinds))
 check("server stream: route 'direct', model 'none', not limited, answer is the record", done.get("route") == "direct" and done.get("model") == "none" and done.get("limited") is False
-      and "Biology (Fall 2026) is offered" in text and BoomGroq.calls == 0, str(done))
+      and "Biology (Fall 2026) is taught by" in text and BoomGroq.calls == 0, str(done))
+check("direct teach: the course answer leads with the teachers, sections follow", __import__("direct")._lead_with_teachers("X (Fall 2026) is offered in these sections:\n- Block 1: A, room 1\n- Block 2: B, room 2\nTaught by: A, B.").startswith("X (Fall 2026) is taught by A and B.\n\nSections:\n- Block 1"))
+check("direct teach: an unparseable record is returned unchanged", __import__("direct")._lead_with_teachers("something else") == "something else")
 check("server stream: meta carries the sources", [d_ for e, d_ in evs if e == "meta"][0]["sources"][0]["type"] == "schedule")
 r = client.post("/api/chat/stream", json={"query": "Who teaches Biology?"})
 done2 = [d_ for e, d_ in sse(r) if e == "done"][0]

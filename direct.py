@@ -105,6 +105,21 @@ def _caveat(text: str) -> str:
     return "Entries marked \"listed only on the course offerings sheet\" are not confirmed by the master schedule."
 
 
+def _lead_with_teachers(body: str) -> str:
+    """A course record reads 'X (Fall 2026) is offered in these sections: ...lines... Taught by: A, B, C.'. A student asking 'who teaches X' wants
+    the names first: 'X (Fall 2026) is taught by A, B and C.', then the sections underneath. Anything that does not parse is returned unchanged."""
+    m = re.search(r"^Taught by:\s*(.+?)\.?\s*$", body, re.M)
+    head = body.split("\n", 1)[0]
+    if not m or not re.search(r"is offered in these sections:?$", head):
+        return body
+    names = [n.strip() for n in m.group(1).split(",") if n.strip()]
+    if not names:
+        return body
+    who = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+    sections = body[len(head):m.start()].strip("\n")
+    return re.sub(r"\s*is offered in these sections:?$", "", head) + f" is taught by {who}.\n\nSections:\n" + sections
+
+
 def teach_answer(query: str, result: dict, today: date) -> dict | None:
     if MULTI_PART.search(query) or len(query.split()) > MAX_WORDS:
         return None
@@ -128,6 +143,8 @@ def teach_answer(query: str, result: dict, today: date) -> dict | None:
     else:
         recs = [t_rec or c_rec]
         body = _body(recs[0])
+        if c_rec and not t_rec:
+            body = _lead_with_teachers(body)
     parts = [body]
     if cav := _caveat(body):
         parts.append(cav)
