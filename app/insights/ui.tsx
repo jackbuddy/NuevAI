@@ -6,7 +6,7 @@ import { useId, useMemo, useState } from 'react';
 // Muted categorical hues, derived from the brand navy and the accent hues already used on Calendar / Resources.
 export const PAL = ['#1b4177', '#3d8f86', '#c08a2b', '#b5607a', '#7a68b0', '#4673b3', '#8a9a5b', '#9aa7bd'];
 export const colorFor = (i: number) => PAL[i % PAL.length];
-const CAT: Record<string, string> = { 'unknown (older event)': '#c5cfdd' };
+const CAT: Record<string, string> = { 'unknown (older event)': '#c5cfdd', 'Left without doing anything': '#c5cfdd' };
 export const catColor = (name: string, i: number) => CAT[name] ?? colorFor(i);
 
 export const fmtInt = (v: number | null | undefined) => (v == null ? '—' : Math.round(v).toLocaleString());
@@ -144,6 +144,53 @@ export function Bars({ data, color = PAL[0], height = 120, unit = '', title, tab
         {data.map((d, k) => <span key={k} className="ink-2 min-w-0 flex-1 overflow-visible whitespace-nowrap text-center text-[9px] leading-none">{k % step === 0 ? d.label : ''}</span>)}
       </div>
       <DataTable head={tableHead} rows={data.map((d) => [d.label, d.value])} />
+    </div>
+  );
+}
+
+export interface PieDatum { label: string; value: number }
+
+/** Pie chart with a legend that carries every number (colour is never the only cue), hover/focus readout and a table fallback. */
+export function Pie({ data, title, tableHead = ['Slice', 'Count'] }: { data: PieDatum[]; title: string; tableHead?: string[] }) {
+  const rows = data.filter((d) => d.value > 0);
+  const total = rows.reduce((a, d) => a + d.value, 0);
+  const [hot, setHot] = useState<number | null>(null);
+  if (!total) return <Empty />;
+  const R = 70, C = 80;
+  let acc = 0;
+  const slices = rows.map((d, i) => {
+    const a0 = (acc / total) * Math.PI * 2 - Math.PI / 2;
+    acc += d.value;
+    const a1 = (acc / total) * Math.PI * 2 - Math.PI / 2;
+    const large = a1 - a0 > Math.PI ? 1 : 0;
+    const pt = (a: number) => `${(C + R * Math.cos(a)).toFixed(2)} ${(C + R * Math.sin(a)).toFixed(2)}`;
+    // a single slice is a full circle: an arc with identical endpoints draws nothing
+    const path = rows.length === 1 ? `M ${C - R} ${C} a ${R} ${R} 0 1 0 ${R * 2} 0 a ${R} ${R} 0 1 0 ${-R * 2} 0` : `M ${C} ${C} L ${pt(a0)} A ${R} ${R} 0 ${large} 1 ${pt(a1)} Z`;
+    return { path, color: catColor(d.label, i), d, i };
+  });
+  const active = hot != null ? rows[hot] : null;
+  return (
+    <div>
+      <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
+        <svg viewBox="0 0 160 160" role="img" aria-label={`${title}. ${rows.map((d) => `${d.label} ${d.value} of ${total}`).join(', ')}`} className="h-40 w-40 shrink-0">
+          {slices.map((sl) => (
+            <path key={sl.i} d={sl.path} fill={sl.color} stroke="#fff" strokeWidth={1.5} opacity={hot == null || hot === sl.i ? 1 : 0.4}
+                  onMouseEnter={() => setHot(sl.i)} onMouseLeave={() => setHot(null)}><title>{`${sl.d.label}: ${sl.d.value} (${((sl.d.value / total) * 100).toFixed(0)}%)`}</title></path>
+          ))}
+        </svg>
+        <ul className="w-full min-w-0 flex-1 space-y-1.5 text-sm" aria-label={`${title} legend`}>
+          {rows.map((d, i) => (
+            <li key={d.label} tabIndex={0} onMouseEnter={() => setHot(i)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(i)} onBlur={() => setHot(null)}
+                className={`flex items-center gap-2 rounded-md px-1 py-0.5 ${hot === i ? 'bg-[var(--surface-2)]' : ''}`}>
+              <span aria-hidden className="h-3 w-3 shrink-0 rounded-sm" style={{ background: catColor(d.label, i) }} />
+              <span className="min-w-0 flex-1">{d.label}</span>
+              <span className="tabular-nums"><b>{d.value}</b> <span className="ink-2 text-xs">{Math.round((d.value / total) * 100)}%</span></span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <p className="ink-2 mt-1 min-h-4 text-xs" aria-live="polite">{active ? `${active.label}: ${active.value} of ${total} (${Math.round((active.value / total) * 100)}%)` : `${total} in total.`}</p>
+      <DataTable head={tableHead} rows={rows.map((d) => [d.label, d.value])} />
     </div>
   );
 }

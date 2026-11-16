@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Flagged } from './flagged';
-import { Bars, Card, catColor, DataTable, Delta, Empty, fmtInt, fmtMs, fmtPct, fmtTok, HBars, Heat, Help, Kpi, Meter, Notice, pac, Pill, SimpleTable, Stacked, ago, PAL } from './ui';
+import { Bars, Card, catColor, DataTable, Delta, Empty, fmtInt, fmtMs, fmtPct, fmtTok, HBars, Heat, Help, Kpi, Meter, Notice, pac, Pie, Pill, SimpleTable, Stacked, ago, PAL } from './ui';
 
 // The payload is built by insights.py; it is typed loosely here on purpose (the server owns the shape, empty states handle gaps).
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -46,6 +46,60 @@ export function Overview({ m, aud, days, setAud }: Ctx) {
       <Card title={`Active users per ${m.meta.granularity}`}>
         <Bars data={barData(m, 'active', 'active users')} color={PAL[1]} title="Active users" tableHead={['Bucket', 'Active users']} />
       </Card>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ First visit (first-time users)
+export function FirstVisit({ m, days }: Ctx) {
+  const f = m.first_time;
+  if (!f) return <Empty>This server version does not send first-time data yet.</Empty>;
+  const p = f.pipeline as { step: string; n: number; of_first: number | null; of_prev: number | null }[];
+  const pick = (s: string) => p.find((x) => x.step === s);
+  const asked = pick('Asked a question'), back = pick('Came back another day'), did = pick('Did something');
+  const top = Math.max(1, f.n);
+  const small = f.n > 0 && f.n < 20;
+  return (
+    <div className="space-y-4">
+      {f.n === 0 ? <Notice>No browsers saw NuevAI for the first time in the last {rangeLabel(days)}. Try a longer range.</Notice> : small && <Notice tone="warn">Only {f.n} first-time {f.n === 1 ? 'browser' : 'browsers'} in this range: read the rates as anecdotes, not trends.</Notice>}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Kpi label="First-time visitors" value={fmtInt(f.n)} help={`Browsers whose very first event (ever) falls in the last ${rangeLabel(days)}. Checked against the whole history, so a returning person is not counted as new.`} sub="first ever visit in this range" />
+        <Kpi label="Asked a question" value={fmtPct(asked?.of_first)} sub={`${fmtInt(asked?.n)} of ${fmtInt(f.n)}`} help="Share of first-time visitors who asked at least one question. This is the activation rate: the number to push up." />
+        <Kpi label="Saw the welcome screen" value={fmtPct(f.saw_welcome_rate)} sub={`${fmtInt(f.saw_welcome)} of ${fmtInt(f.n)}`} help="The first-visit screen only shows when someone has no saved role or campus, and it has only been tracked since it shipped. Browsers that came earlier are not counted here." />
+        <Kpi label="Came back another day" value={fmtPct(back?.of_first)} sub={`${fmtInt(back?.n)} of ${fmtInt(f.n)}`} help="Share seen on a second calendar day (Pacific). Recent visitors have not had time to come back yet, so this undercounts for short ranges." />
+      </div>
+
+      <Card title="First-time user pipeline" help="Each bar is first-time visitors who reached that step, scaled to the first bar. The grey text is the step-to-step rate. Steps are counted independently from their own events, so a step can look larger than the one before it if an event was collected unevenly.">
+        {f.n ? (
+          <ol className="space-y-2.5">
+            {p.map((s, i) => (
+              <li key={s.step}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span>{s.step}</span>
+                  <span className="tabular-nums"><b>{fmtInt(s.n)}</b> <span className="ink-2 text-xs">{fmtPct(s.of_first)}{i > 0 && s.of_prev != null ? ` · ${fmtPct(s.of_prev)} of previous` : ''}</span></span>
+                </div>
+                <div className="surface-2 mt-0.5 h-2.5 overflow-hidden rounded-full"><div className="h-full rounded-full" style={{ width: `${Math.min(100, (s.n / top) * 100)}%`, background: PAL[0], opacity: 1 - i * 0.09 }} /></div>
+              </li>
+            ))}
+          </ol>
+        ) : <Empty />}
+        {f.worst_drop && <p className="mt-3 rounded-xl bg-brand-50 p-2.5 text-xs text-brand-800"><b>Biggest drop:</b> {fmtPct(f.worst_drop.lost)} of people stopped between “{f.worst_drop.from}” and “{f.worst_drop.to}”. That is the step to work on first.</p>}
+        <DataTable head={['Step', 'Browsers', '% of first-time', '% of previous step']} rows={p.map((s) => [s.step, s.n, fmtPct(s.of_first), s.of_prev == null ? '—' : fmtPct(s.of_prev)])} />
+      </Card>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card title="What first-time visitors do first" help="The first real action each new browser took: tapping a starter, typing, tapping a Happening card, opening Ideas, Calendar or Resources, setting a role or campus, or nothing at all. Page loads and automatic events do not count as an action.">
+          <Pie data={(f.pie as { label: string; n: number }[]).map((x) => ({ label: x.label, value: x.n }))} title="First action of first-time visitors" tableHead={['First action', 'Browsers']} />
+        </Card>
+        <Card title="How fast the first visit goes" help="Median seconds from the first thing a new browser did until its first question, and the median time from asking to seeing the full first answer (the first_answer_seen event).">
+          <ul className="space-y-2 text-sm">
+            <li className="flex items-baseline justify-between gap-3"><span>Time to first question</span><b className="tabular-nums">{f.median_s_to_first_question == null ? '—' : f.median_s_to_first_question >= 60 ? `${(f.median_s_to_first_question / 60).toFixed(1)} min` : `${Math.round(f.median_s_to_first_question)} s`} <span className="ink-2 text-xs font-normal">n={f.n_first_question}</span></b></li>
+            <li className="flex items-baseline justify-between gap-3"><span>First answer on screen</span><b className="tabular-nums">{fmtMs(f.median_ms_first_answer)} <span className="ink-2 text-xs font-normal">n={f.n_first_answer}</span></b></li>
+            <li className="flex items-baseline justify-between gap-3"><span>Did something at all</span><b className="tabular-nums">{fmtPct(did?.of_first)} <span className="ink-2 text-xs font-normal">{fmtInt(did?.n)} of {fmtInt(f.n)}</span></b></li>
+          </ul>
+          <p className="ink-2 mt-3 text-xs">{f.note}</p>
+        </Card>
+      </div>
     </div>
   );
 }

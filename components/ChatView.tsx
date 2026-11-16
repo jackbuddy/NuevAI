@@ -336,7 +336,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar, onOpenReso
                 What would you like to <span className="bg-gradient-to-r from-brand-600 to-sky-500 bg-clip-text text-transparent">know</span>?
               </h1>
               {firstRun && (
-                <p className="ink-2 mt-3 max-w-xl text-[13px] leading-relaxed sm:text-sm">Answers come from Nueva’s calendar, lunch menus and school documents, and can be wrong. Check the sources.</p>
+                <p className="mt-3 max-w-xl text-[15px] leading-snug text-brand-700 sm:text-base">Ask in plain English, like a text to a friend who knows the school. Tap one to try it.</p>
               )}
             </div>
 
@@ -357,14 +357,30 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar, onOpenReso
               </div>
             )}
 
-            <div className="animate-rise mt-4 flex flex-wrap justify-center gap-2" style={{ animationDelay: '140ms' }}>
-              {startersShown.map((s) => (
-                <button key={s.label} onClick={() => { track('starter_click', { label: s.label }); send(s.label, 'starter'); }}
-                        className="surface-2 tap-h inline-flex items-center gap-2 rounded-full border border-transparent px-4 py-2 text-[13px] font-medium text-brand-800 transition hover:border-[var(--line)] hover:bg-white hover:shadow-soft">
-                  <s.icon className="h-3.5 w-3.5 text-brand-500" />{s.label}
-                </button>
-              ))}
-            </div>
+            {firstRun ? (
+              /* first visit: bigger tap cards that read as "try me", with the accuracy note kept small underneath instead of leading */
+              <div className="animate-rise mt-5" style={{ animationDelay: '140ms' }}>
+                <div className="grid grid-cols-2 gap-2.5" role="group" aria-label="Try one of these questions">
+                  {startersShown.map((s) => (
+                    <button key={s.label} onClick={() => { track('starter_click', { label: s.label, first_run: true }); send(s.label, 'starter'); }}
+                            className="surface shadow-soft tap-h group flex min-h-[4.5rem] flex-col items-start justify-between gap-2 rounded-2xl p-3.5 text-left transition hover:-translate-y-0.5 hover:shadow-lift">
+                      <span className="grid h-7 w-7 place-items-center rounded-full bg-brand-100 text-brand-700"><s.icon className="h-4 w-4" aria-hidden /></span>
+                      <span className="text-[14px] font-semibold leading-snug text-brand-900">{s.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="ink-2 mt-3 text-center text-[12px] leading-snug">Answers come from Nueva’s calendar, lunch menus and school documents, and can be wrong. Check the sources.</p>
+              </div>
+            ) : (
+              <div className="animate-rise mt-4 flex flex-wrap justify-center gap-2" style={{ animationDelay: '140ms' }}>
+                {startersShown.map((s) => (
+                  <button key={s.label} onClick={() => { track('starter_click', { label: s.label }); send(s.label, 'starter'); }}
+                          className="surface-2 tap-h inline-flex items-center gap-2 rounded-full border border-transparent px-4 py-2 text-[13px] font-medium text-brand-800 transition hover:border-[var(--line)] hover:bg-white hover:shadow-soft">
+                    <s.icon className="h-3.5 w-3.5 text-brand-500" />{s.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <WhatsNew />
             <Happening campus={campus} onCampus={chooseCampus} onOpenCalendar={onOpenCalendar} onAsk={(q) => send(q, 'starter')} />

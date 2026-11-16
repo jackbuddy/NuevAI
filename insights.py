@@ -379,6 +379,12 @@ def build(rows, now: datetime, days: int, selector: str = "users", profiles=None
               {"step": "Came back another day", "n": len(came_back & answered) if answered else len(came_back)}]
     bounced = sorted(f_users - inter)
     no_interaction = {"browsers": len(bounced), "of": len(f_users)}
+    by_anon = defaultdict(list)
+    for e in events:
+        if e.aud != "system":
+            by_anon[e.anon].append(e)
+    new_users = {a for a in f_users if a in prof and (w_start is None or prof[a]["first"] >= w_start) and prof[a]["first"] <= w_end}
+    first_time = first_time_section(by_anon, new_users, prof)
 
     cohorts, overall = cohort_retention(sel_prof, today)
     sess_per = [pr["sessions"] for a, pr in sel_prof.items() if a in f_users and pr["sessions"]]
@@ -517,7 +523,7 @@ def build(rows, now: datetime, days: int, selector: str = "users", profiles=None
             "rows_loaded": len(rows), "duplicates_removed": dups, "truncated": truncated, "profile_source": profile_source,
             "first_event": events[0].t.isoformat() if events else None, "last_event": events[-1].t.isoformat() if events else None}
     return {"meta": meta, "health": health or {}, "kpis": {"cur": cur, "prev": prev}, "series": series, "adoption": adoption, "funnel": funnel,
-            "no_interaction": no_interaction, "cohorts": cohorts, "retention": overall, "usage": usage, "today": today_tl, "engagement": engagement,
+            "first_time": first_time, "no_interaction": no_interaction, "cohorts": cohorts, "retention": overall, "usage": usage, "today": today_tl, "engagement": engagement,
             "content": content, "quality": quality, "system": system, "recent": recent, "audiences": audiences, "notes": notes, "diagnostics": diagnostics,
             "top_questions": [[q["key"], q["n"]] for q in top_questions]}
 
@@ -532,6 +538,103 @@ def _safe(pred, e) -> bool:
         return bool(pred(e.name, e.p))
     except Exception:
         return False
+
+
+# What a first-time visitor did FIRST, for the pie chart. Passive/system events and the bookkeeping events that follow an action
+# (onboarding_dismiss, hints) never count as the first action.
+_FIRST_SKIP = PASSIVE | {"onboarding_dismiss", "hint_click", "hint_dismiss", "chat_answered", "feedback", "feedback_text", "feedback_open", "feedback_detail",
+                         "answer_check", "sources_toggle", "copy_answer", "chat_cleared", "chat_auto_retry", "chat_error_ui", "outbound_click", "answer_link_click", "install_accept", "install_dismiss"}
+FIRST_ACTION_LABELS = ["Tapped a starter question", "Typed a question", "Tapped a Happening card", "Opened the Ideas sheet", "Opened Calendar", "Opened Resources",
+                       "Set role or campus", "Something else", "Left without doing anything"]
+
+
+def first_action_of(evs: list) -> str:
+    """Label for the first meaningful thing a browser did, or 'Left without doing anything'."""
+    for e in evs:
+        n, p = e.name, e.p
+        if p.get("_src") == "server" or n in _FIRST_SKIP:
+            continue
+        if n == "tab_view":
+            if p.get("source") in ("load", "url"):
+                continue
+            return {"calendar": "Opened Calendar", "resources": "Opened Resources"}.get(p.get("tab"), "Something else")
+        if n == "starter_click" or (n == "chat_sent" and p.get("via") == "starter"):
+            return "Tapped a starter question"
+        if n == "chat_sent":
+            return {"typed": "Typed a question", "ask": "Tapped a Happening card", "idea": "Opened the Ideas sheet", "retry": "Typed a question"}.get(p.get("via"), "Typed a question")
+        if n.startswith("happening_") or n == "today_strip_click":
+            return "Tapped a Happening card"
+        if n in ("ideas_open", "idea_click"):
+            return "Opened the Ideas sheet"
+        if n.startswith("calendar_"):
+            return "Opened Calendar"
+        if n.startswith("resource_"):
+            return "Opened Resources"
+        if n == "pref_set":
+            return "Set role or campus"
+        return "Something else"
+    return "Left without doing anything"
+
+
+def first_time_section(by_anon: dict, new_users: set, prof: dict) -> dict:
+    """The first-visit pipeline for browsers whose first-ever event falls in the selected range.
+
+    new -> did something -> asked -> got an answer -> the answer held up -> rated it or asked again -> came back another day.
+    Each step is a subset of the one before. The welcome screen is reported separately (saw_welcome): it only shows when someone has no saved
+    role or campus, so it is a side stat, not a step everyone passes through.
+    """
+    n = len(new_users)
+    seen_welcome, acted, asked, answered, well, engaged, back = set(), set(), set(), set(), set(), set(), set()
+    first_actions = Counter()
+    t_question, t_answer_ms = [], []
+    for a in new_users:
+        evs = by_anon.get(a, [])
+        first_actions[first_action_of(evs)] += 1
+        if any(e.name == "onboarding_shown" for e in evs):
+            seen_welcome.add(a)
+        if any(e.p.get("_src") != "server" and is_interaction(e) for e in evs):
+            acted.add(a)
+        sent = [e for e in evs if e.name == "chat_sent"]
+        ans = [e for e in evs if e.name == "chat_answered"]
+        if sent or ans:
+            asked.add(a)
+        if ans or any(e.name == "first_answer_seen" for e in evs):
+            answered.add(a)
+        if ans and is_well(ans[0].p):
+            well.add(a)
+        if len(sent) >= 2 or len(ans) >= 2 or any(e.name == "feedback" for e in evs):
+            engaged.add(a)
+        if a in prof and len(set(prof[a]["dates"])) >= 2:
+            back.add(a)
+        if sent and evs:
+            t_question.append((sent[0].t - evs[0].t).total_seconds())
+        fa = [e for e in evs if e.name == "first_answer_seen"]
+        if fa and fa[0].p.get("total_ms"):
+            t_answer_ms.append(fa[0].p["total_ms"])
+    # make every step a true subset of the one before (anyone who got an answer obviously asked and did something), so the rates never exceed 100%
+    answered |= well
+    asked |= answered
+    acted |= asked
+    engaged &= answered
+    back &= answered
+    steps = [("New visitors", n), ("Did something", len(acted)), ("Asked a question", len(asked)), ("Got an answer", len(answered)),
+             ("Answer held up", len(well)), ("Rated it or asked again", len(engaged)), ("Came back another day", len(back))]
+    pipeline = []
+    for i, (label, c) in enumerate(steps):
+        prev = steps[i - 1][1] if i else None
+        pipeline.append({"step": label, "n": c, "of_first": ratio(c, n), "of_prev": ratio(c, prev) if prev else None})
+    worst = None                  # the biggest real drop between neighbouring steps (steps that grew are collection gaps, not drops)
+    for i in range(1, len(steps)):
+        if steps[i - 1][1] >= 5 and steps[i][1] <= steps[i - 1][1]:
+            lost = 1 - steps[i][1] / steps[i - 1][1]
+            if worst is None or lost > worst[0]:
+                worst = (lost, steps[i - 1][0], steps[i][0])
+    pie = [{"label": k, "n": first_actions[k]} for k in FIRST_ACTION_LABELS if first_actions[k]]
+    return {"n": n, "pipeline": pipeline, "pie": pie, "saw_welcome": len(seen_welcome), "saw_welcome_rate": ratio(len(seen_welcome), n),
+            "worst_drop": {"from": worst[1], "to": worst[2], "lost": round(worst[0], 3)} if worst else None,
+            "median_s_to_first_question": pct(t_question, .5), "n_first_question": len(t_question),
+            "median_ms_first_answer": pct(t_answer_ms, .5), "n_first_answer": len(t_answer_ms),
+            "note": "Welcome-screen and first-answer events have only been collected since they shipped, so older browsers show 0 there; the other steps use events collected from the start."}
 
 
 # ---------------------------------------------------------------- cohorts / retention

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Logo } from '@/components/Logo';
 import { isInternal, setInternal } from '@/lib/analytics';
-import { Adoption, AudiencePanel, Engagement, Notes, Overview, Questions, Quality, Recent, System, Usage, type Ctx, type M } from './sections';
+import { Adoption, AudiencePanel, Engagement, FirstVisit, Notes, Overview, Questions, Quality, Recent, System, Usage, type Ctx, type M } from './sections';
 import { ago, Help, pac, Pill } from './ui';
 
 const TOKEN_KEY = 'nuevai.metrics.token';
@@ -11,7 +11,7 @@ const OPTOUT_KEY = 'nuevai.internal.optout';
 const RANGES: { d: number; label: string }[] = [{ d: 1, label: '24h' }, { d: 7, label: '7d' }, { d: 30, label: '30d' }, { d: 90, label: '90d' }, { d: 0, label: 'All' }];
 const AUDS: { id: string; label: string }[] = [{ id: 'users', label: 'Real users' }, { id: 'users_internal', label: 'Users + internal' }, { id: 'test_bots', label: 'Test & bots' }, { id: 'all', label: 'Everything' }];
 const TABS = [
-  { id: 'overview', label: 'Overview' }, { id: 'adoption', label: 'Adoption' }, { id: 'usage', label: 'Usage' }, { id: 'engagement', label: 'Engagement' },
+  { id: 'overview', label: 'Overview' }, { id: 'firstvisit', label: 'First visit' }, { id: 'adoption', label: 'Adoption' }, { id: 'usage', label: 'Usage' }, { id: 'engagement', label: 'Engagement' },
   { id: 'questions', label: 'Questions' }, { id: 'quality', label: 'Quality' }, { id: 'system', label: 'System' }, { id: 'recent', label: 'Recent' },
   { id: 'audience', label: 'Audience' }, { id: 'notes', label: 'Data notes' },
 ] as const;
@@ -150,6 +150,7 @@ export default function Insights() {
               <div id="panel" role="tabpanel" aria-labelledby={`tab-${tab}`} className="pt-4">
                 <p className="ink-2 mb-3 text-xs">{m.meta.window.start ? `${pac(m.meta.window.start, { month: 'short', day: 'numeric', hour: 'numeric' })} to ${pac(m.meta.window.end, { month: 'short', day: 'numeric', hour: 'numeric' })} PT` : 'All time'} · <Pill tone={aud === 'users' ? 'info' : 'neutral'}>{AUDS.find((a) => a.id === aud)?.label}</Pill>{' '}{m.meta.profile_source !== 'sql_all_time' && <Pill tone="warn">first-seen from loaded rows only</Pill>}</p>
                 {tab === 'overview' && <Overview {...ctx} />}
+                {tab === 'firstvisit' && <FirstVisit {...ctx} />}
                 {tab === 'adoption' && <Adoption {...ctx} />}
                 {tab === 'usage' && <Usage {...ctx} />}
                 {tab === 'engagement' && <Engagement {...ctx} />}

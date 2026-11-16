@@ -513,6 +513,32 @@ src = {n: open(os.path.join(os.path.dirname(__file__), n)).read() for n in ("eva
 check("harnesses: eval_golden / eval_redteam use test-<harness>- ids and send the test header", 'test-golden-' in src["eval_golden.py"] and 'test-redteam-' in src["eval_redteam.py"]
       and "x-nuevai-test" in src["eval_golden.py"] and "x-nuevai-test" in src["eval_redteam.py"])
 
+# ================================================================== first-time user pipeline + pie
+_t = lambda m: NOW - timedelta(days=2) + timedelta(minutes=m)
+n1, n2, n3, n4, old = "n1" * 6, "n2" * 6, "n3" * 6, "n4" * 6, "ol" * 6
+ft_rows = [
+    row(_t(0), n1, "session_start", {"visit_number": 1}), row(_t(0), n1, "onboarding_shown", {"variant": "first_run_v1"}), row(_t(1), n1, "starter_click", {"label": "x"}),
+    row(_t(1), n1, "chat_sent", {"via": "starter"}), chat(_t(2), n1), row(_t(2), n1, "first_answer_seen", {"ms": 800, "total_ms": 2500}), row(_t(3), n1, "feedback", {"value": "up"}),
+    row(_t(0), n2, "session_start", {"visit_number": 1}), row(_t(5), n2, "chat_sent", {"via": "typed"}), chat(_t(6), n2, fallback=True),
+    row(_t(0), n3, "session_start", {"visit_number": 1}), row(_t(0), n3, "page_view"),
+    row(_t(0), n4, "session_start", {"visit_number": 1}), row(_t(2), n4, "tab_view", {"tab": "chat", "source": "load"}), row(_t(3), n4, "tab_view", {"tab": "calendar", "source": "nav"}),
+    row(_t(0), old, "session_start", {"visit_number": 5}), row(_t(4), old, "chat_sent", {"via": "typed"}), chat(_t(5), old),
+]
+ft_profiles = [prof(n1, _t(0), [_t(0).date(), (_t(0) + timedelta(days=1)).date()]), prof(n2, _t(0), [_t(0).date()]), prof(n3, _t(0), [_t(0).date()]),
+               prof(n4, _t(0), [_t(0).date()]), prof(old, NOW - timedelta(days=30), [(NOW - timedelta(days=30)).date(), _t(0).date()])]
+ftm = I.build(ft_rows, NOW, 7, "users", profiles=ft_profiles)["first_time"]
+steps = {s["step"]: s["n"] for s in ftm["pipeline"]}
+check("first-time: only browsers first seen in the range are counted (the old browser is excluded)", ftm["n"] == 4 and steps["New visitors"] == 4, str(ftm["pipeline"]))
+check("first-time: pipeline steps count what they say", ftm["saw_welcome"] == 1 and steps["Did something"] == 3 and steps["Asked a question"] == 2
+      and steps["Got an answer"] == 2 and steps["Answer held up"] == 1 and steps["Rated it or asked again"] == 1 and steps["Came back another day"] == 1, str(steps))
+pie = {x["label"]: x["n"] for x in ftm["pie"]}
+check("first-time: pie shows what each browser did first", pie == {"Tapped a starter question": 1, "Typed a question": 1, "Opened Calendar": 1, "Left without doing anything": 1}, str(pie))
+check("first-time: pie slices add up to the number of new browsers", sum(pie.values()) == ftm["n"])
+check("first-time: rates are step-to-step and of-first", ftm["pipeline"][2]["of_prev"] == round(2 / 3, 3) and ftm["pipeline"][2]["of_first"] == 0.5)
+check("first-time: every step is a subset of the one before (no rate above 100%)", all(x["of_prev"] is None or x["of_prev"] <= 1 for x in ftm["pipeline"]))
+check("first-time: timing medians from the first answer event", ftm["median_ms_first_answer"] == 2500 and ftm["n_first_answer"] == 1 and ftm["median_s_to_first_question"] is not None)
+check("first-time: empty range does not crash", I.build([], NOW, 7, "users", profiles=[])["first_time"]["n"] == 0)
+
 fails = [n for n, ok_ in RESULTS if not ok_]
 print(f"\n{len(RESULTS) - len(fails)}/{len(RESULTS)} passed")
 sys.exit(1 if fails else 0)
