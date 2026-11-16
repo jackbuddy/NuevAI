@@ -30,6 +30,7 @@ import lunch_lookup
 import refusal
 import audience
 import chat_trace
+import direct
 from chat_trace import Trace
 
 load_dotenv()
@@ -534,30 +535,72 @@ def _prepare(req: QueryRequest, trace: Trace | None = None):
     return msgs, sources, result, now
 
 
+def _calendar_question(result: dict) -> bool:
+    """True when the question is really about the calendar (a team, a game, a date, a day type, a holiday or a named event), so that
+    calendar lines belong in a fallback answer. A bare keyword match ("finals", "ap") over many events is not enough."""
+    it = result.get("intent")
+    events = result.get("events") or []
+    if it is None or not events:
+        return False
+    if it.sport or it.kind or it.category or it.dayinfo or it.date_given or it.holidays:
+        return True
+    if it.keywords:
+        import understand
+        q = result.get("resolved") or ""
+        return len(events) <= 4 or str(it.label).startswith("events matching") or bool(understand.calendar_alias(q))
+    return False
+
+
 def degraded_answer(sources: list[dict], result: dict | None, reason: str = "llm") -> str:
-    """What to show when the model cannot write the answer: the facts we already retrieved, as plain text and links.
-    Uses only retrieved data (calendar lines, confirmed facts, titles, links), never anything generated."""
-    lines = ["I'm having trouble writing a full answer right now (the AI service is busy), but here is what I found in the school's information. "
-             "Please try asking again in a minute."]
+    """What to show when the model cannot write the answer: the parts of what we already retrieved that answer the question, as plain text
+    and links. Only retrieved text (calendar lines for calendar questions, the teaching records, confirmed facts, the best passages of the
+    top documents quoted as written, scrubbed like the model's context), never anything generated."""
     result = result or {}
     if result.get("lunch"):
         from rag import lunch_plain_answer          # exact records, no model needed: this answer is complete as it is
         return lunch_plain_answer(result["lunch"])
-    events = result.get("events") or []
-    if events:
-        from rag import fmt_event
+    import rag
+    lines = ["The AI service is busy right now, so here is what I found in the school's information; please ask again in a minute for a full answer."]
+    query = result.get("resolved") or (getattr(result.get("interp"), "text", "") or "")
+    shown = False
+    if _calendar_question(result):
+        events = result["events"]
+        try:
+            events = rag.select_events(events, result["intent"], query, 6, result.get("interp"), result.get("today")) or events
+        except Exception:
+            pass
+        hol = [h.lower() for h in (result["intent"].holidays or [])]
+        named = [e for e in events if hol and any(h in ((e.get("metadata") or {}).get("summary") or "").lower() for h in hol)]
+        events = named or events                     # "when is winter break": the winter break rows, not every other break
         lines.append("\n**On the school calendar**")
-        lines += [f"- {fmt_event(e).lstrip('- ').strip()}" for e in events[:6]]
+        lines += [f"- {rag.fmt_event(e).lstrip('- ').strip()}" for e in events[:6]]
+        shown = True
+    try:
+        subj = direct.entity_subject(query, result, result.get("today") or datetime.now(PACIFIC).date()) if result.get("entities") else None
+    except Exception:
+        subj = None
+    if subj:
+        for rec in (subj["t_rec"], subj["c_rec"]):
+            if rec:
+                lines.append("\n" + guard.scrub_context(direct._body(rec)))
+        lines.append("\n" + direct._source_line(subj["t_rec"] or subj["c_rec"]))
+        shown = True
     facts = [p for p in (result.get("pinned") or []) if (p.get("metadata") or {}).get("source") == "school_facts"]
-    for p in facts[:2]:
-        lines.append("\n" + p["content"].split("\n\n", 1)[-1][:500].strip())
-    docs = [x for x in sources if x.get("title") and (not events or x.get("type") != "calendar")]
-    if docs:
-        lines.append("\n**Related pages and documents**")
-        for x in docs[:5]:
-            title = (x.get("title") or "School document").strip()[:100]
-            lines.append(f"- [{title}]({x['url']})" if x.get("url") else f"- {title}")
-    if not events and not docs and not facts:
+    docs = result.get("docs") or []
+    cards = [d for d in docs if (d.get("metadata") or {}).get("source") == "link_registry" and (d.get("metadata") or {}).get("source_url")]
+    if cards:                                        # the link itself is the answer for "how do I book a tour"
+        lines.append("\n**Links**")
+        lines += [f"- [{(d['metadata'].get('title') or 'Link').strip()[:100]}]({d['metadata']['source_url']})" for d in cards[:3]]
+        shown = True
+    # confirmed facts and the retrieved documents are scored together: a fact about the campus phone number is not an answer about the phone policy
+    passages = [] if subj else rag.best_passages(facts + docs, query, result.get("rare") or [], k=2 if shown else 3)
+    for ps in passages:
+        lines.append(f"\n**{ps['title']}**" + (" (may be out of date)" if ps["stale"] else ""))
+        lines.append(ps["text"])
+        if ps["url"]:
+            lines.append(f"[Open the document]({ps['url']})")
+        shown = True
+    if not shown:
         lines.append("\nI could not find anything relevant to show. You can also browse the Resources and Calendar tabs.")
     return "\n".join(lines)
 
@@ -887,6 +930,8 @@ def _answer_inner(req: QueryRequest, request: Request | None, trace: Trace) -> d
                                          **_answer_props(hit["answer"], None, hit["sources"])}), trace)
         return {**hit, "cached": True, "timings": {"total_ms": total}, "route": trace.route}
     msgs, sources, result, now = _prepare(req, trace)
+    if (d := _direct(req, result, now)) is not None:
+        return _direct_response(req, request, key, d, result, t0, trace)
     model = req.model or LLM_MODEL
     trace.requested_model = model
     t_llm = time.time()
@@ -914,6 +959,35 @@ def _answer_inner(req: QueryRequest, request: Request | None, trace: Trace) -> d
     _track(req, request, _fit_props({"query": req.query[:300], "cached": False, "sources": len(sources), "no_context": not sources,
                                      **_answer_props(answer, result, sources), "ttft_ms": timings["total_ms"], "alen": len(answer), **timings}), trace)
     return {**payload, "cached": False, "timings": timings, "route": trace.route, "limited": limited}
+
+
+def _direct(req: QueryRequest, result: dict, now: datetime) -> dict | None:
+    """The no-model answer (see direct.py) when the records alone hold a complete, confident one; None -> the model answers as usual.
+    A user-chosen model (the model picker / evaluation) always goes to the model."""
+    if req.model:
+        return None
+    d = direct.direct_answer(req.query, result, [t.model_dump() for t in req.history], req.campus, req.grade, now.date())
+    if d is not None and refusal.detect(d["answer"])["refusal"]:
+        return None                          # a direct answer is never a refusal; if it reads like one, let the model word it
+    return d
+
+
+def _direct_payload(req: QueryRequest, d: dict, result: dict) -> dict:
+    return {"answer": d["answer"], "model_used": "none", "sources": d["sources"],
+            "suggestions": suggestions_for(result, req.query, req.grade, req.history, limited=False)}
+
+
+def _direct_response(req, request, key, d: dict, result: dict, t0: float, trace: Trace) -> dict:
+    """Answered from the records with no model call: same payload shape as an LLM answer, route 'direct', cached briefly in memory only."""
+    payload = _direct_payload(req, d, result)
+    total = round((time.time() - t0) * 1000)
+    timings = {**result["timings"], "total_ms": total}
+    trace.route = "direct"
+    if key and payload["sources"] and d["kind"] == "teach":          # day answers depend on the asker's campus, which the cache key does not carry
+        answer_cache.set(key, payload, ttl=NON_PRIMARY_TTL)
+    _track(req, request, _fit_props({"query": req.query[:300], "cached": False, "direct": d["kind"], "sources": len(payload["sources"]), "ttft_ms": total, "alen": len(payload["answer"]),
+                                     **_answer_props(payload["answer"], result, payload["sources"]), **timings}), trace)
+    return {**payload, "cached": False, "timings": timings, "route": "direct", "limited": False}
 
 
 def _degraded_response(req, request, sources, result, t0, exc, trace: Trace | None = None) -> dict:
@@ -1027,6 +1101,15 @@ def _stream_inner(req: QueryRequest, request: Request, trace: Trace):
                                              **_answer_props(text, None, hit["sources"])}), trace)
             return
         msgs, sources, result, now = _prepare(req, trace)
+        if (d := _direct(req, result, now)) is not None:
+            payload = _direct_payload(req, d, result)
+            yield _sse("meta", {"sources": payload["sources"], "cached": False, "intent": bool(result["intent"])})
+            text = payload["answer"]
+            for i in range(0, len(text), 80):
+                yield _sse("delta", {"t": text[i:i + 80]})
+            r = _direct_response(req, request, key, d, result, t0, trace)
+            yield _sse("done", {"cached": False, "timings": {**r["timings"], "ttft_ms": r["timings"]["total_ms"]}, "suggestions": payload["suggestions"], "route": "direct", "model": "none", "limited": False})
+            return
         yield _sse("meta", {"sources": sources, "cached": False, "intent": bool(result["intent"])})
         model = req.model or LLM_MODEL
         trace.requested_model = model
