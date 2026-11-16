@@ -5,8 +5,21 @@ import { Manrope } from 'next/font/google';
 const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope', display: 'swap' });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://nuev-ai.vercel.app'),
   title: 'NuevAI',
   description: 'Courses, calendar, sports schedules and campus resources for The Nueva School community.',
+  openGraph: {
+    type: 'website',
+    siteName: 'NuevAI',
+    url: '/',
+    title: 'NuevAI: ask anything about Nueva',
+    description: 'Courses, calendar, sports schedules, lunch and campus resources for The Nueva School community.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'NuevAI: ask anything about Nueva',
+    description: 'Courses, calendar, sports schedules, lunch and campus resources for The Nueva School community.',
+  },
   applicationName: 'NuevAI',
   appleWebApp: { capable: true, title: 'NuevAI', statusBarStyle: 'default' },
 };

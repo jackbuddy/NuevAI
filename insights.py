@@ -377,6 +377,20 @@ def build(rows, now: datetime, days: int, selector: str = "users", profiles=None
     funnel = [{"step": "Visited", "n": len(f_users)}, {"step": "Interacted", "n": len(inter)}, {"step": "Asked a question", "n": len(asked)},
               {"step": "Got an answer", "n": len(answered)}, {"step": "Asked again", "n": sum(1 for v in asked2.values() if v >= 2)},
               {"step": "Came back another day", "n": len(came_back & answered) if answered else len(came_back)}]
+    # campaign sources (posters / TV / QR links): distinct browsers per ?src= of a session in the window, and per first-touch source
+    src_b, first_b = defaultdict(set), defaultdict(set)
+    for e in vis_w:
+        if e.name == "session_start":
+            if e.p.get("src"):
+                src_b[str(e.p["src"])[:24]].add(e.anon)
+            if e.p.get("first_src"):
+                first_b[str(e.p["first_src"])[:24]].add(e.anon)
+    def _src_rows(m):
+        tagged = set().union(*m.values()) if m else set()
+        rows_ = [{"src": k, "n": len(v)} for k, v in m.items()]
+        rows_.sort(key=lambda r: (-r["n"], r["src"]))
+        return rows_ + [{"src": "none", "n": len(f_users - tagged)}]
+    sources = {"src": _src_rows(src_b), "first_src": _src_rows(first_b), "n": len(f_users)}
     bounced = sorted(f_users - inter)
     no_interaction = {"browsers": len(bounced), "of": len(f_users)}
     by_anon = defaultdict(list)
@@ -523,7 +537,7 @@ def build(rows, now: datetime, days: int, selector: str = "users", profiles=None
             "rows_loaded": len(rows), "duplicates_removed": dups, "truncated": truncated, "profile_source": profile_source,
             "first_event": events[0].t.isoformat() if events else None, "last_event": events[-1].t.isoformat() if events else None}
     return {"meta": meta, "health": health or {}, "kpis": {"cur": cur, "prev": prev}, "series": series, "adoption": adoption, "funnel": funnel,
-            "first_time": first_time, "no_interaction": no_interaction, "cohorts": cohorts, "retention": overall, "usage": usage, "today": today_tl, "engagement": engagement,
+            "first_time": first_time, "sources": sources, "no_interaction": no_interaction, "cohorts": cohorts, "retention": overall, "usage": usage, "today": today_tl, "engagement": engagement,
             "content": content, "quality": quality, "system": system, "recent": recent, "audiences": audiences, "notes": notes, "diagnostics": diagnostics,
             "top_questions": [[q["key"], q["n"]] for q in top_questions]}
 
@@ -893,6 +907,7 @@ def data_notes(events) -> list[dict]:
         ("Concurrency, memory, cold start", lambda e: e.name == "chat_answered" and "inflight" in e.p, "measured"),
         ("Dependency errors / rate-limit rejections / server boots", lambda e: e.name in ("dependency_error", "rate_limited", "server_boot"), "measured"),
         ("Visit number and days since first visit", lambda e: e.name == "session_start" and "visit_number" in e.p, "measured"),
+        ("Campaign source (?src=, first-touch source)", lambda e: e.name == "session_start" and ("src" in e.p or "first_src" in e.p), "measured"),
         ("Real browser user-agent on chat events", lambda e: e.name == "chat_answered" and e.ua and e.ua != "node", "measured"),
     ]
     out = [{"metric": m, "since": first(f), "kind": k} for m, f, k in spec]
