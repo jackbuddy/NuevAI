@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarPlus, ChevronLeft, ChevronRight, Clock, MapPin, MessageCircle, Search, Star, X, CalendarX2, Home, Plane } from 'lucide-react';
+import { ArrowUp, CalendarPlus, ChevronLeft, ChevronRight, Clock, MapPin, MessageCircle, Search, SlidersHorizontal, Star, X, CalendarX2, Home, Plane } from 'lucide-react';
 import { CATEGORIES, CalEvent, DayInfo, appliesToCampus, cancelsClasses, catMeta, dayBadge, dayHeadline, downloadIcs, iso, onDay, parseISO, timeLabel, todayLA } from '@/lib/calendar';
 import { loadCampus, type Campus } from '@/lib/chat';
 import { track } from '@/lib/analytics';
@@ -15,6 +15,7 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
   const [todayIso, setTodayIso] = useState(todayLA);
   const [cursor, setCursor] = useState(() => { const d = parseISO(todayLA()); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const detailRef = useRef<HTMLElement>(null);
+  const topRef = useRef<HTMLDivElement>(null);
   useEffect(() => {   // keep "today" right if the tab stays open past midnight
     const t = setInterval(() => setTodayIso((p) => { const n = todayLA(); return n === p ? p : n; }), 60_000);
     const vis = () => setTodayIso(todayLA());
@@ -25,6 +26,7 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
   const [cats, setCats] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
   const [practices, setPractices] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);   // phones: search, categories and practices fold away so the month is the first thing on screen
   const [selected, setSelected] = useState<string>(todayIso);
   const [events, setEvents] = useState<CalEvent[]>([]);
   const [days, setDays] = useState<Record<string, DayInfo>>({});      // the master schedule's record per date: A/B/A'/B' day, no classes, special bell schedule
@@ -106,7 +108,7 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
   return (
     <div className="scroll-thin min-h-0 flex-1 overflow-y-auto bg-gradient-to-b from-brand-50 via-white to-white">
       <div className="mx-auto w-full max-w-5xl px-4 pb-10 pt-6 md:px-6">
-        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div ref={topRef} className="mb-5 flex scroll-mt-4 flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-sm font-medium text-brand-600">School calendar</p>
             <h2 aria-live="polite" className="text-3xl font-bold tracking-tight text-brand-900 md:text-4xl">{monthLabel}</h2>
@@ -125,7 +127,19 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
           </div>
         </div>
 
-        <div className="mb-4 flex flex-wrap items-center gap-2">
+        {(() => {
+          const active = cats.size + (q.trim() ? 1 : 0) + (practices ? 1 : 0) + (otherCampus ? 1 : 0);
+          return (
+            <div className="mb-3 flex items-center gap-2 sm:hidden">
+              <button type="button" onClick={() => { setFiltersOpen((o) => !o); track('calendar_filters_toggle', { open: !filtersOpen }); }} aria-expanded={filtersOpen} aria-controls="cal-filters"
+                      className="surface tap-h inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-semibold text-brand-800">
+                <SlidersHorizontal className="h-4 w-4" aria-hidden />Filters{active > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-brand-900 px-1 text-[11px] font-bold text-white">{active}</span>}
+              </button>
+              {active > 0 && <button type="button" onClick={() => { setCats(new Set()); setQ(''); setPractices(false); setOtherCampus(false); }} className="tap-h px-2 text-[13px] font-semibold text-brand-600">Clear</button>}
+            </div>
+          );
+        })()}
+        <div id="cal-filters" className={`${filtersOpen ? 'flex' : 'hidden'} mb-4 flex-wrap items-center gap-2 sm:flex`}>
           <div className="surface tap-h flex min-w-[12rem] flex-1 items-center gap-2 rounded-full px-3.5 py-2 transition focus-within:border-brand-400 focus-within:ring-4 focus-within:ring-brand-500/10 sm:max-w-xs">
             <Search className="ink-2 h-4 w-4 shrink-0" aria-hidden />
             <input value={q} onChange={(e) => setQ(e.target.value)} onBlur={() => q && track('calendar_search', { q: q.slice(0, 40) })} placeholder="Search events or places" aria-label="Search events" type="search" enterKeyHint="search"
@@ -206,7 +220,11 @@ export function CalendarView({ onAsk }: { onAsk: (q: string) => void }) {
             </div>
 
             <aside ref={detailRef} aria-label="Selected day" className="surface shadow-soft h-fit scroll-mt-4 rounded-3xl border-t-4 border-t-brand-500 p-4 lg:sticky lg:top-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">{selected === todayIso ? 'Today' : 'Selected day'}</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">{selected === todayIso ? 'Today' : 'Selected day'}</p>
+                <button type="button" onClick={() => topRef.current?.scrollIntoView({ behavior: typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })}
+                        className="tap-h -mr-2 inline-flex items-center gap-1 rounded-full px-3 text-xs font-semibold text-brand-700 hover:bg-brand-100 lg:hidden"><ArrowUp className="h-3.5 w-3.5" aria-hidden />Back to month</button>
+              </div>
               <h3 className="wrap-any mb-1 text-xl font-bold">{parseISO(selected).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</h3>
               {(() => {
                 const info = showDays ? days[selected] : undefined, off = noClasses(selected);
@@ -270,6 +288,8 @@ function EventCard({ e, onAsk, followKeys }: { e: CalEvent; onAsk: (q: string) =
   const cat = catMeta(e.category);
   const team = e.category === 'athletics' ? parseTeam(e.summary) : null;
   const following = !!team && followKeys.has(team.key);
+  const [more, setMore] = useState(false);
+  const long = (e.description?.length ?? 0) > 150;
   return (
     <div className={`surface rounded-2xl border-l-4 p-3.5 ${cat.edge} ${following ? 'ring-1 ring-amber-300' : ''}`}>
       <div className="flex items-start gap-2.5">
@@ -286,7 +306,12 @@ function EventCard({ e, onAsk, followKeys }: { e: CalEvent; onAsk: (q: string) =
             {e.home_away === 'home' && <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-semibold text-brand-700"><Home className="h-2.5 w-2.5" />Home</span>}
             {e.home_away === 'away' && <span className="inline-flex items-center gap-1 rounded-full bg-slate-500/10 px-2 py-0.5 text-[11px] font-semibold"><Plane className="h-2.5 w-2.5" />Away</span>}
           </div>
-          {e.description && <p className="ink-2 wrap-any mt-2 whitespace-pre-line text-[13px] leading-relaxed">{e.description}</p>}
+          {e.description && (
+            <div className="mt-2">
+              <p className={`ink-2 wrap-any whitespace-pre-line text-[13px] leading-relaxed ${!more && long ? 'line-clamp-3' : ''}`}>{e.description}</p>
+              {long && <button type="button" onClick={() => setMore((m) => !m)} aria-expanded={more} className="tap-h text-xs font-semibold text-brand-600 hover:underline">{more ? 'Show less' : 'Show more'}</button>}
+            </div>
+          )}
           <div className="mt-2.5 flex flex-wrap gap-1.5">
             <button onClick={() => { downloadIcs(e); track('calendar_add', { summary: e.summary.slice(0, 60) }); }} className="surface-2 tap-box gap-1 rounded-full px-3 py-1 text-xs font-semibold hover:bg-brand-500/10"><CalendarPlus className="h-3 w-3" />Add to calendar</button>
             <button onClick={() => { track('calendar_ask', { summary: e.summary.slice(0, 60) }); onAsk(`Tell me about "${e.summary.trim()}" on ${e.when}`); }} className="surface-2 tap-box gap-1 rounded-full px-3 py-1 text-xs font-semibold hover:bg-brand-500/10"><MessageCircle className="h-3 w-3" />Ask NuevAI</button>
