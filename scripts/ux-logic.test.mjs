@@ -161,7 +161,7 @@ t('team: Varsity and JV are different follows', () => assert.notEqual(parseTeam(
 t('hour constant sane', () => assert.equal(HOUR * 24, DAY));
 
 // ---- date-aware starters
-t('topic: teacher questions are their own topic', () => { assert.equal(topicOf('Does Mara Ballmer teach Biology?'), 'courses'); assert.equal(topicOf('Who teaches Math 3?'), 'courses'); assert.equal(topicOf('What does Scott Cairns teach?'), 'courses'); });
+t('topic: teacher questions are their own topic', () => { assert.equal(topicOf('Does Mara Ballmer teach Biology?'), 'courses'); assert.equal(topicOf('Who teaches Math 3?'), 'courses'); assert.equal(topicOf('What does Max Cowan teach?'), 'courses'); });
 t('topic: lunch and games unaffected', () => { assert.equal(topicOf('What is for lunch today?'), 'lunch'); assert.equal(topicOf('When is the next home game?'), 'games'); });
 t('starters: teacher pick rotates daily, always a courses question with a name or course', () => {
   const seen = new Set();

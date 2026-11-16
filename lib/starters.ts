@@ -10,7 +10,7 @@ export interface DatedStarter { label: string; topic: Topic }
 /** One real teacher/course question per day, rotating. Names and courses come from the 2026-27 master schedule. */
 const TEACH: DatedStarter[] = [
   { label: 'Does Mara Ballmer teach Biology?', topic: 'courses' },
-  { label: 'What does Scott Cairns teach?', topic: 'courses' },
+  { label: 'What does Max Cowan teach?', topic: 'courses' },
   { label: 'Who teaches Physics?', topic: 'courses' },
   { label: 'Who teaches Math 3?', topic: 'courses' },
 ];
