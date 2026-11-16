@@ -9,6 +9,8 @@
  *  - envelope flags (top level of every batch and chat request, never inside props): `i` = this browser was marked as the
  *    owner/dev's ("Mark this browser as me" on /insights, or /?internal=1), `wd` = webdriver/headless, `dev` = localhost build.
  *    The server turns them into the event's audience (user | internal | test | bot).
+ *  - campaign source: ?src= (or ?utm_source=) on a poster/TV/QR link is recorded on session_start as `src`; the first one ever seen
+ *    is kept in this browser (nuevai.first_src) and sent as `first_src`. Sanitised to [a-z0-9_-], 24 chars. A label for a link, never a person.
  *  - visit counter: nuevai.visits is incremented whenever a new session starts.
  * Everything here fails silent: analytics must never break the app.
  */
@@ -19,6 +21,7 @@ const LAST_KEY = 'nuevai.last';
 const FIRST_KEY = 'nuevai.first';
 const VISITS_KEY = 'nuevai.visits';
 const INTERNAL_KEY = 'nuevai.internal';
+const SRC_KEY = 'nuevai.first_src';
 const SESSION_GAP_MS = 30 * 60 * 1000;
 const FLUSH_MS = 3000;
 
@@ -82,6 +85,24 @@ export function getVisitInfo(): { visit_number: number | null; first_visit: bool
     first_seen: first,
     days_since_first: Number.isFinite(t) ? Math.max(0, Math.floor((Date.now() - t) / 86_400_000)) : null,
   };
+}
+
+/** Lowercase, [a-z0-9_-] only, max 24 chars; '' when nothing usable is left. */
+export function cleanSrc(v: string | null | undefined): string {
+  return String(v ?? '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 24);
+}
+
+/** This session's campaign source from the URL, and the browser's first-touch source (stored once, never overwritten). */
+function campaignSource(): { src: string | null; first_src: string | null } {
+  let src = '';
+  try { const q = new URLSearchParams(location.search); src = cleanSrc(q.get('src')) || cleanSrc(q.get('utm_source')); } catch {}
+  const ls = store('local');
+  let first = '';
+  try {
+    first = cleanSrc(ls?.getItem(SRC_KEY));
+    if (!first && src) { ls?.setItem(SRC_KEY, src); first = src; }
+  } catch {}
+  return { src: src || null, first_src: first || null };
 }
 
 /** Is this browser marked as the owner's / a developer's? Stored only in this browser. */
@@ -168,6 +189,7 @@ export function startAnalytics() {
         referrer: document.referrer ? new URL(document.referrer).host : 'direct',
         lang: navigator.language,
         dark: window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false,
+        ...campaignSource(),
       });
     }
     track('page_view', { title: document.title });

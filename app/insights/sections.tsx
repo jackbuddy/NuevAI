@@ -87,6 +87,19 @@ export function FirstVisit({ m, days }: Ctx) {
         <DataTable head={['Step', 'Browsers', '% of first-time', '% of previous step']} rows={p.map((s) => [s.step, s.n, fmtPct(s.of_first), s.of_prev == null ? '—' : fmtPct(s.of_prev)])} />
       </Card>
 
+      {m.sources && (
+        <Card title="Where visitors came from" help="Posters, TV ads and QR codes point to the site with ?src=something (for example ?tab=chat&src=tv). 'This visit' is the source of a session in the range; 'First ever' is the first source the browser ever arrived with. Counts are distinct browsers; 'none' means no source tag (typed address, shared link, saved app).">
+          <div className="grid gap-4 md:grid-cols-2">
+            {([['This visit', m.sources.src], ['First ever', m.sources.first_src]] as const).map(([t, list]) => (
+              <div key={t}>
+                <p className="ink-2 mb-1.5 text-[11px] font-bold uppercase tracking-wider">{t}</p>
+                <HBars rows={(list as { src: string; n: number }[]).filter((r) => r.n > 0).map((r) => ({ label: r.src, value: r.n }))} max={Math.max(1, m.sources.n)} />
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2">
         <Card title="What first-time visitors do first" help="The first real action each new browser took: tapping a starter, typing, tapping a Happening card, opening Ideas, Calendar or Resources, setting a role or campus, or nothing at all. Page loads and automatic events do not count as an action.">
           <Pie data={(f.pie as { label: string; n: number }[]).map((x) => ({ label: x.label, value: x.n }))} title="First action of first-time visitors" tableHead={['First action', 'Browsers']} />

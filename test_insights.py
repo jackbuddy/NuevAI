@@ -539,6 +539,16 @@ check("first-time: every step is a subset of the one before (no rate above 100%)
 check("first-time: timing medians from the first answer event", ftm["median_ms_first_answer"] == 2500 and ftm["n_first_answer"] == 1 and ftm["median_s_to_first_question"] is not None)
 check("first-time: empty range does not crash", I.build([], NOW, 7, "users", profiles=[])["first_time"]["n"] == 0)
 
+# ================================================================== campaign sources
+sa, sb_, sc = "s1" * 6, "s2" * 6, "s3" * 6
+src_rows = [row(_t(0), sa, "session_start", {"src": "tv", "first_src": "tv"}), row(_t(0), sb_, "session_start", {"first_src": "poster"}),
+            row(_t(1), sb_, "session_start", {"src": "tv", "first_src": "poster"}), row(_t(0), sc, "session_start", {"visit_number": 1})]
+srcm = I.build(src_rows, NOW, 7, "users", profiles=[prof(x, _t(0), [_t(0).date()]) for x in (sa, sb_, sc)])["sources"]
+sd, fd = {r["src"]: r["n"] for r in srcm["src"]}, {r["src"]: r["n"] for r in srcm["first_src"]}
+check("sources: distinct browsers per session src, untagged browsers counted as none", sd == {"tv": 2, "none": 1}, str(sd))
+check("sources: first-touch source counted per browser", fd == {"poster": 1, "tv": 1, "none": 1}, str(fd))
+check("sources: empty range does not crash", I.build([], NOW, 7, "users", profiles=[])["sources"]["n"] == 0)
+
 fails = [n for n, ok_ in RESULTS if not ok_]
 print(f"\n{len(RESULTS) - len(fails)}/{len(RESULTS)} passed")
 sys.exit(1 if fails else 0)

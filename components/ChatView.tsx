@@ -286,7 +286,9 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar, onOpenReso
   }, [ideasOpen]);
 
   const startersShown = useMemo(() => {
-    const pool = withDated(STARTERS_BY_ROLE[role ?? 'student'], nowLA().date);
+    // the date-aware slots rotate daily and the page is prerendered, so the first (server-matching) render uses the plain list
+    const base = STARTERS_BY_ROLE[role ?? 'student'];
+    const pool = hydrated ? withDated(base, nowLA().date) : base;
     if (!hydrated || firstRun) return pool.slice(0, 4);
     return rankStarters(pool, ux().topics, recents(), 4);
   }, [role, hydrated, firstRun, empty]);   // eslint-disable-line react-hooks/exhaustive-deps
