@@ -27,14 +27,17 @@ const CAMPUS_DIVISIONS: Record<CampusId, string[]> = { san_mateo: ['us'], hillsb
 /** Does the event concern someone on this campus? San Mateo is the Upper School, Hillsborough the Lower and Middle School.
  *  No campus chosen, or an event with no division marker (whole school), always applies. */
 export function appliesToCampus(e: Pick<CalEvent, 'division'>, campus: CampusId | null | undefined): boolean {
-  if (!campus || !e.division || e.division.length === 0) return true;
-  return e.division.some((d) => CAMPUS_DIVISIONS[campus].includes(d));
+  const div = divisionsOf(e.division);
+  if (!campus || div.length === 0) return true;
+  return div.some((d) => CAMPUS_DIVISIONS[campus].includes(d));
 }
+/** Divisions arrive as a list, but older rows carry a bare string ("US"); never assume the shape. */
+const divisionsOf = (v: unknown): string[] => (Array.isArray(v) ? v : typeof v === 'string' && v ? [v] : []).map((x) => String(x).trim().toLowerCase());
 
 /** Is there no school for this campus because of this event? (the whole school, or the viewer's division) */
 export function cancelsClasses(e: Pick<CalEvent, 'no_classes'>, campus: CampusId | null | undefined): boolean {
-  const n = e.no_classes;
-  if (!n || n.length === 0) return false;
+  const n = divisionsOf(e.no_classes);
+  if (n.length === 0) return false;
   if (n.includes('all')) return true;
   return campus ? n.some((d) => CAMPUS_DIVISIONS[campus].includes(d)) : false;
 }

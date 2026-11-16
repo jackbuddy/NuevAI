@@ -16,6 +16,12 @@ t('campus: San Mateo sees US and whole-school events, not LS/MS only', () => {
   assert.equal(appliesToCampus(ev({ division: ['us'] }), 'hillsborough'), false);
   assert.equal(appliesToCampus(ev({ division: ['us'] }), null), true);
 });
+t('campus: a bare-string division ("US", from the athletics sheet) must not throw', () => {
+  assert.equal(appliesToCampus(ev({ division: 'US' }), 'san_mateo'), true);
+  assert.equal(appliesToCampus(ev({ division: 'US' }), 'hillsborough'), false);
+  assert.equal(appliesToCampus(ev({ division: '' }), 'hillsborough'), true);
+  assert.equal(cancelsClasses({ no_classes: 'US' }, 'san_mateo'), true);
+});
 t('no classes: whole school, or only the viewer division', () => {
   assert.equal(cancelsClasses({ no_classes: ['all'] }, 'san_mateo'), true);
   assert.equal(cancelsClasses({ no_classes: ['ls', 'ms'] }, 'san_mateo'), false);

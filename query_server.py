@@ -715,7 +715,7 @@ def _answer_props(answer: str, result: dict | None, sources: list[dict], query: 
     else:
         props["rroute"] = "docs"
     if r.get("division"):
-        props["div"] = r["division"][0]
+        props["div"] = (calendar_meta.norm_divisions(r["division"]) or [""])[0]
     try:        # how the question was understood: question type, lookup kind, defaults applied, rewrite used, confidence (a few dozen bytes, no text)
         import understand
         iu = understand.props(r.get("interp"), "lunch" if r.get("lunch") else it)
@@ -1114,7 +1114,7 @@ def calendar_event_out(meta: dict) -> dict:
     indexed before they existed get them computed from the title the same way, so the UI never depends on the refresh having run."""
     m = meta or {}
     e = {k: m.get(k) for k in CAL_FIELDS}
-    e["division"] = m["division"] if "division" in m else calendar_meta.divisions_of(m.get("summary") or "")
+    e["division"] = calendar_meta.norm_divisions(m["division"]) if "division" in m else calendar_meta.divisions_of(m.get("summary") or "")
     e["no_classes"] = m["no_classes"] if "no_classes" in m else calendar_meta.no_classes_for(m.get("summary") or "")
     if e["no_classes"] and e["category"] != "no_school":
         e["category"] = "no_school"

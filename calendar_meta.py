@@ -77,9 +77,18 @@ def no_classes_for(summary: str):
     return None
 
 
+def norm_divisions(v) -> list[str]:
+    """Stored `division` metadata is a list, but rows from the athletics sheet carry a bare string ("US"). Always a lowercase list."""
+    if not v:
+        return []
+    items = [v] if isinstance(v, str) else list(v)
+    return [str(x).strip().lower() for x in items if str(x).strip()]
+
+
 def applies_to(division: list[str] | None, campus: str | None) -> bool:
     """Does an event with these divisions concern someone on this campus? san_mateo = Upper School, hillsborough = Lower and Middle School.
     No campus chosen, or an event with no division marker, always applies."""
+    division = norm_divisions(division)
     if not campus or not division:
         return True
     mine = {"san_mateo": {"us"}, "hillsborough": {"ls", "ms"}}.get(campus)
