@@ -78,7 +78,7 @@ BLOCKED_TITLE = re.compile(r"diploma|rsvp|sign[- ]?up|roster|responses|attendanc
 # Everyday wording -> the words the handbook actually uses. Added to the search text only (never shown).
 SYNONYMS = {
     r"\blate\b|\bleft early\b": "tardy tardies attendance",
-    r"\babsent\b|\bmiss(ing)? school\b|\bsick\b": "absence absences attendance illness",
+    r"\babsent\b|\bmiss(ing)? school\b|\bsick\b": "absence absences attendance illness attendance reporting form report an absence",
     r"\bphones?\b(?!\s+numbers?)|\bairpods?\b|\bearbuds?\b": "cell phone policy devices",
     r"^(?!.*\bclubs?\b)(?s:.*)(?:\bai\b|\bchatgpt\b|\bgpt\b)": "artificial intelligence generative AI academic integrity",
     r"\bcheat(ing)?\b|\bcopy(ing)?\b": "plagiarism academic integrity honor",
@@ -101,6 +101,10 @@ SYNONYMS = {
     r"\bclubs?\b|\baffinity\b|\bstudent organi[sz]ations?\b": "clubs and affinity groups list",
     r"\blanguages?\b|\bforeign language\b": "world languages Chinese Spanish French Japanese Latin Korean language courses",
     r"\bmakeup\b|\bmake[- ]up\b|\bretake\b": "make-up retake assessment policy",
+    # what students and parents call things vs the words the documents use
+    r"\bhigh ?school\b": "Upper School",
+    r"\bdrop(ping)? (a |my |the )?(class|course)\b|\bwithdraw (from )?(a |my )?(class|course)\b": "add/drop course change requests schedule change",
+    r"\btutorials?\b(?!.*\b(course request|blackbaud)\b)": "tutorial office hours",
     r"\bfirst day of (school|classes)\b|\bwhen (did|does|do) (school|classes) (start|begin)\b|\bschool (started|starts|begins)\b": "First Day of School classes begin opening day",
     # nicknames, acronyms and the words the school's own documents use
     r"\bhoco\b|\bhomecoming\b": "HoCo homecoming spirit week dance",
