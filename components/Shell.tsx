@@ -87,9 +87,9 @@ export function Shell() {
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-full focus:bg-brand-900 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white">Skip to content</a>
       <header className="pt-safe relative z-20 border-b hairline bg-white/90 backdrop-blur">
         <div className="px-safe mx-auto grid w-full max-w-5xl grid-cols-[1fr_auto_1fr] items-center gap-2 py-2 sm:gap-3 md:px-6">
-          <button onClick={() => go('chat', 'logo')} className="tap-box -ml-1 gap-2 justify-self-start rounded-full px-1" aria-label="NuevAI home">
+          <button onClick={() => go('chat', 'logo')} className="tap-box -ml-1 gap-2 justify-self-start rounded-full px-1" aria-label="Nueva AI home">
             <Logo size={26} />
-            <span className="hidden text-[15px] font-bold tracking-tight sm:block">NuevAI</span>
+            <span className="hidden text-[15px] font-bold tracking-tight sm:block">Nueva<span className="text-brand-500">AI</span></span>
           </button>
 
           <nav role="tablist" aria-label="Sections" onKeyDown={onTabKey} className="surface-2 relative grid grid-cols-3 rounded-full p-1">

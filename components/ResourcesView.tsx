@@ -78,7 +78,7 @@ export function ResourcesView({ onAsk }: { onAsk: (q: string) => void }) {
             {hits.length === 0 ? (
               <div className="py-10 text-center">
                 <p className="wrap-any font-semibold">Nothing matches “{q}”</p>
-                <button onClick={() => { track('resource_search_ask', { q: q.slice(0, 60) }); onAsk(q); }} className="tap-box mt-3 rounded-full bg-brand-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">Ask NuevAI instead</button>
+                <button onClick={() => { track('resource_search_ask', { q: q.slice(0, 60) }); onAsk(q); }} className="tap-box mt-3 rounded-full bg-brand-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">Ask Nueva AI instead</button>
               </div>
             ) : <List items={hits} onAsk={onAsk} onOpen={(r) => open(r, 'search')} />}
           </section>
@@ -147,7 +147,7 @@ function List({ items, group, onAsk, onOpen }: { items: Resource[]; group?: stri
               <span className="ink-2 block truncate text-xs">{r.desc}</span>
             </a>
             {r.ask && (
-              <button onClick={() => { track('resource_ask', { label: r.title }); onAsk(r.ask!); }} aria-label={`Ask NuevAI about ${r.title}`} title="Ask NuevAI"
+              <button onClick={() => { track('resource_ask', { label: r.title }); onAsk(r.ask!); }} aria-label={`Ask Nueva AI about ${r.title}`} title="Ask Nueva AI"
                       className="ink-2 tap-box h-8 w-8 shrink-0 rounded-full transition hover:bg-white hover:text-brand-700">
                 <MessageCircle className="h-4 w-4" aria-hidden />
               </button>

@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'NuevAI',
-    short_name: 'NuevAI',
+    name: 'Nueva AI',
+    short_name: 'Nueva AI',
     description: 'Lunch, games, the school calendar and quick answers for The Nueva School community.',
     start_url: '/',
     scope: '/',

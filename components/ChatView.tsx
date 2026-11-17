@@ -317,7 +317,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar, onOpenReso
                 }}
                 enterKeyHint="send" autoComplete="off"
                 onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-                placeholder={empty ? PLACEHOLDERS[phIdx] : 'Ask a follow-up…'} aria-label="Ask NuevAI"
+                placeholder={empty ? PLACEHOLDERS[phIdx] : 'Ask a follow-up…'} aria-label="Ask Nueva AI"
                 className="bare max-h-40 min-h-[2.75rem] min-w-0 flex-1 resize-none bg-transparent py-3 text-base outline-none placeholder:text-[var(--ink-2)] sm:text-[15px]" />
       {messages.length > 0 && (
         <button type="button" onClick={clear} aria-label="New chat" title="New chat" className="ink-2 tap-box h-11 shrink-0 gap-1.5 rounded-full px-3 text-xs font-semibold hover:bg-[var(--surface-2)] max-sm:w-11 max-sm:px-0"><SquarePen className="h-4 w-4" aria-hidden /><span className="hidden sm:inline">New chat</span></button>
@@ -432,7 +432,7 @@ export function ChatView({ pendingAsk, onAskConsumed, onOpenCalendar, onOpenReso
             <div className="mx-auto w-full max-w-3xl">
               {composer}
               <div className="relative z-20 mt-1 text-center">{prefs}</div>
-              <p className="ink-2 mt-2 text-center text-[11px] leading-snug">NuevAI can make mistakes — check sources for anything important. Anonymous analytics only; no account or personal data.</p>
+              <p className="ink-2 mt-2 text-center text-[11px] leading-snug">Nueva AI can make mistakes — check sources for anything important. Anonymous analytics only; no account or personal data.</p>
             </div>
           </div>
         </>

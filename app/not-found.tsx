@@ -6,7 +6,7 @@ export default function NotFound() {
       <div className="max-w-sm text-center">
         <h1 className="text-2xl font-bold tracking-tight text-brand-900">Page not found</h1>
         <p className="ink-2 mt-2 text-sm">That page doesn’t exist. The assistant, calendar and resources are on the home page.</p>
-        <Link href="/" className="tap-box mt-5 rounded-full bg-brand-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">Back to NuevAI</Link>
+        <Link href="/" className="tap-box mt-5 rounded-full bg-brand-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">Back to Nueva AI</Link>
       </div>
     </div>
   );

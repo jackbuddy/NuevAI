@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og';
 
-export const alt = 'NuevAI: ask anything about Nueva.';
+export const alt = 'Nueva AI: ask anything about Nueva.';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -13,7 +13,7 @@ export default function OpenGraphImage() {
     (
       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', background: '#F4F1EB', padding: '64px 80px', fontFamily: FONT }}>
         <div style={{ display: 'flex', fontSize: 52, fontWeight: 800, letterSpacing: -1, color: NAVY }}>
-          <span>Nuev</span>
+          <span>Nueva</span>
           <span style={{ color: BLUE }}>AI</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

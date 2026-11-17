@@ -111,7 +111,7 @@ export default function Insights() {
       <div className="mx-auto max-w-6xl">
         <header className="z-30 -mx-4 border-b border-[var(--line)] bg-white/90 px-4 py-3 backdrop-blur md:sticky md:top-0 md:mx-0 md:rounded-b-2xl md:px-4">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <a href="/" className="tap-h flex items-center gap-3 rounded-lg" aria-label="NuevAI home"><Logo size={32} /><div><h1 className="text-xl font-bold leading-none">Insights</h1><p className="ink-2 text-[11px]">Pacific time (America/Los_Angeles)</p></div></a>
+            <a href="/" className="tap-h flex items-center gap-3 rounded-lg" aria-label="Nueva AI home"><Logo size={32} /><div><h1 className="text-xl font-bold leading-none">Insights</h1><p className="ink-2 text-[11px]">Pacific time (America/Los_Angeles)</p></div></a>
             <form onSubmit={(e) => { e.preventDefault(); if (token) load(token, days, aud, true); }} className="ml-auto flex flex-wrap items-center gap-2">
               <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Metrics token" aria-label="Metrics token" autoComplete="off" className="bare surface tap-h w-36 rounded-full px-4 py-2 text-base outline-none focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 sm:text-sm" />
               <button disabled={loading || !token} className="tap-box rounded-full bg-brand-900 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">{loading ? 'Loading…' : m ? 'Refresh' : 'Load'}</button>

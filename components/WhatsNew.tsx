@@ -7,7 +7,7 @@ import { readVisit, updateUx, ux } from '@/lib/visit';
 import { whatsNewActive } from '@/lib/ux-logic';
 
 /**
- * One quiet line for people who used NuevAI before this release ("New · lunch menus and followable teams").
+ * One quiet line for people who used Nueva AI before this release ("New · lunch menus and followable teams").
  * Opens into a short list, closes for good with "Got it". First-time visitors never see it: nothing is new to them.
  */
 export function WhatsNew() {

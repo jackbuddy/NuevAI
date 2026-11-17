@@ -201,7 +201,7 @@ def scrub_context(text: str) -> str:
 
 # ---------------------------------------------------------------- output check
 _LEAK = re.compile(
-    r"(STYLE \(house style|GROUNDING\n|house style, follow exactly|You are NuevAI, a high-utility|Privacy: never give information about individual students|"
+    r"(STYLE \(house style|GROUNDING\n|house style, follow exactly|You are (?:Nueva AI|NuevAI), a high-utility|Privacy: never give information about individual students|"
     r"\bgsk_[A-Za-z0-9]{10,}|\bsb_(secret|publishable)_[A-Za-z0-9_-]{8,}|\beyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{10,}|SUPABASE_SERVICE_ROLE_KEY\s*=|GROQ_API_KEY\s*=)")
 
 LEAK_REPLY = "I can't share that. " + OFFER

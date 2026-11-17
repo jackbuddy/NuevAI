@@ -61,7 +61,7 @@ export function FirstVisit({ m, days }: Ctx) {
   const small = f.n > 0 && f.n < 20;
   return (
     <div className="space-y-4">
-      {f.n === 0 ? <Notice>No browsers saw NuevAI for the first time in the last {rangeLabel(days)}. Try a longer range.</Notice> : small && <Notice tone="warn">Only {f.n} first-time {f.n === 1 ? 'browser' : 'browsers'} in this range: read the rates as anecdotes, not trends.</Notice>}
+      {f.n === 0 ? <Notice>No browsers saw Nueva AI for the first time in the last {rangeLabel(days)}. Try a longer range.</Notice> : small && <Notice tone="warn">Only {f.n} first-time {f.n === 1 ? 'browser' : 'browsers'} in this range: read the rates as anecdotes, not trends.</Notice>}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="First-time visitors" value={fmtInt(f.n)} help={`Browsers whose very first event (ever) falls in the last ${rangeLabel(days)}. Checked against the whole history, so a returning person is not counted as new.`} sub="first ever visit in this range" />
         <Kpi label="Asked a question" value={fmtPct(asked?.of_first)} sub={`${fmtInt(asked?.n)} of ${fmtInt(f.n)}`} help="Share of first-time visitors who asked at least one question. This is the activation rate: the number to push up." />

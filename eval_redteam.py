@@ -328,7 +328,7 @@ def main():
 
     # D4: output leak check (model answers that reveal the prompt or a secret are replaced)
     for txt, want in [("Sure! STYLE (house style, follow exactly) - First sentence is the direct answer", True),
-                      ("You are NuevAI, a high-utility AI assistant for the Nueva School community.", True),
+                      ("You are Nueva AI, a high-utility AI assistant for the Nueva School community.", True),
                       ("The key is gsk_abcdefghijklmnop1234567890", True), ("sb_secret_abcdEFGH12345678", True),
                       ("SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi", True),
                       ("Boys basketball practice is Tue and Thu at 4 PM in the gym.", False),

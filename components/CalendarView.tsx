@@ -314,7 +314,7 @@ function EventCard({ e, onAsk, followKeys }: { e: CalEvent; onAsk: (q: string) =
           )}
           <div className="mt-2.5 flex flex-wrap gap-1.5">
             <button onClick={() => { downloadIcs(e); track('calendar_add', { summary: e.summary.slice(0, 60) }); }} className="surface-2 tap-box gap-1 rounded-full px-3 py-1 text-xs font-semibold hover:bg-brand-500/10"><CalendarPlus className="h-3 w-3" />Add to calendar</button>
-            <button onClick={() => { track('calendar_ask', { summary: e.summary.slice(0, 60) }); onAsk(`Tell me about "${e.summary.trim()}" on ${e.when}`); }} className="surface-2 tap-box gap-1 rounded-full px-3 py-1 text-xs font-semibold hover:bg-brand-500/10"><MessageCircle className="h-3 w-3" />Ask NuevAI</button>
+            <button onClick={() => { track('calendar_ask', { summary: e.summary.slice(0, 60) }); onAsk(`Tell me about "${e.summary.trim()}" on ${e.when}`); }} className="surface-2 tap-box gap-1 rounded-full px-3 py-1 text-xs font-semibold hover:bg-brand-500/10"><MessageCircle className="h-3 w-3" />Ask Nueva AI</button>
             {team && (
               <button onClick={() => toggleFollow(team)} aria-pressed={following} aria-label={following ? `Following ${team.label}. Tap to unfollow` : `Follow ${team.label}`}
                       className={`tap-box gap-1 rounded-full px-3 py-1 text-xs font-semibold ${following ? 'bg-amber-100 text-amber-900 hover:bg-amber-200' : 'surface-2 hover:bg-brand-500/10'}`}>

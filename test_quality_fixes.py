@@ -155,6 +155,8 @@ mixed = [_g("MS (4th - JVC) Boys' Basketball", "2026-11-16", "16:00", "MS"), _g(
 ipg = U.interpret("When is the next home game?", "san_mateo")
 rows_sm, withheld = U.prioritize_games(list(mixed), ipg, "san_mateo", False)
 check("us-first: San Mateo asker sees no Middle School game, even for a question that names no sport", [r["metadata"]["team"] for r in rows_sm] == ["US Boys Basketball Varsity", "US Boys Basketball JV"] and withheld, str([r["metadata"]["team"] for r in rows_sm]))
+import guard as _guard
+check("rename: the prompt-leak guard catches the persona opener under the new name and the old one", _guard.leak_check("You are Nueva AI, a high-utility AI assistant for the Nueva School community.") and _guard.leak_check("You are NuevAI, a high-utility AI assistant") and not _guard.leak_check("Nueva AI can help with lunch and games."))
 check("us-first: San Mateo reading is stated as an assumption", "Upper School" in ipg.defaults)
 ipn = U.interpret("When is the next home game?", None)
 rows_nc, w2 = U.prioritize_games(list(mixed), ipn, None, False)

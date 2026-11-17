@@ -68,7 +68,7 @@ export function FeedbackButton({ tab }: { tab: string }) {
           <form ref={panel} role="dialog" aria-modal="true" aria-labelledby="fb-title" onSubmit={submit} onClick={(e) => e.stopPropagation()} className="surface shadow-lift animate-rise max-h-full w-full max-w-md overflow-y-auto rounded-3xl bg-white p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 id="fb-title" className="text-lg font-bold tracking-tight">Help improve NuevAI</h3>
+                <h3 id="fb-title" className="text-lg font-bold tracking-tight">Help improve Nueva AI</h3>
                 <p className="ink-2 mt-0.5 text-[13px]">Tell us what was wrong, missing or great.</p>
               </div>
               <button type="button" onClick={close} aria-label="Close" className="ink-2 tap-box -mr-2 -mt-2 h-10 w-10 shrink-0 rounded-full hover:bg-[var(--surface-2)]"><X className="h-4 w-4" aria-hidden /></button>

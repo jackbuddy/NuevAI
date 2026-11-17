@@ -1,4 +1,4 @@
-/** Curated, link-checked resources. Each has a ready-made question for "Ask NuevAI". */
+/** Curated, link-checked resources. Each has a ready-made question for "Ask Nueva AI". */
 export interface Resource {
   title: string;
   desc: string;

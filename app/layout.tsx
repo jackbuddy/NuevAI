@@ -6,22 +6,22 @@ const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope', displa
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://nuev-ai.vercel.app'),
-  title: 'NuevAI',
+  title: 'Nueva AI',
   description: 'Courses, calendar, sports schedules and campus resources for The Nueva School community.',
   openGraph: {
     type: 'website',
-    siteName: 'NuevAI',
+    siteName: 'Nueva AI',
     url: '/',
-    title: 'NuevAI: ask anything about Nueva',
+    title: 'Nueva AI: ask anything about Nueva',
     description: 'Courses, calendar, sports schedules, lunch and campus resources for The Nueva School community.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'NuevAI: ask anything about Nueva',
+    title: 'Nueva AI: ask anything about Nueva',
     description: 'Courses, calendar, sports schedules, lunch and campus resources for The Nueva School community.',
   },
-  applicationName: 'NuevAI',
-  appleWebApp: { capable: true, title: 'NuevAI', statusBarStyle: 'default' },
+  applicationName: 'Nueva AI',
+  appleWebApp: { capable: true, title: 'Nueva AI', statusBarStyle: 'default' },
 };
 export const viewport: Viewport = { themeColor: '#ffffff', width: 'device-width', initialScale: 1, viewportFit: 'cover', interactiveWidget: 'resizes-content' };
 

@@ -1,4 +1,4 @@
-# NuevAI
+# Nueva AI
 
 A question-answering assistant for The Nueva School community: courses, the school calendar and game
 schedules, policies, and campus resources.
