@@ -23,7 +23,7 @@ export default function OpenGraphImage() {
             <div style={{ display: 'flex', alignSelf: 'flex-start', marginTop: 20, background: '#E6E6EB', color: '#111', fontSize: 34, fontWeight: 500, lineHeight: 1.25, padding: '22px 32px', borderRadius: 40, borderBottomLeftRadius: 10 }}>Here&apos;s today&apos;s menu for your campus.</div>
           </div>
         </div>
-        <div style={{ display: 'flex', fontSize: 30, fontWeight: 600, color: NAVY, opacity: 0.7 }}>nuev-ai.vercel.app</div>
+        <div style={{ display: 'flex', fontSize: 30, fontWeight: 600, color: NAVY, opacity: 0.7 }}>nuevaai.org</div>
       </div>
     ),
     { ...size },

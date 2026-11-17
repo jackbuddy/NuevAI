@@ -5,7 +5,7 @@ import { Manrope } from 'next/font/google';
 const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope', display: 'swap' });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://nuev-ai.vercel.app'),
+  metadataBase: new URL('https://nuevaai.org'),
   title: 'Nueva AI',
   description: 'Courses, calendar, sports schedules and campus resources for The Nueva School community.',
   openGraph: {
