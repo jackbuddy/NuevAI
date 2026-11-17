@@ -102,6 +102,7 @@ SYNONYMS = {
     r"\blanguages?\b|\bforeign language\b": "world languages Chinese Spanish French Japanese Latin Korean language courses",
     r"\bmakeup\b|\bmake[- ]up\b|\bretake\b": "make-up retake assessment policy",
     # what students and parents call things vs the words the documents use
+    r"\b(when|what (day|time|date)s?) (do|does|is|are|will)\b.*\b(play|plays|playing|compete|competes)\b": "game schedule games published",
     r"\bhigh ?school\b": "Upper School",
     r"\bdrop(ping)? (a |my |the )?(class|course)\b|\bwithdraw (from )?(a |my )?(class|course)\b": "add/drop course change requests schedule change",
     r"\btutorials?\b(?!.*\b(course request|blackbaud)\b)": "tutorial office hours",
