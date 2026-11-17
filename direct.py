@@ -99,10 +99,20 @@ def entity_subject(query: str, result: dict, today: date) -> dict | None:
             "t_rec": t_rec, "c_rec": c_rec, "names": names, "similar": sim_names[:3], "toks": toks, "want": want}
 
 
+_LONG_CAVEAT = " (listed only on the course offerings sheet; the master schedule does not confirm it)"
+_SHORT_CAVEAT = " (unconfirmed)"
+
+
+def _shorten_caveat(text: str) -> str:
+    """The records repeat the full caveat on every unconfirmed line, which fills a phone screen: mark the line "(unconfirmed)" and say what
+    that means once, below (see _caveat)."""
+    return text.replace(_LONG_CAVEAT, _SHORT_CAVEAT)
+
+
 def _caveat(text: str) -> str:
-    if "listed only on the course offerings sheet" not in text:
+    if _SHORT_CAVEAT not in text:
         return ""
-    return "Entries marked \"listed only on the course offerings sheet\" are not confirmed by the master schedule."
+    return "Entries marked \"unconfirmed\" are listed only on the course offerings sheet; the master schedule does not confirm them."
 
 
 def _lead_with_teachers(body: str) -> str:
@@ -145,6 +155,7 @@ def teach_answer(query: str, result: dict, today: date) -> dict | None:
         body = _body(recs[0])
         if c_rec and not t_rec:
             body = _lead_with_teachers(body)
+    body = _shorten_caveat(body)
     parts = [body]
     if cav := _caveat(body):
         parts.append(cav)

@@ -152,7 +152,8 @@ def ask(q, ents, history=None, campus=None, grade=None, notes=None, conf=1.0):
 d = ask("Who teaches Biology?", [BIO_FALL, BIO_SPRING, BIO_RES])
 check("direct teach: 'Who teaches Biology?' answers from the current-semester course record", d and d["kind"] == "teach" and "Biology (Fall 2026) is taught by Lindy Jensen and Mara Ballmer." in d["answer"] and "Sections:" in d["answer"]
       and "Spring 2027" not in d["answer"], str(d))
-check("direct teach: the unconfirmed-entry caveat is reproduced per line and summarised", d and f"Lindy Jensen {CAVEAT}" in d["answer"] and "not confirmed by the master schedule" in d["answer"], str(d))
+check("direct teach: unconfirmed lines are marked short and explained once", d and "Lindy Jensen (unconfirmed)" in d["answer"] and CAVEAT not in d["answer"]
+      and d["answer"].count("listed only on the course offerings sheet") == 1 and "the master schedule does not confirm them" in d["answer"], str(d))
 check("direct teach: sources named, similar course names offered", d and d["sources"][0]["type"] == "schedule" and "Source: The Sheet - Master Schedule 2026-27" in d["answer"]
       and "Biology Research Teams 1" in d["answer"], str(d))
 d = ask("who teaches biology in spring", [BIO_FALL, BIO_SPRING])
@@ -161,7 +162,7 @@ d = ask("What does Max Cowan teach?", [MAX_FALL, MAX_SPRING])
 check("direct teach: 'What does Max Cowan teach?' lists his Fall blocks and rooms", d and "Sound Experience, room 1109" in d["answer"] and "Hit Harmonics" not in d["answer"], str(d))
 d = ask("Does Mara Ballmer teach Biology?", [MARA_FALL, BIO_FALL])
 check("direct teach: yes/no keeps only her Biology lines and the caveat", d and d["answer"].startswith("Yes. Mara Ballmer teaches Biology (Fall 2026)") and "Immunology" not in d["answer"]
-      and CAVEAT in d["answer"], str(d))
+      and "(unconfirmed)" in d["answer"], str(d))
 d = ask("Does Pat Quinn teach Biology?", [MARA_ONLY_UNCONF, BIO_FALL])
 check("direct teach: only-unconfirmed entries are not called a plain yes", d and d["answer"].startswith("Only partly confirmed"), str(d))
 check("direct teach: a teacher with no line for that course is left to the model (no 'no' from us)", ask("Does Max Cowan teach Biology?", [MAX_FALL, BIO_FALL]) is None)
