@@ -15,6 +15,7 @@ export type Topic = 'lunch' | 'games' | 'clubs' | 'courses' | 'school_day' | 'ca
 export function topicOf(q: string): Topic {
   const s = q.toLowerCase();
   if (/\bclubs?\b/.test(s)) return 'clubs';
+  if (/\b(lunch|cafe|cafeteria|food|dining)\s+(line|queue)\b/.test(s)) return 'other';   // the live line count, not the menu: no menu loading text or campus nudge
   if (/\b(lunch|cafe|cafeteria|menu)\b/.test(s)) return 'lunch';
   if (/\b(teach(es|er|ers)?|taught|instructor)\b/.test(s)) return 'courses';
   if (/\b(games?|scrimmages?|matches?|teams?|basketball|soccer|volleyball|tennis|swim(ming)?|baseball|softball|track|sports?|athletics?|varsity)\b/.test(s) && !/\b(game design|video games?)\b/.test(s)) return 'games';

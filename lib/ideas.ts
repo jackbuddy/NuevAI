@@ -5,7 +5,7 @@ export const IDEAS: IdeaGroup[] = [
   { id: 'today', label: 'Today', prompts: ['What’s for lunch today?', 'What games are today?', 'Is there school tomorrow?', 'What kind of day is it today?', 'What’s happening on campus this week?'] },
   { id: 'sports', label: 'Sports', prompts: ['What games are this week?', 'When is the next home game?', 'What’s the Varsity Boys Basketball schedule?', 'When does girls basketball play at home?', 'Are there any away games this week?'] },
   { id: 'clubs', label: 'Clubs', prompts: ['What clubs meet today?', 'What clubs meet at lunch?', 'How do I start a club?', 'Which clubs are about coding or robotics?'] },
-  { id: 'lunch', label: 'Lunch', prompts: ['What’s for lunch tomorrow?', 'What’s for lunch at San Mateo?', 'What’s for lunch at Hillsborough?', 'What’s for lunch on Friday?'] },
+  { id: 'lunch', label: 'Lunch', prompts: ['What’s for lunch tomorrow?', 'What’s for lunch at San Mateo?', 'What’s for lunch at Hillsborough?', 'What’s for lunch on Friday?', 'How many people are in the lunch line?'] },
   { id: 'calendar', label: 'Calendar & days', prompts: ['When is the next no-school day?', 'When is Thanksgiving break?', 'When is winter break?', 'Is tomorrow an A day or a B day?', "What does an A' day mean?", 'When are the next PD days?'] },
   { id: 'classes', label: 'Classes & teachers', prompts: ['Does Mara Ballmer teach Biology?', 'Who teaches Math 3?', 'What does Max Cowan teach?', 'Who teaches Physics?', 'Where do I find course offerings?'] },
   { id: 'handbook', label: 'Handbook & policies', prompts: ['What’s the dress code?', 'What’s the attendance policy?', 'What’s the phone policy?', 'What are the graduation requirements?'] },

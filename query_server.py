@@ -21,6 +21,7 @@ import calendar_meta
 import settings
 from analytics import Analytics
 from cache import TTLCache
+import lunchline
 from answer_store import AnswerStore
 from rag import Retriever, build_context
 from followup import grade_relevant, valid_grade
@@ -392,6 +393,8 @@ def quick_reply(q: str) -> tuple[str, str] | None:
         return canned, "smalltalk"
     if (text := personal_decline(q)) is not None:
         return text, "personal"
+    if (text := lunchline.answer(q)) is not None:
+        return text, "lunchline"
     return None
 
 

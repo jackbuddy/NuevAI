@@ -1,13 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowUpRight, BookOpen, CalendarDays, ChevronDown, FileText, GraduationCap, Globe, LogIn, MapPin, MessageCircle, Search, Ticket, Users, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ArrowUpRight, BookOpen, CalendarDays, FileText, GraduationCap, Globe, LogIn, MapPin, MessageCircle, Search, Ticket, Users, X } from 'lucide-react';
 import { RESOURCE_GROUPS, Resource } from '@/lib/resources';
 import { track } from '@/lib/analytics';
 
-interface Found { label: string; url: string; link_category: string }
 const hostOf = (u: string) => { try { return new URL(u).host.replace(/^www\./, ''); } catch { return ''; } };
-const norm = (u: string) => { try { const x = new URL(u); return x.host.replace(/^www\./, '') + x.pathname.replace(/\/$/, ''); } catch { return u; } };
 const iconFor = (r: Resource) => (hostOf(r.url).includes('docs.google') ? FileText : r.badge === 'Booking' ? Ticket : Globe);
 
 const TILE_ICON: Record<string, typeof FileText> = { 'Student & Family Handbook': BookOpen, '2026–27 Course Catalog': GraduationCap, 'Clubs & Affinity Groups list': Users, 'Athletics calendar': CalendarDays, 'Register for an admissions event': MapPin, 'Nexus (MySchoolApp)': LogIn };
@@ -30,10 +28,6 @@ const FILTERS = [{ id: 'all', label: 'All' }, ...RESOURCE_GROUPS.map((g) => ({ i
 export function ResourcesView({ onAsk }: { onAsk: (q: string) => void }) {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('all');
-  const [found, setFound] = useState<Found[]>([]);
-  const [showFound, setShowFound] = useState(false);
-
-  useEffect(() => { fetch('/api/links').then((r) => (r.ok ? r.json() : null)).then((j) => j?.links && setFound(j.links)).catch(() => {}); }, []);
 
   const all = useMemo(() => RESOURCE_GROUPS.flatMap((g) => g.items.map((i) => ({ ...i, group: g.id, groupTitle: g.title }))), []);
   const featured = useMemo(() => FEATURED.map((t) => all.find((r) => r.title === t)).filter(Boolean) as (Resource & { group: string })[], [all]);
@@ -41,20 +35,11 @@ export function ResourcesView({ onAsk }: { onAsk: (q: string) => void }) {
   const searching = needle.length > 0;
   const groups = RESOURCE_GROUPS.filter((g) => filter === 'all' || g.id === filter);
 
-  const known = useMemo(() => new Set(all.map((i) => norm(i.url))), [all]);
-  const extra: Resource[] = useMemo(() => {
-    const seen = new Set<string>();
-    return found
-      .filter((l) => ['booking', 'form', 'payment', 'document'].includes(l.link_category) && l.label && !known.has(norm(l.url)) && !seen.has(norm(l.url)) && seen.add(norm(l.url)))
-      .slice(0, 30)
-      .map((l) => ({ title: l.label.replace(/\s*\(opens in new window\/tab\)/, '').slice(0, 70), desc: hostOf(l.url), url: l.url }));
-  }, [found, known]);
-
-  // search covers the curated list and the extra links found on school pages; every word must match
+  // search covers the curated list; every word must match
   const hits = useMemo(() => {
     const words = needle.split(/\s+/).filter(Boolean);
-    return [...all, ...extra].filter((r) => { const hay = `${r.title} ${r.desc} ${r.badge ?? ''}`.toLowerCase(); return words.every((w) => hay.includes(w)); });
-  }, [all, extra, needle]);
+    return all.filter((r) => { const hay = `${r.title} ${r.desc} ${r.badge ?? ''}`.toLowerCase(); return words.every((w) => hay.includes(w)); });
+  }, [all, needle]);
 
   const open = (r: Resource, where: string) => track('resource_click', { label: r.title, group: where, host: hostOf(r.url) });
 
@@ -116,17 +101,6 @@ export function ResourcesView({ onAsk }: { onAsk: (q: string) => void }) {
                 </section>
               ))}
             </div>
-
-            {extra.length > 0 && filter === 'all' && (
-              <section className="mt-10">
-                <button onClick={() => { setShowFound(!showFound); track('resource_more_toggle', { open: !showFound }); }}
-                        aria-expanded={showFound} className="ink-2 tap-h mx-auto flex items-center gap-1.5 text-[13px] font-semibold hover:text-[var(--ink)]">
-                  {showFound ? 'Hide' : 'Show'} {extra.length} more links from school pages
-                  <ChevronDown className={`h-4 w-4 transition ${showFound ? 'rotate-180' : ''}`} />
-                </button>
-                {showFound && <div className="mt-4"><List items={extra} onAsk={onAsk} onOpen={(r) => open(r, 'found')} /></div>}
-              </section>
-            )}
           </>
         )}
       </div>
